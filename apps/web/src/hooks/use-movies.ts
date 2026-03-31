@@ -11,5 +11,6 @@ export const useMovies = (tenantSlug: string) => {
       return response.data;
     },
     enabled: !!tenantSlug,
+    staleTime: 2 * 60 * 1000,
   });
 };

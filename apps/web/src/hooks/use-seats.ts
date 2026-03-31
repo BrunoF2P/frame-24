@@ -12,8 +12,8 @@ export const useSeatsMap = (showtimeId: string) => {
     },
     enabled: !!showtimeId,
     refetchInterval: false, // WebSocket will handle real-time updates
-    refetchOnWindowFocus: true, // Refetch when user returns to tab
-    refetchOnMount: true, // Always fetch fresh data when component mounts
-    staleTime: 0, // Consider data immediately stale to ensure fresh seat status
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    staleTime: 10 * 1000,
   });
 };

@@ -26,5 +26,6 @@ export const useShowtimes = ({
       return response.data;
     },
     enabled: !!tenantSlug,
+    staleTime: 30 * 1000,
   });
 };

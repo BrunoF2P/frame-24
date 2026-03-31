@@ -33,7 +33,8 @@ export interface ShowtimeDetails {
 
 export const useShowtimeDetails = (showtimeId: string) => {
   return useQuery<ShowtimeDetails>({
-    queryKey: ["showtime-details", showtimeId],
+    // Mesma origem do useSeatsMap para reutilizar cache e evitar request duplicada
+    queryKey: ["seats-map", showtimeId],
     queryFn: async () => {
       const response = await publicApi.publicControllerGetSeatsMapV1({
         id: showtimeId,
@@ -41,5 +42,8 @@ export const useShowtimeDetails = (showtimeId: string) => {
       return response.data as unknown as ShowtimeDetails;
     },
     enabled: !!showtimeId,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    staleTime: 10 * 1000,
   });
 };

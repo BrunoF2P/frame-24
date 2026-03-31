@@ -12,5 +12,6 @@ export const useProducts = (tenantSlug: string, complexId?: string) => {
       return response.data;
     },
     enabled: !!tenantSlug,
+    staleTime: 60 * 1000,
   });
 };
