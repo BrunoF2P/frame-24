@@ -33,7 +33,9 @@ export class TicketTypesService {
     );
 
     if (existing) {
-      throw new ConflictException('Já existe um tipo de ingresso com este nome');
+      throw new ConflictException(
+        'Já existe um tipo de ingresso com este nome',
+      );
     }
 
     const ticketType = await this.ticketTypesRepository.create({
@@ -92,7 +94,9 @@ export class TicketTypesService {
       );
 
       if (existing) {
-        throw new ConflictException('Já existe um tipo de ingresso com este nome');
+        throw new ConflictException(
+          'Já existe um tipo de ingresso com este nome',
+        );
       }
     }
 

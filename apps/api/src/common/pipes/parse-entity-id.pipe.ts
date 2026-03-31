@@ -24,10 +24,14 @@ export class ParseEntityIdPipe implements PipeTransform<string, string> {
           return normalized;
         }
       } catch {
-        throw new BadRequestException('ID invalido: esperado UUID ou Snowflake numerico');
+        throw new BadRequestException(
+          'ID invalido: esperado UUID ou Snowflake numerico',
+        );
       }
     }
 
-    throw new BadRequestException('ID invalido: esperado UUID ou Snowflake numerico');
+    throw new BadRequestException(
+      'ID invalido: esperado UUID ou Snowflake numerico',
+    );
   }
 }

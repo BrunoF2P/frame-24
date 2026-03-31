@@ -349,7 +349,9 @@ async function main() {
         synopsis: m.synopsis,
         tmdb_id: m.tmdb_id ?? null,
         original_language: m.original_language ?? null,
-        tmdb_genres_json: JSON.stringify(mapCategoriesToTmdbGenres(m.categories)),
+        tmdb_genres_json: JSON.stringify(
+          mapCategoriesToTmdbGenres(m.categories),
+        ),
         active: true,
       },
       create: {
@@ -365,7 +367,9 @@ async function main() {
         synopsis: m.synopsis,
         tmdb_id: m.tmdb_id ?? null,
         original_language: m.original_language ?? null,
-        tmdb_genres_json: JSON.stringify(mapCategoriesToTmdbGenres(m.categories)),
+        tmdb_genres_json: JSON.stringify(
+          mapCategoriesToTmdbGenres(m.categories),
+        ),
         slug: slug,
         active: true,
       },

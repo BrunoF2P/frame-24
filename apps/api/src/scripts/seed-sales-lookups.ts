@@ -79,7 +79,9 @@ async function main() {
     });
   }
 
-  console.log('✅ Tipos de venda, status de venda e tipos de ingresso criados.');
+  console.log(
+    '✅ Tipos de venda, status de venda e tipos de ingresso criados.',
+  );
 }
 
 main()

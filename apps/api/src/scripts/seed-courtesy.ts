@@ -9,8 +9,7 @@ async function main() {
   const company =
     (await prisma.companies.findUnique({
       where: { tenant_slug: 'lawtrel-admin' },
-    })) ??
-    (await prisma.companies.findFirst({ where: { active: true } }));
+    })) ?? (await prisma.companies.findFirst({ where: { active: true } }));
   if (!company) return console.error('❌ Nenhuma empresa ativa encontrada.');
 
   await prisma.ticket_types.upsert({

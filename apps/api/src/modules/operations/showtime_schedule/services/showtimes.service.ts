@@ -916,7 +916,9 @@ export class ShowtimesService {
       )) || (await this.seatStatusRepository.findDefaultByCompany(companyId));
 
     if (!availableStatus) {
-      throw new NotFoundException('Status de assento "Disponível" não configurado');
+      throw new NotFoundException(
+        'Status de assento "Disponível" não configurado',
+      );
     }
 
     if (status === 'Bloqueado' && !blockedStatus) {
@@ -946,10 +948,11 @@ export class ShowtimesService {
       status === 'Bloqueado' &&
       currentSeatStatus.status === availableStatus.id
     ) {
-      const didBlock = await this.showtimesRepository.blockSeatsCountersAtomically(
-        showtime_id,
-        1,
-      );
+      const didBlock =
+        await this.showtimesRepository.blockSeatsCountersAtomically(
+          showtime_id,
+          1,
+        );
       if (!didBlock) {
         throw new ConflictException(
           'Não foi possível bloquear assento: não há assentos disponíveis suficientes.',

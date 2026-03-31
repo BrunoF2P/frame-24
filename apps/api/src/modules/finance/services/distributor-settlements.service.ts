@@ -160,7 +160,10 @@ export class DistributorSettlementsService {
     const competenceStart = new Date(dto.competence_start_date);
     const competenceEnd = new Date(dto.competence_end_date);
 
-    if (Number.isNaN(competenceStart.getTime()) || Number.isNaN(competenceEnd.getTime())) {
+    if (
+      Number.isNaN(competenceStart.getTime()) ||
+      Number.isNaN(competenceEnd.getTime())
+    ) {
       throw new BadRequestException('Período de competência inválido');
     }
 

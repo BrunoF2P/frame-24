@@ -71,7 +71,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // Se for CUSTOMER, validar customer
     if (payload.session_context === 'CUSTOMER') {
-      const customerUser = await this.buildCustomerUser(payload, identity.email);
+      const customerUser = await this.buildCustomerUser(
+        payload,
+        identity.email,
+      );
 
       this.logger.debug(
         `Customer Auth OK: ${customerUser.email}`,
@@ -226,7 +229,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const permissions = (companyUser.custom_roles.role_permissions || [])
       .filter((rp) => !!rp.permissions)
-      .map((rp) => `${rp.permissions!.resource}:${rp.permissions!.action}`);
+      .map((rp) => `${rp.permissions.resource}:${rp.permissions.action}`);
 
     return {
       sub: payload.sub,

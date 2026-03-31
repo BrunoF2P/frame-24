@@ -378,8 +378,7 @@ export class AuthService {
       const company = companyMap.get(cu.companyId);
       return {
         company_id: cu.companyId,
-        company_name:
-          company?.tradeName || company?.corporateName || 'Empresa',
+        company_name: company?.tradeName || company?.corporateName || 'Empresa',
         tenant_slug: company?.tenantSlug || '',
         role_name: '',
       };

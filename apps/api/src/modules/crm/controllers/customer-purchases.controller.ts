@@ -159,7 +159,9 @@ export class CustomerPurchasesController {
     status: 204,
     description: 'Compra cancelada com sucesso',
   })
-  async cancelPurchase(@Param('id', ParseEntityIdPipe) id: string): Promise<void> {
+  async cancelPurchase(
+    @Param('id', ParseEntityIdPipe) id: string,
+  ): Promise<void> {
     return this.customerPurchasesService.cancelPurchase(id);
   }
 }

@@ -10,10 +10,7 @@ export class TicketTypesRepository {
     private readonly snowflake: SnowflakeService,
   ) {}
 
-  async findById(
-    id: string,
-    company_id: string,
-  ): Promise<ticket_types | null> {
+  async findById(id: string, company_id: string): Promise<ticket_types | null> {
     return this.prisma.ticket_types.findFirst({
       where: { id, company_id },
     });
@@ -31,10 +28,7 @@ export class TicketTypesRepository {
   async findAll(company_id: string): Promise<ticket_types[]> {
     return this.prisma.ticket_types.findMany({
       where: { company_id },
-      orderBy: [
-        { discount_percentage: 'desc' },
-        { name: 'asc' },
-      ],
+      orderBy: [{ discount_percentage: 'desc' }, { name: 'asc' }],
     });
   }
 

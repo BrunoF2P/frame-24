@@ -194,10 +194,7 @@ export class PositionReportsService {
     });
 
     // Agrupar títulos pagos por cliente em memória
-    const paidByCustomer = new Map<
-      string,
-      { count: number; total: number }
-    >();
+    const paidByCustomer = new Map<string, { count: number; total: number }>();
     for (const t of allPaidTitles) {
       const cid = t.customer_id ?? 'unknown';
       const entry = paidByCustomer.get(cid) ?? { count: 0, total: 0 };
