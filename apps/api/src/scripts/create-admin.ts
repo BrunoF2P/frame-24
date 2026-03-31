@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '@repo/db';
 import * as bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function main() {
   const email = 'admin@lawtrel.com';
@@ -33,25 +33,37 @@ async function main() {
   console.log(`✅ Empresa criada/encontrada: ${company.trade_name}`);
 
   // 3. Criar a Pessoa (Dados Pessoais)
-  const person = await prisma.persons.create({
-    data: {
-      full_name: 'Super Admin',
-      email: email,
-      cpf: '00000000000', // CPF Fictício
-    },
+  const existingPerson = await prisma.persons.findFirst({
+    where: { email },
   });
 
+  const person =
+    existingPerson ??
+    (await prisma.persons.create({
+      data: {
+        full_name: 'Super Admin',
+        email: email,
+        cpf: '00000000000', // CPF Fictício
+      },
+    }));
+
   // 4. Criar a Identidade (Login)
-  const identity = await prisma.identities.create({
-    data: {
-      person_id: person.id,
-      email: email,
-      password_hash: hashedPassword,
-      identity_type: 'EMPLOYEE', // Tipo de identidade
-      active: true,
-      email_verified: true,
-    },
+  const existingIdentity = await prisma.identities.findFirst({
+    where: { email },
   });
+
+  const identity =
+    existingIdentity ??
+    (await prisma.identities.create({
+      data: {
+        person_id: person.id,
+        email: email,
+        password_hash: hashedPassword,
+        identity_type: 'EMPLOYEE', // Tipo de identidade
+        active: true,
+        email_verified: true,
+      },
+    }));
 
   console.log(`✅ Identidade de login criada.`);
 
@@ -69,13 +81,23 @@ async function main() {
       name: 'Super Admin',
       description: 'Acesso total ao sistema',
       is_system_role: true,
-      hierarchy_level: 999,
+      hierarchy_level: 1,
     },
   });
 
   // 6. Vincular Usuário à Empresa com o Perfil
-  await prisma.company_users.create({
-    data: {
+  await prisma.company_users.upsert({
+    where: {
+      company_id_identity_id: {
+        company_id: company.id,
+        identity_id: identity.id,
+      },
+    },
+    update: {
+      role_id: role.id,
+      active: true,
+    },
+    create: {
       company_id: company.id,
       identity_id: identity.id,
       role_id: role.id,

@@ -913,6 +913,7 @@ model company_customers {
   customer_preferred_rows     customer_preferred_rows[]
   customer_preferred_times    customer_preferred_times[]
   customer_preferred_weekdays customer_preferred_weekdays[]
+  recommendation_events       recommendation_events[]
 
   @@unique([company_id, customer_id])
   @@index([company_id])
@@ -1408,6 +1409,9 @@ model cinema_complexes {
   address                String?
   city                   String?             @db.VarChar(100)
   state                  String?             @db.Char(2)
+  latitude               Decimal?            @db.Decimal(9, 6)
+  longitude              Decimal?            @db.Decimal(9, 6)
+  timezone               String?             @db.VarChar(50)
   postal_code            String?             @db.VarChar(10)
   ibge_municipality_code String              @db.VarChar(7)
   ancine_registry        String?             @db.VarChar(50)
@@ -1423,6 +1427,7 @@ model cinema_complexes {
   @@index([code])
   @@index([company_id])
   @@index([ibge_municipality_code])
+  @@index([latitude, longitude])
   @@index([active])
   @@schema("operations")
 }
@@ -1444,6 +1449,8 @@ model showtime_schedule {
   start_time          DateTime
   end_time            DateTime
   session_seat_status session_seat_status[]
+  context_features    showtime_context_features?
+  recommendation_events recommendation_events[]
   audio_types         audio_types?          @relation(fields: [audio_type], references: [id])
   cinema_complexes    cinema_complexes      @relation(fields: [cinema_complex_id], references: [id])
   projection_types    projection_types?     @relation(fields: [projection_type], references: [id])
@@ -1459,6 +1466,39 @@ model showtime_schedule {
   @@index([projection_type])
   @@index([audio_type])
   @@index([session_language])
+  @@schema("operations")
+}
+
+model showtime_context_features {
+  id                         String            @id @default(uuid())
+  showtime_id                String            @unique
+  source                     String            @db.VarChar(50)
+  country_code               String?           @db.Char(2)
+  state_code                 String?           @db.Char(2)
+  city_name                  String?           @db.VarChar(100)
+  is_holiday                 Boolean?          @default(false)
+  is_holiday_eve             Boolean?          @default(false)
+  holiday_name               String?           @db.VarChar(150)
+  holiday_scope              String?           @db.VarChar(30)
+  holiday_date               DateTime?         @db.Date
+  weather_code               Int?
+  temperature_c              Decimal?          @db.Decimal(5, 2)
+  apparent_temperature_c     Decimal?          @db.Decimal(5, 2)
+  precipitation_mm           Decimal?          @db.Decimal(6, 2)
+  rain_mm                    Decimal?          @db.Decimal(6, 2)
+  cloud_cover_pct            Int?
+  wind_speed_kmh             Decimal?          @db.Decimal(5, 2)
+  demand_context_score       Decimal?          @db.Decimal(8, 4)
+  external_market_signal     Decimal?          @db.Decimal(12, 2)
+  metadata_json              String?
+  captured_at                DateTime?         @default(now()) @db.Timestamp(0)
+  updated_at                 DateTime?         @updatedAt @db.Timestamp(0)
+  showtime_schedule          showtime_schedule @relation(fields: [showtime_id], references: [id], onDelete: Cascade)
+
+  @@index([source])
+  @@index([is_holiday, holiday_date])
+  @@index([state_code, city_name])
+  @@index([weather_code])
   @@schema("operations")
 }
 
@@ -2210,36 +2250,45 @@ model movies_on_categories {
 }
 
 model movies {
-  id                     String                 @id @default(uuid())
+  id                     String                   @id @default(uuid())
   distributor_id         String
-  original_title         String                 @db.VarChar(300)
-  brazil_title           String?                @db.VarChar(300)
-  ancine_number          String?                @db.VarChar(50)
+  original_title         String                   @db.VarChar(300)
+  brazil_title           String?                  @db.VarChar(300)
+  ancine_number          String?                  @db.VarChar(50)
   duration_minutes       Int
-  country_of_origin      String?                @db.VarChar(50)
+  country_of_origin      String?                  @db.VarChar(50)
   production_year        Int?
-  national               Boolean                @default(false)
-  active                 Boolean                @default(true)
-  created_at             DateTime               @default(now()) @db.Timestamp(0)
+  national               Boolean                  @default(false)
+  active                 Boolean                  @default(true)
+  created_at             DateTime                 @default(now()) @db.Timestamp(0)
   synopsis               String?
-  short_synopsis         String?                @db.VarChar(500)
-  budget                 Decimal?               @db.Decimal(15, 2)
-  website                String?                @db.VarChar(200)
-  tmdb_id                String?                @db.VarChar(50)
-  imdb_id                String?                @db.VarChar(20)
+  short_synopsis         String?                  @db.VarChar(500)
+  budget                 Decimal?                 @db.Decimal(15, 2)
+  website                String?                  @db.VarChar(200)
+  tmdb_id                String?                  @db.VarChar(50)
+  imdb_id                String?                  @db.VarChar(20)
   tags_json              String?
-  worldwide_release_date DateTime?              @db.Date
-  original_language      String?                @db.VarChar(50)
-  slug                   String?                @unique @db.VarChar(200)
+  worldwide_release_date DateTime?                @db.Date
+  original_language      String?                  @db.VarChar(50)
+  slug                   String?                  @unique @db.VarChar(200)
   company_id             String
   age_rating_id          String?
   movie_categoriesId     String?
+  // ML enrichment fields (populated from TMDB API / TMDB 5000 dataset)
+  popularity             Float?
+  vote_average           Float?
+  vote_count             Int?
+  tmdb_genres_json       String?                  // '["Ação","Aventura"]'
+  tmdb_keywords_json     String?                  // '["herói","vilão","espaço"]'
+  tmdb_poster_path       String?                  @db.VarChar(300)
+  tmdb_synced_at         DateTime?
   movie_cast             movie_cast[]
   movie_media            movie_media[]
-  age_rating             age_ratings?           @relation(fields: [age_rating_id], references: [id])
-  movie_categories       movie_categories?      @relation(fields: [movie_categoriesId], references: [id])
+  age_rating             age_ratings?             @relation(fields: [age_rating_id], references: [id])
+  movie_categories       movie_categories?        @relation(fields: [movie_categoriesId], references: [id])
   category_links         movies_on_categories[]
   exhibition_contracts   exhibition_contracts[]
+  recommendation_events  recommendation_events[]
 
   @@index([company_id])
   @@index([distributor_id])
@@ -2249,6 +2298,73 @@ model movies {
   @@index([slug])
   @@index([tmdb_id])
   @@index([imdb_id])
+  @@index([popularity])
+  @@schema("catalog")
+}
+
+model recommendation_events {
+  id                  String    @id @default(uuid())
+  company_customer_id String?
+  movie_id            String
+  showtime_id         String?
+  algorithm_version   String    @db.VarChar(50)  // "collab_v1", "content_v1", "hybrid_v1"
+  model_name          String?   @db.VarChar(100)
+  feature_version     String?   @db.VarChar(50)
+  score               Decimal?  @db.Decimal(10, 6)
+  position            Int       // posição na lista de recomendações (1 = primeiro)
+  context             String?   @db.VarChar(50)  // "HOME", "POST_BUY", "EMAIL", "SEARCH"
+  recommended_at      DateTime  @default(now()) @db.Timestamp(0)
+  clicked             Boolean   @default(false)
+  clicked_at          DateTime? @db.Timestamp(0)
+  purchased           Boolean   @default(false)
+  purchased_at        DateTime? @db.Timestamp(0)
+  purchased_sale_id   String?   // FK lógica para sales.id
+  company_customers   company_customers?         @relation(fields: [company_customer_id], references: [id])
+  movies              movies                     @relation(fields: [movie_id], references: [id])
+  deliveries          recommendation_deliveries[]
+  showtime_schedule   showtime_schedule?         @relation(fields: [showtime_id], references: [id])
+
+  @@index([company_customer_id, recommended_at])
+  @@index([movie_id])
+  @@index([showtime_id])
+  @@index([algorithm_version])
+  @@index([model_name])
+  @@index([feature_version])
+  @@index([score])
+  @@index([context])
+  @@index([purchased])
+  @@schema("catalog")
+}
+
+model recommendation_deliveries {
+  id                      String                         @id @default(uuid())
+  recommendation_event_id String
+  channel                 recommendation_delivery_channel
+  status                  recommendation_delivery_status @default(PENDING)
+  campaign_id             String?                        @db.VarChar(100)
+  template_key            String?                        @db.VarChar(100)
+  provider_name           String?                        @db.VarChar(50)
+  provider_message_id     String?                        @db.VarChar(150)
+  scheduled_at            DateTime?                      @db.Timestamp(0)
+  sent_at                 DateTime?                      @db.Timestamp(0)
+  delivered_at            DateTime?                      @db.Timestamp(0)
+  opened_at               DateTime?                      @db.Timestamp(0)
+  clicked_at              DateTime?                      @db.Timestamp(0)
+  failed_at               DateTime?                      @db.Timestamp(0)
+  error_message           String?
+  metadata_json           String?
+  created_at              DateTime?                      @default(now()) @db.Timestamp(0)
+  updated_at              DateTime?                      @updatedAt @db.Timestamp(0)
+  recommendation_events   recommendation_events          @relation(fields: [recommendation_event_id], references: [id], onDelete: Cascade)
+
+  @@index([recommendation_event_id])
+  @@index([channel, status])
+  @@index([campaign_id])
+  @@index([provider_message_id])
+  @@index([scheduled_at])
+  @@index([sent_at])
+  @@index([delivered_at])
+  @@index([opened_at])
   @@schema("catalog")
 }
 
@@ -2548,4 +2664,25 @@ enum concession_item_type {
   COMBO
 
   @@schema("sales")
+}
+
+enum recommendation_delivery_channel {
+  WHATSAPP
+  EMAIL
+  PUSH
+
+  @@schema("catalog")
+}
+
+enum recommendation_delivery_status {
+  PENDING
+  SKIPPED
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  FAILED
+  CANCELLED
+
+  @@schema("catalog")
 }

@@ -1,7 +1,29 @@
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '@repo/db';
 import { randomUUID } from 'node:crypto';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
+
+function mapCategoriesToTmdbGenres(categories: string[]): string[] {
+  const genreMap: Record<string, string> = {
+    Ação: 'Action',
+    Aventura: 'Adventure',
+    Comédia: 'Comedy',
+    Drama: 'Drama',
+    Terror: 'Horror',
+    'Ficção Científica': 'Science Fiction',
+    Romance: 'Romance',
+    Animação: 'Animation',
+    Documentário: 'Documentary',
+    Suspense: 'Thriller',
+    Fantasia: 'Fantasy',
+    Musical: 'Music',
+    Crime: 'Crime',
+  };
+
+  return categories
+    .map((category) => genreMap[category] ?? category)
+    .filter((value, index, array) => array.indexOf(value) === index);
+}
 
 async function main() {
   console.log(`🎬 Iniciando seed de filmes...`);
@@ -134,6 +156,8 @@ async function main() {
     {
       original_title: 'Avengers: Endgame',
       brazil_title: 'Vingadores: Ultimato',
+      tmdb_id: '299534',
+      original_language: 'en',
       distributor: 'Disney',
       year: 2019,
       duration: 181,
@@ -148,6 +172,8 @@ async function main() {
     {
       original_title: 'Spider-Man: No Way Home',
       brazil_title: 'Homem-Aranha: Sem Volta para Casa',
+      tmdb_id: '634649',
+      original_language: 'en',
       distributor: 'Sony',
       year: 2021,
       duration: 148,
@@ -162,6 +188,8 @@ async function main() {
     {
       original_title: 'Black Panther: Wakanda Forever',
       brazil_title: 'Pantera Negra: Wakanda Para Sempre',
+      tmdb_id: '505642',
+      original_language: 'en',
       distributor: 'Disney',
       year: 2022,
       duration: 161,
@@ -178,6 +206,8 @@ async function main() {
     {
       original_title: 'The Batman',
       brazil_title: 'Batman',
+      tmdb_id: '414906',
+      original_language: 'en',
       distributor: 'Warner',
       year: 2022,
       duration: 176,
@@ -192,6 +222,8 @@ async function main() {
     {
       original_title: 'Dune: Part Two',
       brazil_title: 'Duna: Parte Dois',
+      tmdb_id: '693134',
+      original_language: 'en',
       distributor: 'Warner',
       year: 2024,
       duration: 166,
@@ -208,6 +240,7 @@ async function main() {
     {
       original_title: 'Ó Paí, Ó',
       brazil_title: 'Ó Paí, Ó',
+      original_language: 'pt',
       distributor: 'Imagem', // Imagem Filmes
       year: 2007,
       duration: 96,
@@ -222,6 +255,8 @@ async function main() {
     {
       original_title: 'Tropa de Elite',
       brazil_title: 'Tropa de Elite',
+      tmdb_id: '7345',
+      original_language: 'pt',
       distributor: 'Universal', // Universal distribuiu o 2, mas serve para o exemplo ou Zazen
       year: 2007,
       duration: 115,
@@ -236,6 +271,8 @@ async function main() {
     {
       original_title: 'Cidade de Deus',
       brazil_title: 'Cidade de Deus',
+      tmdb_id: '598',
+      original_language: 'pt',
       distributor: 'Imagem',
       year: 2002,
       duration: 130,
@@ -250,6 +287,7 @@ async function main() {
     {
       original_title: 'O Auto da Compadecida',
       brazil_title: 'O Auto da Compadecida',
+      original_language: 'pt',
       distributor: 'Sony', // Sony/Columbia
       year: 2000,
       duration: 104,
@@ -264,6 +302,7 @@ async function main() {
     {
       original_title: 'Deus e o Diabo na Terra do Sol',
       brazil_title: 'Deus e o Diabo na Terra do Sol',
+      original_language: 'pt',
       distributor: 'Globo', // Globo Filmes (relançamentos/restauros) ou Vitrine
       year: 1964,
       duration: 120,
@@ -300,7 +339,19 @@ async function main() {
     // Criar o filme
     const movie = await prisma.movies.upsert({
       where: { slug },
-      update: {},
+      update: {
+        original_title: m.original_title,
+        brazil_title: m.brazil_title,
+        duration_minutes: m.duration,
+        production_year: m.year,
+        national: m.national,
+        age_rating_id: ratingId,
+        synopsis: m.synopsis,
+        tmdb_id: m.tmdb_id ?? null,
+        original_language: m.original_language ?? null,
+        tmdb_genres_json: JSON.stringify(mapCategoriesToTmdbGenres(m.categories)),
+        active: true,
+      },
       create: {
         id: randomUUID(),
         company_id: companyId,
@@ -312,6 +363,9 @@ async function main() {
         national: m.national,
         age_rating_id: ratingId,
         synopsis: m.synopsis,
+        tmdb_id: m.tmdb_id ?? null,
+        original_language: m.original_language ?? null,
+        tmdb_genres_json: JSON.stringify(mapCategoriesToTmdbGenres(m.categories)),
         slug: slug,
         active: true,
       },

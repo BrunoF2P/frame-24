@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '@repo/db';
 import { randomUUID } from 'node:crypto'; // Import para gerar IDs
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function main() {
   console.log(`🌱 Iniciando seed do catálogo...`);

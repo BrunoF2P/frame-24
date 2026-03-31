@@ -1,12 +1,16 @@
-import { PrismaClient } from '@repo/db';
+import { createPrismaClient } from '@repo/db';
 import { randomUUID } from 'node:crypto';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function main() {
   console.log('🎟️ Criando Tipo de Ingresso: Cortesia...');
 
-  const company = await prisma.companies.findFirst({ where: { active: true } });
+  const company =
+    (await prisma.companies.findUnique({
+      where: { tenant_slug: 'lawtrel-admin' },
+    })) ??
+    (await prisma.companies.findFirst({ where: { active: true } }));
   if (!company) return console.error('❌ Nenhuma empresa ativa encontrada.');
 
   await prisma.ticket_types.upsert({

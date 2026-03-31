@@ -1,15 +1,19 @@
-import { PrismaClient } from '@repo/db';
+import { createPrismaClient } from '@repo/db';
 import { randomUUID } from 'node:crypto';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function main() {
   console.log('🗣️ Iniciando criação de Idiomas de Sessão...');
 
   // 1. Buscar a empresa
-  const company = await prisma.companies.findFirst({
-    where: { active: true },
-  });
+  const company =
+    (await prisma.companies.findUnique({
+      where: { tenant_slug: 'lawtrel-admin' },
+    })) ??
+    (await prisma.companies.findFirst({
+      where: { active: true },
+    }));
 
   if (!company) {
     console.error('❌ Nenhuma empresa encontrada.');
