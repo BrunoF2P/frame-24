@@ -24,16 +24,12 @@ import { StockModule } from 'src/modules/stock/stock.module';
 import { PublicModule } from 'src/modules/public/public.module';
 import { CrmModule } from 'src/modules/crm/crm.module';
 import { AppController } from './app.controller';
+import { throttlerConfig } from './common/config/throttler.config';
 
 @Module({
   imports: [
     // Security: Rate limiting
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000, // 1 minute
-        limit: 100, // 100 requests per minute
-      },
-    ]),
+    ThrottlerModule.forRoot(throttlerConfig),
     ClsModule.forRoot({
       global: true,
       middleware: {

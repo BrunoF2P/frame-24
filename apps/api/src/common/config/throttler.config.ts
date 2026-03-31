@@ -12,5 +12,15 @@ export const throttlerConfig: ThrottlerModuleOptions = {
       ttl: 60000, // 60 seconds
       limit: 10, // 10 requests per minute for auth endpoints
     },
+    {
+      name: 'public',
+      ttl: 60000, // 60 seconds
+      limit: 300, // higher read throughput for storefront browsing
+    },
+    {
+      name: 'write',
+      ttl: 60000, // 60 seconds
+      limit: 30, // strict mutation budget per minute
+    },
   ],
 };
