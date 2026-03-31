@@ -15,6 +15,14 @@ interface SeatMapStatusData {
   expiration_date: Date | null;
 }
 
+interface ShowtimesFilterOptions {
+  complexId?: string;
+  movieId?: string;
+  date?: Date;
+  page?: number;
+  limit?: number;
+}
+
 @Injectable()
 export class PublicService {
   constructor(
@@ -121,11 +129,19 @@ export class PublicService {
 
   async getShowtimesByCompany(
     companyId: string,
-    filters?: {
-      complexId?: string;
-      movieId?: string;
-      date?: Date;
-    },
+    filters?: ShowtimesFilterOptions,
+  ) {
+    const showtimesPage = await this.getShowtimesByCompanyPaginated(
+      companyId,
+      filters,
+    );
+
+    return showtimesPage.items;
+  }
+
+  async getShowtimesByCompanyPaginated(
+    companyId: string,
+    filters?: ShowtimesFilterOptions,
   ) {
     // Buscar complexos da empresa
     const complexes =
@@ -144,6 +160,9 @@ export class PublicService {
       session_status: {
         name: 'Aberta para Vendas',
       },
+      start_time: {
+        gte: new Date(),
+      },
       ...(filters?.movieId && { movie_id: filters.movieId }),
     };
 
@@ -159,69 +178,72 @@ export class PublicService {
       };
     }
 
-    const showtimes = await this.prisma.showtime_schedule.findMany({
-      where,
-      select: {
-        id: true,
-        movie_id: true,
-        start_time: true,
-        end_time: true,
-        base_ticket_price: true,
-        available_seats: true,
-        sold_seats: true,
-        blocked_seats: true,
-        cinema_complexes: {
-          select: {
-            id: true,
-            name: true,
-            address: true,
-          },
-        },
-        rooms: {
-          select: {
-            id: true,
-            name: true,
-            room_number: true,
-          },
-        },
-        projection_types: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        audio_types: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        session_languages: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        session_status: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-      orderBy: {
-        start_time: 'asc',
-      },
-    });
+    const page = filters?.page ?? 1;
+    const limit = filters?.limit ?? 50;
+    const skip = (page - 1) * limit;
 
-    // Filtrar apenas sessões futuras ou do dia atual e buscar filmes
-    const now = new Date();
-    const filteredShowtimes = showtimes.filter(
-      (s) => new Date(s.start_time) >= now,
-    );
+    const [showtimes, total] = await Promise.all([
+      this.prisma.showtime_schedule.findMany({
+        where,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          movie_id: true,
+          start_time: true,
+          end_time: true,
+          base_ticket_price: true,
+          available_seats: true,
+          sold_seats: true,
+          blocked_seats: true,
+          cinema_complexes: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+            },
+          },
+          rooms: {
+            select: {
+              id: true,
+              name: true,
+              room_number: true,
+            },
+          },
+          projection_types: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          audio_types: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          session_languages: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          session_status: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: {
+          start_time: 'asc',
+        },
+      }),
+      this.prisma.showtime_schedule.count({ where }),
+    ]);
 
     // Buscar filmes para cada sessão com includes
-    const movieIds = [...new Set(filteredShowtimes.map((s) => s.movie_id))];
+    const movieIds = [...new Set(showtimes.map((s) => s.movie_id))];
     const movies = await this.prisma.movies.findMany({
       where: { id: { in: movieIds } },
       include: {
@@ -246,7 +268,7 @@ export class PublicService {
     const movieMap = new Map(movies.map((m) => [m.id, m]));
 
     // Adicionar dados do filme a cada sessão
-    return filteredShowtimes.map((showtime) => {
+    const items = showtimes.map((showtime) => {
       const movie = movieMap.get(showtime.movie_id);
       return {
         ...showtime,
@@ -261,6 +283,14 @@ export class PublicService {
           : null,
       };
     });
+
+    return {
+      items,
+      page,
+      limit,
+      total,
+      total_pages: Math.max(1, Math.ceil(total / limit)),
+    };
   }
 
   async getShowtimeSeatsMap(showtimeId: string) {
@@ -422,6 +452,54 @@ export class PublicService {
         description: true,
       },
     });
+  }
+
+  async getStorefrontData(
+    tenantSlug: string,
+    options?: {
+      includeShowtimes?: boolean;
+      complexId?: string;
+      movieId?: string;
+      date?: Date;
+      showtimesPage?: number;
+      showtimesLimit?: number;
+    },
+  ) {
+    const company = await this.getCompanyBySlug(tenantSlug);
+
+    const [
+      complexes,
+      movies,
+      products,
+      ticketTypes,
+      paymentMethods,
+      showtimes,
+    ] = await Promise.all([
+      this.getComplexesByCompany(company.id),
+      this.getMoviesByCompany(company.id),
+      this.getProductsByCompany(company.id, options?.complexId),
+      this.getTicketTypes(company.id),
+      this.getPaymentMethods(company.id),
+      options?.includeShowtimes
+        ? this.getShowtimesByCompanyPaginated(company.id, {
+            complexId: options?.complexId,
+            movieId: options?.movieId,
+            date: options?.date,
+            page: options?.showtimesPage,
+            limit: options?.showtimesLimit,
+          })
+        : Promise.resolve(null),
+    ]);
+
+    return {
+      company,
+      complexes,
+      movies,
+      products,
+      ticket_types: ticketTypes,
+      payment_methods: paymentMethods,
+      showtimes,
+    };
   }
 
   async getSaleDetails(companyId: string, publicReference: string) {

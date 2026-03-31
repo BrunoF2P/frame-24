@@ -28,7 +28,7 @@ describe('PublicService', () => {
 
     prisma = {
       companies: { findMany: jest.fn(), findUnique: companiesFindUnique },
-      showtime_schedule: { findMany: jest.fn(), findUnique: jest.fn() },
+      showtime_schedule: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
       movies: { findMany: jest.fn(), findUnique: jest.fn() },
       product_prices: { findFirst: productPricesFindFirst },
       ticket_types: { findMany: jest.fn() },
@@ -154,6 +154,7 @@ describe('PublicService', () => {
         session_status: { id: 'ss1', name: 'Aberta para Vendas' },
       },
     ] as never);
+    (prisma.showtime_schedule.count as jest.Mock).mockResolvedValue(1);
     (prisma.movies.findMany as jest.Mock).mockResolvedValue([
       {
         id: 'm1',

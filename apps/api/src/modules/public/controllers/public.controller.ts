@@ -5,16 +5,35 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  Req,
+  Res,
 } from '@nestjs/common';
 import { ParseEntityIdPipe } from 'src/common/pipes/parse-entity-id.pipe';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { Public } from 'src/common/decorators/public.decorator';
 import { PublicService } from '../services/public.service';
+import { PublicReadThrottle } from 'src/common/decorators/auth-throttle.decorator';
+import { createHash } from 'crypto';
+import type { Request, Response } from 'express';
+import { StorefrontResponseDto } from '../dto/storefront-response.dto';
 
 @ApiTags('Public')
 @Controller({ path: 'public', version: '1' })
+@PublicReadThrottle()
 export class PublicController {
   constructor(private readonly publicService: PublicService) {}
+
+  private buildWeakEtag(payload: unknown): string {
+    const raw = JSON.stringify(payload);
+    const digest = createHash('sha1').update(raw).digest('base64url');
+    return `W/"${digest}"`;
+  }
 
   @Get('companies')
   @Public()
@@ -102,6 +121,18 @@ export class PublicController {
     required: false,
     description: 'Data das sessões (YYYY-MM-DD)',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Página para paginação (padrão: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Itens por página (padrão: 50, máximo: 100)',
+    example: 50,
+  })
   @ApiResponse({
     status: 200,
     description: 'Lista de sessões retornada com sucesso',
@@ -111,12 +142,24 @@ export class PublicController {
     @Query('complex_id') complexId?: string,
     @Query('movie_id') movieId?: string,
     @Query('date') date?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     const company = await this.publicService.getCompanyBySlug(tenantSlug);
+
+    const parsedPage =
+      page && Number.isFinite(Number(page)) ? Math.max(1, Number(page)) : 1;
+    const parsedLimit =
+      limit && Number.isFinite(Number(limit))
+        ? Math.min(100, Math.max(1, Number(limit)))
+        : 50;
+
     return this.publicService.getShowtimesByCompany(company.id, {
       complexId,
       movieId,
       date: date ? new Date(date) : undefined,
+      page: parsedPage,
+      limit: parsedLimit,
     });
   }
 
@@ -194,6 +237,127 @@ export class PublicController {
   async getPaymentMethods(@Param('tenant_slug') tenantSlug: string) {
     const company = await this.publicService.getCompanyBySlug(tenantSlug);
     return this.publicService.getPaymentMethods(company.id);
+  }
+
+  @Get('companies/:tenant_slug/storefront')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Obter dados agregados da vitrine pública',
+    description:
+      'Retorna em uma única requisição os dados mais usados na experiência pública (empresa, complexos, filmes, produtos, tipos de ingresso e métodos de pagamento). Opcionalmente inclui sessões filtradas.',
+  })
+  @ApiQuery({
+    name: 'include_showtimes',
+    required: false,
+    description: 'Se true, inclui sessões no payload',
+    example: 'false',
+  })
+  @ApiQuery({
+    name: 'complex_id',
+    required: false,
+    description:
+      'Filtro opcional de complexo para sessões e preços de produtos',
+  })
+  @ApiQuery({
+    name: 'movie_id',
+    required: false,
+    description: 'Filtro opcional de filme para sessões',
+  })
+  @ApiQuery({
+    name: 'date',
+    required: false,
+    description: 'Data opcional para filtrar sessões (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'showtimes_page',
+    required: false,
+    description: 'Página das sessões quando include_showtimes=true (padrão: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'showtimes_limit',
+    required: false,
+    description:
+      'Itens por página das sessões quando include_showtimes=true (padrão: 20, máximo: 100)',
+    example: 20,
+  })
+  @ApiOkResponse({
+    description: 'Dados agregados da vitrine retornados com sucesso',
+    type: StorefrontResponseDto,
+  })
+  @ApiResponse({
+    status: 304,
+    description: 'Conteúdo não alterado desde o último ETag enviado',
+  })
+  async getStorefrontData(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Param('tenant_slug') tenantSlug: string,
+    @Query('include_showtimes') includeShowtimes?: string,
+    @Query('complex_id') complexId?: string,
+    @Query('movie_id') movieId?: string,
+    @Query('date') date?: string,
+    @Query('showtimes_page') showtimesPage?: string,
+    @Query('showtimes_limit') showtimesLimit?: string,
+  ) {
+    const parsedShowtimesPage =
+      showtimesPage && Number.isFinite(Number(showtimesPage))
+        ? Math.max(1, Number(showtimesPage))
+        : 1;
+    const parsedShowtimesLimit =
+      showtimesLimit && Number.isFinite(Number(showtimesLimit))
+        ? Math.min(100, Math.max(1, Number(showtimesLimit)))
+        : 20;
+
+    const data = await this.publicService.getStorefrontData(tenantSlug, {
+      includeShowtimes: includeShowtimes === 'true',
+      complexId,
+      movieId,
+      date: date ? new Date(date) : undefined,
+      showtimesPage: parsedShowtimesPage,
+      showtimesLimit: parsedShowtimesLimit,
+    });
+
+    const payload = {
+      company: data.company,
+      complexes: data.complexes,
+      movies: data.movies,
+      products: data.products,
+      ticket_types: data.ticket_types,
+      payment_methods: data.payment_methods,
+      showtimes: data.showtimes ? data.showtimes.items : null,
+      showtimes_pagination: data.showtimes
+        ? {
+            page: data.showtimes.page,
+            limit: data.showtimes.limit,
+            total: data.showtimes.total,
+            total_pages: data.showtimes.total_pages,
+          }
+        : null,
+    };
+
+    const etag = this.buildWeakEtag(payload);
+    res.setHeader('ETag', etag);
+    res.setHeader(
+      'Cache-Control',
+      'public, max-age=30, stale-while-revalidate=120',
+    );
+
+    const ifNoneMatch = req.headers['if-none-match'];
+    if (typeof ifNoneMatch === 'string' && ifNoneMatch === etag) {
+      res.status(HttpStatus.NOT_MODIFIED);
+      return;
+    }
+
+    return {
+      success: true,
+      meta: {
+        generated_at: new Date().toISOString(),
+        include_showtimes: includeShowtimes === 'true',
+      },
+      data: payload,
+    };
   }
 
   @Get('companies/:tenant_slug/sales/:reference')
