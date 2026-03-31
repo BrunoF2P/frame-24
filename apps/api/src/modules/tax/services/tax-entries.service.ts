@@ -1,5 +1,4 @@
 import {
-  ForbiddenException,
   Injectable,
   NotFoundException,
   BadRequestException,
@@ -8,7 +7,6 @@ import { TenantContextService } from 'src/common/services/tenant-context.service
 import { todayISO } from 'src/common/utils/date.util';
 import { Transactional } from '@nestjs-cls/transactional';
 import { tax_entries } from '@repo/db';
-import { ClsService } from 'nestjs-cls';
 import { TaxEntriesRepository } from '../repositories/tax-entries.repository';
 import {
   TaxCalculationResult,
@@ -109,25 +107,6 @@ export class TaxEntriesService {
     return this.mapToDto(entry);
   }
 
-  @Transactional()
-  async markAsProcessed(id: string): Promise<TaxEntryResponseDto> {
-    const userId = this.tenantContext.getRequiredUserId();
-    const entry = await this.findOne(id);
-
-    if (entry.processed) {
-      throw new BadRequestException('Lançamento já foi processado');
-    }
-
-    const updated = await this.taxEntriesRepository.markAsProcessed(id, userId);
-
-    this.logger.log(
-      `Lançamento fiscal processado: ${id}`,
-      TaxEntriesService.name,
-    );
-
-    return this.mapToDto(updated);
-  }
-
   private mapToDto(entry: tax_entries): TaxEntryResponseDto {
     const issAmount = Number(entry.iss_amount || 0);
     const pisPayable = Number(entry.pis_amount_payable);
@@ -221,7 +200,8 @@ export class TaxEntriesService {
       cofins_credit_amount: calculation.cofins_credit_amount,
       cofins_amount_payable: calculation.cofins_amount_payable,
       processing_user_id: userId,
-      processed: false,
+      processing_date: new Date(),
+      processed: true,
     });
   }
 

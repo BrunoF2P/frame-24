@@ -1,14 +1,7 @@
-import {
-  Controller,
-  ForbiddenException,
-  Get,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, ForbiddenException, Get, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { PermissionDiscoveryService } from '../services/permission-discovery.service';
 import { RequirePermission } from 'src/common/decorators/require-permission.decorator';
 import { AuthorizationGuard } from 'src/common/guards/authorization.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -29,7 +22,6 @@ interface GroupedPermissionItem {
 export class PermissionsController {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly permissionDiscovery: PermissionDiscoveryService,
     private readonly cls: ClsService,
   ) {}
 
@@ -75,18 +67,5 @@ export class PermissionsController {
       },
       {} as Record<string, GroupedPermissionItem[]>,
     );
-  }
-
-  @Post('sync')
-  @RequirePermission('permissions', 'update')
-  @ApiOperation({
-    summary: 'Sincronizar permissões',
-    description:
-      'Força sincronização das permissões do código para o banco de dados. Útil após adicionar novos controllers.',
-  })
-  async syncPermissions() {
-    const companyId = this.getCompanyId();
-    await this.permissionDiscovery.syncCompanyPermissions(companyId);
-    return { message: 'Permissions synced successfully' };
   }
 }

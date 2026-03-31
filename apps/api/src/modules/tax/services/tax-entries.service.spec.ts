@@ -30,7 +30,6 @@ describe('TaxEntriesService', () => {
       findById: jest.fn(),
       findBySource: jest.fn(),
       create: jest.fn(),
-      markAsProcessed: jest.fn(),
     } as unknown as jest.Mocked<TaxEntriesRepository>;
 
     taxCalculationService = {
@@ -170,16 +169,5 @@ describe('TaxEntriesService', () => {
     expect(rabbitmq.publish).toHaveBeenCalled();
     expect(cashFlowEntriesService.createForCompany).toHaveBeenCalled();
     expect(result.id).toBe('tax-1');
-  });
-
-  it('should reject markAsProcessed when already processed', async () => {
-    jest.spyOn(service, 'findOne').mockResolvedValue({
-      id: 'tax-1',
-      processed: true,
-    } as never);
-
-    await expect(service.markAsProcessed('tax-1')).rejects.toThrow(
-      BadRequestException,
-    );
   });
 });

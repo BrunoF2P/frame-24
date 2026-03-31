@@ -103,20 +103,6 @@ export class TaxEntriesRepository {
     });
   }
 
-  async markAsProcessed(
-    id: string,
-    processing_user_id: string,
-  ): Promise<tax_entries> {
-    return this.prisma.tax_entries.update({
-      where: { id },
-      data: {
-        processed: true,
-        processing_date: new Date(),
-        processing_user_id,
-      },
-    });
-  }
-
   async getTotalByCompetence(
     cinema_complex_id: string,
     year: number,

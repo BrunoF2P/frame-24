@@ -10,7 +10,6 @@ import { FinanceReportsModule } from './reports/finance-reports.module';
 import { ChartOfAccountsController } from './controllers/chart-of-accounts.controller';
 import { JournalEntriesController } from './controllers/journal-entries.controller';
 import { DistributorSettlementsController } from './controllers/distributor-settlements.controller';
-import { FinanceReportsController } from './controllers/finance-reports.controller';
 import { ChartOfAccountsService } from './services/chart-of-accounts.service';
 import { JournalEntriesService } from './services/journal-entries.service';
 import { DistributorSettlementsService } from './services/distributor-settlements.service';
@@ -32,7 +31,6 @@ import { AgingAutomationService } from './services/aging-automation.service';
     ChartOfAccountsController,
     JournalEntriesController,
     DistributorSettlementsController,
-    FinanceReportsController,
   ],
   providers: [
     ChartOfAccountsService,

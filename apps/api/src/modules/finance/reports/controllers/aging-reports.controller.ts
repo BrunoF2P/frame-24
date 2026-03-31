@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Get,
-  Query,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Query, Param, UseGuards } from '@nestjs/common';
 import { ParseEntityIdPipe } from 'src/common/pipes/parse-entity-id.pipe';
 import { AgingReportsService } from '../services/aging-reports.service';
 import { PositionReportsService } from '../services/position-reports.service';

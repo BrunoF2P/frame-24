@@ -7,25 +7,19 @@ describe('TaxEntriesController', () => {
 
   beforeEach(() => {
     service = {
-      create: jest.fn(),
       findAll: jest.fn(),
       findOne: jest.fn(),
-      markAsProcessed: jest.fn(),
     } as unknown as jest.Mocked<TaxEntriesService>;
 
     controller = new TaxEntriesController(service);
   });
 
-  it('should delegate create and findOne', async () => {
-    service.create.mockResolvedValue({ id: 'tax-1' } as never);
+  it('should delegate findOne', async () => {
     service.findOne.mockResolvedValue({ id: 'tax-1' } as never);
 
-    const created = await controller.create({ cinema_complex_id: 'complex-1' } as any);
     const found = await controller.findOne('tax-1');
 
-    expect(service.create).toHaveBeenCalled();
     expect(service.findOne).toHaveBeenCalledWith('tax-1');
-    expect(created).toEqual({ id: 'tax-1' });
     expect(found).toEqual({ id: 'tax-1' });
   });
 
@@ -49,14 +43,5 @@ describe('TaxEntriesController', () => {
       end_date: new Date('2026-03-31'),
       processed: true,
     });
-  });
-
-  it('should delegate markAsProcessed', async () => {
-    service.markAsProcessed.mockResolvedValue({ id: 'tax-1', processed: true } as never);
-
-    const result = await controller.markAsProcessed('tax-1');
-
-    expect(service.markAsProcessed).toHaveBeenCalledWith('tax-1');
-    expect(result).toEqual({ id: 'tax-1', processed: true });
   });
 });

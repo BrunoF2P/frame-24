@@ -1,15 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ParseEntityIdPipe } from 'src/common/pipes/parse-entity-id.pipe';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 
@@ -18,7 +7,6 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RequirePermission } from 'src/common/decorators/require-permission.decorator';
 
 import { TaxEntriesService } from '../services/tax-entries.service';
-import { CreateTaxEntryDto } from '../dto/create-tax-entry.dto';
 import { TaxEntryResponseDto } from '../dto/tax-entry-response.dto';
 
 @ApiTags('Tax')
@@ -27,14 +15,6 @@ import { TaxEntryResponseDto } from '../dto/tax-entry-response.dto';
 @UseGuards(JwtAuthGuard, AuthorizationGuard)
 export class TaxEntriesController {
   constructor(private readonly taxEntriesService: TaxEntriesService) {}
-
-  @Post()
-  @RequirePermission('tax', 'create')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Criar lançamento fiscal' })
-  async create(@Body() dto: CreateTaxEntryDto): Promise<TaxEntryResponseDto> {
-    return await this.taxEntriesService.create(dto);
-  }
 
   @Get()
   @RequirePermission('tax', 'read')
@@ -73,15 +53,5 @@ export class TaxEntriesController {
     @Param('id', ParseEntityIdPipe) id: string,
   ): Promise<TaxEntryResponseDto> {
     return await this.taxEntriesService.findOne(id);
-  }
-
-  @Put(':id/process')
-  @RequirePermission('tax', 'update')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Marcar lançamento fiscal como processado' })
-  async markAsProcessed(
-    @Param('id', ParseEntityIdPipe) id: string,
-  ): Promise<TaxEntryResponseDto> {
-    return await this.taxEntriesService.markAsProcessed(id);
   }
 }
