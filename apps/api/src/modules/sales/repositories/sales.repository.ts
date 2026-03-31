@@ -110,6 +110,8 @@ export class SalesRepository {
       start_date?: Date;
       end_date?: Date;
       status?: string;
+      page?: number;
+      limit?: number;
     },
   ): Promise<SaleWithBasicRelations[]> {
     // Buscar complexos da empresa
@@ -135,8 +137,14 @@ export class SalesRepository {
       ...(filters?.status && { status: filters.status }),
     };
 
+    const page = filters?.page ?? 1;
+    const limit = filters?.limit ?? 50;
+    const skip = (page - 1) * limit;
+
     return this.prisma.sales.findMany({
       where,
+      skip,
+      take: limit,
       include: {
         tickets: true,
         sale_types: true,
@@ -146,6 +154,36 @@ export class SalesRepository {
       },
       orderBy: {
         sale_date: 'desc',
+      },
+    });
+  }
+
+  async findByPublicReference(
+    company_id: string,
+    public_reference: string,
+  ): Promise<SaleWithFullRelations | null> {
+    const complexes = await this.prisma.cinema_complexes.findMany({
+      where: { company_id },
+      select: { id: true },
+    });
+    const complexIds = complexes.map((c) => c.id);
+
+    return this.prisma.sales.findFirst({
+      where: {
+        public_reference,
+        cinema_complex_id: { in: complexIds },
+      },
+      include: {
+        tickets: true,
+        concession_sales: {
+          include: {
+            concession_sale_items: true,
+          },
+        },
+        promotions_used: true,
+        sale_types: true,
+        payment_methods: true,
+        sale_status: true,
       },
     });
   }

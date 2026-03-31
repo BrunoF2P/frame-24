@@ -1,5 +1,4 @@
 import {
-  ForbiddenException,
   Injectable,
   NotFoundException,
   BadRequestException,
@@ -30,9 +29,7 @@ import {
   CampaignsService,
   PromotionApplicationResult,
 } from 'src/modules/marketing/services/campaigns.service';
-import { ClsService } from 'nestjs-cls';
 
-import { toErrorMessage } from 'src/common/utils/error.util';
 import { todayISO } from 'src/common/utils/date.util';
 
 import { AccountsReceivableService } from 'src/modules/finance/accounts-receivable/services/accounts-receivable.service';
@@ -40,6 +37,7 @@ import { TransactionsService } from 'src/modules/finance/transactions/services/t
 import { BankAccountsRepository } from 'src/modules/finance/cash-flow/repositories/bank-accounts.repository';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SnowflakeService } from 'src/common/services/snowflake.service';
+import { createHash } from 'crypto';
 
 type ProductItem = Awaited<
   ReturnType<ProductRepository['findAllByIds']>
@@ -62,10 +60,11 @@ type ConcessionItemData = {
 };
 type SaleForResponse = SaleWithBasicRelations | SaleWithFullRelations;
 type SalesExecutionContext = {
-  companyId: string;
+  companyId?: string;
   userId?: string;
   customerId?: string;
   sessionContext?: 'EMPLOYEE' | 'CUSTOMER';
+  idempotencyKey?: string;
 };
 
 @Injectable()
@@ -106,6 +105,8 @@ export class SalesService {
     start_date?: Date;
     end_date?: Date;
     status?: string;
+    page?: number;
+    limit?: number;
   }): Promise<SaleResponseDto[]> {
     const sales = await this.salesRepository.findAll(
       this.tenantContext.getCompanyId(),
@@ -138,6 +139,20 @@ export class SalesService {
     const sessionContext = context?.sessionContext ?? this.getSessionContext();
     const contextCustomerId = context?.customerId ?? this.getCustomerId();
     const resolvedCustomerId = dto.customer_id || contextCustomerId;
+    const idempotencyReference = context?.idempotencyKey
+      ? this.buildIdempotencyReference(company_id, context.idempotencyKey)
+      : undefined;
+
+    if (idempotencyReference) {
+      const existingSale = await this.salesRepository.findByPublicReference(
+        company_id,
+        idempotencyReference,
+      );
+
+      if (existingSale) {
+        return this.mapToDto(existingSale);
+      }
+    }
 
     // Validar complexo
     const complex = await this.cinemaComplexesRepository.findById(
@@ -350,20 +365,37 @@ export class SalesService {
     const sale_number =
       await this.salesRepository.generateSaleNumber(company_id);
 
-    const sale = await this.salesRepository.create({
-      id: this.snowflake.generate(),
-      sale_number,
-      sale_date: new Date(),
-      cinema_complex_id: dto.cinema_complex_id,
-      ...(dto.customer_id && { customer_id: dto.customer_id }),
-      sale_types: { connect: { id: resolvedSaleTypeId } },
-      payment_methods: { connect: { id: dto.payment_method } },
-      sale_status: { connect: { id: resolvedInitialStatusId } },
-      total_amount,
-      discount_amount,
-      net_amount,
-      ...(user_id && { user_id }),
-    });
+    let sale;
+    try {
+      sale = await this.salesRepository.create({
+        id: this.snowflake.generate(),
+        sale_number,
+        sale_date: new Date(),
+        cinema_complex_id: dto.cinema_complex_id,
+        ...(dto.customer_id && { customer_id: dto.customer_id }),
+        sale_types: { connect: { id: resolvedSaleTypeId } },
+        payment_methods: { connect: { id: dto.payment_method } },
+        sale_status: { connect: { id: resolvedInitialStatusId } },
+        total_amount,
+        discount_amount,
+        net_amount,
+        ...(user_id && { user_id }),
+        ...(idempotencyReference && {
+          public_reference: idempotencyReference,
+        }),
+      });
+    } catch (error) {
+      if (idempotencyReference) {
+        const duplicatedSale = await this.salesRepository.findByPublicReference(
+          company_id,
+          idempotencyReference,
+        );
+        if (duplicatedSale) {
+          return this.mapToDto(duplicatedSale);
+        }
+      }
+      throw error;
+    }
 
     const seatsByShowtime = new Map<string, string[]>();
 
@@ -487,7 +519,8 @@ export class SalesService {
               cofins_credit_amount: calc.cofins_credit_amount,
               cofins_amount_payable: calc.cofins_amount_payable,
               processing_user_id: user_id || null,
-              processed: false,
+              processing_date: new Date(),
+              processed: true,
             });
           }),
       );
@@ -532,7 +565,8 @@ export class SalesService {
               cofins_credit_amount: calc.cofins_credit_amount,
               cofins_amount_payable: calc.cofins_amount_payable,
               processing_user_id: user_id || null,
-              processed: false,
+              processing_date: new Date(),
+              processed: true,
             });
           }),
       );
@@ -759,7 +793,8 @@ export class SalesService {
         cofins_credit_amount: -Number(entry.cofins_credit_amount || 0),
         cofins_amount_payable: -Number(entry.cofins_amount_payable),
         processing_user_id: processingUserId,
-        processed: false,
+        processing_date: new Date(),
+        processed: true,
       });
     }
   }
@@ -908,6 +943,17 @@ export class SalesService {
     const deferredKeywords = ['CREDITO', 'PRAZO', 'BOLETO', 'FATURADO'];
 
     return !deferredKeywords.some((keyword) => normalized.includes(keyword));
+  }
+
+  private buildIdempotencyReference(
+    companyId: string,
+    idempotencyKey: string,
+  ): string {
+    const normalizedKey = idempotencyKey.trim();
+    const digest = createHash('sha256')
+      .update(`${companyId}:${normalizedKey}`)
+      .digest('hex');
+    return `idem_${digest.slice(0, 59)}`;
   }
 
   private async resolveSaleTypeId(
