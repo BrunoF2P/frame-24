@@ -1,0 +1,138 @@
+{
+  "realm": "frame-24-realm",
+  "enabled": true,
+  "displayName": "Frame-24",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "sslRequired": "external",
+  "roles": {
+    "realm": [
+      {
+        "name": "FRAME24_ADMIN",
+        "description": "Administrative access"
+      },
+      {
+        "name": "FRAME24_EMPLOYEE",
+        "description": "Employee access"
+      },
+      {
+        "name": "FRAME24_CUSTOMER",
+        "description": "Customer access"
+      }
+    ]
+  },
+  "clientScopes": [
+    {
+      "name": "frame24-api-audience",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "frame24-api-aud",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "frame24-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "frame24-api",
+      "name": "Frame-24 API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    },
+    {
+      "clientId": "frame24-web",
+      "name": "Frame-24 Web",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "frame24-web-dev-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/api/auth/callback/keycloak",
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      },
+      "defaultClientScopes": [
+        "frame24-api-audience"
+      ]
+    },
+    {
+      "clientId": "frame24-admin",
+      "name": "Frame-24 Admin",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "frame24-admin-dev-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3004/api/auth/callback/keycloak",
+        "http://localhost:3004/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3004"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3004/*"
+      },
+      "defaultClientScopes": [
+        "frame24-api-audience"
+      ]
+    },
+    {
+      "clientId": "frame24-landing",
+      "name": "Frame-24 Landing",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "frame24-landing-dev-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3003/api/auth/callback/keycloak",
+        "http://localhost:3003/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3003"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3003/*"
+      },
+      "defaultClientScopes": [
+        "frame24-api-audience"
+      ]
+    }
+  ]
+}

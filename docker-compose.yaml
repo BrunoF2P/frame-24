@@ -18,6 +18,23 @@ services:
       timeout: 5s
       retries: 5
 
+  authentik-postgres:
+    image: postgres:16-alpine
+    container_name: frame24-authentik-postgres
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: authentikpass
+      POSTGRES_DB: authentik
+    volumes:
+      - authentik_postgres_data:/var/lib/postgresql/data
+    networks:
+      - frame24-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authentik -d authentik"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   mailpit:
     image: axllent/mailpit:latest
     container_name: frame24-mailpit
@@ -69,10 +86,90 @@ services:
     networks:
       - frame24-network
 
+  authentik:
+    image: ghcr.io/goauthentik/server:2026.2.1
+    container_name: frame24-authentik
+    restart: unless-stopped
+    command: server
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+    environment:
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentikpass
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_SECRET_KEY: change-me-to-a-long-random-authentik-secret
+      AUTHENTIK_BOOTSTRAP_EMAIL: admin@frame24.local
+      AUTHENTIK_BOOTSTRAP_PASSWORD: admin
+      AUTHENTIK_BOOTSTRAP_TOKEN: frame24-authentik-bootstrap-token
+    ports:
+      - "9080:9000"
+      - "9444:9443"
+    shm_size: 512mb
+    volumes:
+      - authentik_data:/data
+      - authentik_templates:/templates
+    networks:
+      - frame24-network
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2026.2.1
+    container_name: frame24-authentik-worker
+    restart: unless-stopped
+    command: worker
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+    environment:
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentikpass
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_SECRET_KEY: change-me-to-a-long-random-authentik-secret
+      AUTHENTIK_BOOTSTRAP_EMAIL: admin@frame24.local
+      AUTHENTIK_BOOTSTRAP_PASSWORD: admin
+      AUTHENTIK_BOOTSTRAP_TOKEN: frame24-authentik-bootstrap-token
+    shm_size: 512mb
+    user: root
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - authentik_data:/data
+      - authentik_certs:/certs
+      - authentik_templates:/templates
+    networks:
+      - frame24-network
+
+  authentik-bootstrap:
+    image: node:22-alpine
+    container_name: frame24-authentik-bootstrap
+    depends_on:
+      - authentik
+      - authentik-worker
+    restart: on-failure
+    working_dir: /bootstrap
+    command: ["node", "/bootstrap/bootstrap-authentik.mjs"]
+    environment:
+      AUTHENTIK_URL: http://authentik:9000
+      AUTHENTIK_TOKEN: frame24-authentik-bootstrap-token
+      FRAME24_OIDC_CLIENT_ID: frame24-app
+      FRAME24_OIDC_CLIENT_SECRET: frame24-app-dev-secret
+      FRAME24_WEB_URL: http://localhost:3000
+      FRAME24_ADMIN_URL: http://localhost:3004
+      FRAME24_LANDING_URL: http://localhost:3003
+    volumes:
+      - ./scripts/bootstrap-authentik.mjs:/bootstrap/bootstrap-authentik.mjs:ro
+    networks:
+      - frame24-network
+
 volumes:
   postgres_data:
+  authentik_postgres_data:
   rabbitmq_data:
   minio_data:
+  authentik_data:
+  authentik_certs:
+  authentik_templates:
 
 networks:
   frame24-network:
