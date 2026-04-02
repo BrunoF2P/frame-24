@@ -58,4 +58,9 @@ export function validateEnvironment(): void {
     requireEnv('AUTHENTIK_URL', 'http://localhost:9080');
     requireEnv('AUTHENTIK_TOKEN');
   }
+
+  if (!process.env.REDIS_URL) {
+    requireEnv('REDIS_HOST', 'localhost');
+    requireEnv('REDIS_PORT', '6379');
+  }
 }

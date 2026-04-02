@@ -18,6 +18,7 @@ import { TicketsController } from './controllers/tickets.controller';
 import { SalesService } from './services/sales.service';
 import { TicketTypesService } from './services/ticket-types.service';
 import { TicketsService } from './services/tickets.service';
+import { SeatReservationStoreService } from './services/seat-reservation-store.service';
 import { SalesRepository } from './repositories/sales.repository';
 import { TicketTypesRepository } from './repositories/ticket-types.repository';
 import { TicketsRepository } from './repositories/tickets.repository';
@@ -55,6 +56,7 @@ import { AuthModule } from '../identity/auth/auth.module';
     TicketTypesRepository,
     TicketsRepository,
     ConcessionSalesRepository,
+    SeatReservationStoreService,
     ProductPricesRepository,
     CombosRepository,
     SeatsReservationGateway,

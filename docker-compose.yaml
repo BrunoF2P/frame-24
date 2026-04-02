@@ -70,6 +70,23 @@ services:
       timeout: 10s
       retries: 5
 
+  redis:
+    image: redis:8.6.2-alpine
+    container_name: frame24-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    networks:
+      - frame24-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   minio:
     image: alpine/minio:RELEASE.2025-10-15T17-29-55Z
     container_name: frame24-minio
@@ -175,6 +192,7 @@ volumes:
   postgres_data:
   authentik_postgres_data:
   rabbitmq_data:
+  redis_data:
   minio_data:
   authentik_data:
   authentik_certs:

@@ -1,6 +1,7 @@
 import { LoggerService } from 'src/common/services/logger.service';
 import { SeatStatusRepository } from 'src/modules/operations/seat-status/repositories/seat-status.repository';
 import { SessionSeatStatusRepository } from 'src/modules/operations/session_seat_status/repositories/session-seat-status.repository';
+import { SeatReservationStoreService } from '../services/seat-reservation-store.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SeatsReservationGateway } from './seats-reservation.gateway';
 
@@ -15,6 +16,7 @@ describe('SeatsReservationGateway', () => {
   let logger: jest.Mocked<LoggerService>;
   let prisma: jest.Mocked<PrismaService>;
   let seatStatusRepository: jest.Mocked<SeatStatusRepository>;
+  let seatReservationStore: jest.Mocked<SeatReservationStoreService>;
   let sessionSeatStatusFindMany: jest.Mock;
   let sessionSeatStatusUpdateMany: jest.Mock;
   let showtimeFindUnique: jest.Mock;
@@ -63,11 +65,21 @@ describe('SeatsReservationGateway', () => {
       findByNameAndCompany: jest.fn(),
     } as unknown as jest.Mocked<SeatStatusRepository>;
 
+    seatReservationStore = {
+      saveReservation: jest.fn(),
+      removeReservation: jest.fn(),
+      findUserReservation: jest.fn(),
+      tryAcquireSeatLocks: jest.fn().mockResolvedValue({ acquired: true }),
+      syncSeatLocks: jest.fn(),
+      releaseSeatLocks: jest.fn(),
+    } as unknown as jest.Mocked<SeatReservationStoreService>;
+
     gateway = new SeatsReservationGateway(
       logger,
       prisma,
       {} as SessionSeatStatusRepository,
       seatStatusRepository,
+      seatReservationStore,
     );
 
     (gateway as any).server = {
@@ -205,6 +217,7 @@ describe('SeatsReservationGateway', () => {
       'reservation-success',
       expect.objectContaining({ seat_ids: ['A1', 'A2'] }),
     );
+    expect(seatReservationStore.tryAcquireSeatLocks).toHaveBeenCalled();
     expect(roomEmit).toHaveBeenCalledWith(
       'seats-reserved',
       expect.objectContaining({ seat_ids: ['A1', 'A2'] }),
@@ -242,6 +255,7 @@ describe('SeatsReservationGateway', () => {
         message: expect.stringContaining('não está disponível'),
       }),
     );
+    expect(seatReservationStore.releaseSeatLocks).toHaveBeenCalled();
   });
 
   it('should emit reservation error when update count differs from requested seats', async () => {
@@ -273,6 +287,36 @@ describe('SeatsReservationGateway', () => {
       'reservation-error',
       expect.objectContaining({
         message: expect.stringContaining('Não foi possível reservar todos'),
+      }),
+    );
+    expect(seatReservationStore.releaseSeatLocks).toHaveBeenCalled();
+  });
+
+  it('should emit reservation error when redis lock acquisition fails', async () => {
+    const client = makeClient();
+    client.data.user = { sub: 'user-1', company_id: 'company-1' };
+    showtimeFindUnique.mockResolvedValue({
+      id: 'show-1',
+      cinema_complexes: { company_id: 'company-1' },
+    } as never);
+    seatStatusRepository.findByNameAndCompany.mockResolvedValue({
+      id: 'reserved-status',
+    } as never);
+    seatReservationStore.tryAcquireSeatLocks.mockResolvedValue({
+      acquired: false,
+      conflictingSeatIds: ['A1'],
+    } as never);
+
+    await gateway.handleReserveSeats(client, {
+      showtime_id: 'show-1',
+      seat_ids: ['A1'],
+    });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(client.emit).toHaveBeenCalledWith(
+      'reservation-error',
+      expect.objectContaining({
+        message: expect.stringContaining('A1'),
       }),
     );
   });
@@ -322,6 +366,11 @@ describe('SeatsReservationGateway', () => {
       expect.objectContaining({ seat_ids: ['A1', 'A2'], sale_id: 'sale-1' }),
     );
     expect((gateway as any).reservations.has('res-1')).toBe(false);
+    expect(seatReservationStore.releaseSeatLocks).toHaveBeenCalledWith(
+      'show-1',
+      ['A1', 'A2'],
+      'res-1',
+    );
   });
 
   it('should emit confirmation error when update fails', async () => {
@@ -427,6 +476,11 @@ describe('SeatsReservationGateway', () => {
       expect.objectContaining({ seat_ids: ['A1'], reservation_uuid: 'res-1' }),
     );
     expect((gateway as any).reservations.has('res-1')).toBe(false);
+    expect(seatReservationStore.releaseSeatLocks).toHaveBeenCalledWith(
+      'show-1',
+      ['A1'],
+      'res-1',
+    );
   });
 
   it('should skip expiration when company cannot be determined', async () => {

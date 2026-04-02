@@ -9,10 +9,12 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { AppModule } from './app.module';
 import { getAllTags, TAG_GROUPS } from './swagger.config';
-import { VersioningType } from '@nestjs/common';
+import { Logger, VersioningType } from '@nestjs/common';
 import { validateEnvironment } from './config/validate-env';
 import { PublicModule } from './modules/public/public.module';
 import { CrmModule } from './modules/crm/crm.module';
+import { RedisIoAdapter } from './common/redis/redis-io.adapter';
+import { RedisService } from './common/redis/redis.service';
 
 const HTTP_METHODS = new Set([
   'get',
@@ -108,8 +110,19 @@ function buildCompanyDocument(
 }
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   validateEnvironment();
   const app = await NestFactory.create(AppModule);
+  const redisIoAdapter = new RedisIoAdapter(app, app.get(RedisService));
+  try {
+    await redisIoAdapter.connectToRedis();
+    logger.log('Socket.IO Redis adapter enabled.');
+  } catch (error) {
+    logger.warn(
+      `Socket.IO Redis adapter unavailable, falling back to local adapter: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  app.useWebSocketAdapter(redisIoAdapter);
 
   // Garante um request id único por requisição e propaga no response header.
   app.use((req: Request, res: Response, next: () => void) => {
