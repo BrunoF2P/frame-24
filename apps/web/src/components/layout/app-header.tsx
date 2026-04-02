@@ -27,6 +27,7 @@ export function AppHeader({ tenantSlug }: { tenantSlug: string }) {
   const { selectedComplexId, setComplex, selectedCity, setCity } = useFilters();
 
   const complexesList = (complexes as unknown as Complex[]) || [];
+  const companyData = (company as Company | undefined) ?? undefined;
 
   // Extrair cidades únicas
   const cities = Array.from(
@@ -56,8 +57,7 @@ export function AppHeader({ tenantSlug }: { tenantSlug: string }) {
             <div className="text-sm">
               <div className="text-zinc-400">Rede:</div>
               <div className="text-white font-medium">
-                {(company as any)?.trade_name ||
-                  (company as any)?.corporate_name}
+                {companyData?.trade_name || companyData?.corporate_name}
               </div>
             </div>
           </div>

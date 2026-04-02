@@ -1,4 +1,5 @@
 import { io, Socket } from "socket.io-client";
+import { getSession } from "next-auth/react";
 
 // Tipos para eventos do Socket
 export interface ServerToClientEvents {
@@ -56,7 +57,7 @@ let socketInstance: SeatsSocket | null = null;
 /**
  * Retorna uma instância singleton do Socket.IO conectado ao namespace /seats
  */
-export const getSeatsSocket = (): SeatsSocket => {
+export const getSeatsSocket = async (): Promise<SeatsSocket> => {
   if (!socketInstance) {
     const socketUrl =
       process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000";
@@ -67,12 +68,12 @@ export const getSeatsSocket = (): SeatsSocket => {
     }) as SeatsSocket;
   }
 
-  // Attempt to grab token from localStorage if we are in the browser
+  // Use Auth.js session token for socket authentication
   if (typeof window !== "undefined") {
-    const token =
-      localStorage.getItem("token") || localStorage.getItem("access_token");
-    if (token) {
-      socketInstance.auth = { token };
+    const session = await getSession();
+    const keycloakToken = session?.accessToken;
+    if (keycloakToken) {
+      socketInstance.auth = { token: keycloakToken };
     }
   }
 

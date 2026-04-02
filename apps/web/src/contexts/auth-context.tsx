@@ -1,24 +1,29 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  ReactNode,
-} from "react";
-import { useRouter } from "next/navigation";
-import { authApi } from "@/lib/api-client";
+import { createContext, useContext, ReactNode, useEffect, useState } from "react";
+import { useSession, signOut } from "next-auth/react";
+import { buildOidcLogoutUrl } from "@/lib/oidc-logout";
+import { customerApi, unwrapResponse } from "@/lib/api-client";
 
 interface User {
   id: string;
-  email: string;
-  name: string;
-  company_id: string;
-  tenant_slug: string;
-  loyalty_level: string;
-  accumulated_points: number;
+  email?: string;
+  name?: string;
+  company_id?: string;
+  tenant_slug?: string;
+  loyalty_level?: string;
+  accumulated_points?: number;
 }
+
+type CustomerProfile = {
+  id: string;
+  email?: string;
+  full_name?: string;
+  loyalty_level?: string;
+  accumulated_points?: number;
+  company_id?: string;
+  tenant_slug?: string;
+};
 
 interface AuthContextType {
   user: User | null;
@@ -32,57 +37,86 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
+  const { data: session, status } = useSession();
+  const [profile, setProfile] = useState<CustomerProfile | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("auth_token");
-    const storedUser = localStorage.getItem("auth_user");
-
-    if (storedToken && storedUser) {
-      try {
-        setToken(storedToken);
-
-        const parsedUser = JSON.parse(storedUser);
-        if (!parsedUser || typeof parsedUser !== "object") {
-          throw new Error("Formato de usuário inválido");
-        }
-
-        setUser(parsedUser);
-      } catch (error) {
-        console.error("Erro ao restaurar sessão:", error);
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("auth_user");
-        setToken(null);
-        setUser(null);
-      }
+    if (status !== "authenticated" || !session?.accessToken || !session.user?.id) {
+      setProfile(null);
+      setIsProfileLoading(false);
+      return;
     }
-    setIsLoading(false);
-  }, []);
 
-  const login = (newToken: string, newUser: User) => {
-    setToken(newToken);
-    setUser(newUser);
-    localStorage.setItem("auth_token", newToken);
-    localStorage.setItem("auth_user", JSON.stringify(newUser));
+    let isMounted = true;
+
+    const loadProfile = async () => {
+      setIsProfileLoading(true);
+
+      try {
+        const response = await customerApi.customerControllerGetProfileV1();
+        const data = unwrapResponse(response) as unknown as CustomerProfile;
+
+        if (isMounted) {
+          setProfile(data);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setProfile(null);
+        }
+        console.error("Erro ao carregar perfil do cliente:", error);
+      } finally {
+        if (isMounted) {
+          setIsProfileLoading(false);
+        }
+      }
+    };
+
+    void loadProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [session?.accessToken, session?.user?.id, status]);
+
+  const user: User | null = session?.user?.id
+    ? {
+        id: profile?.id ?? session.user.id,
+        email: profile?.email ?? session.user?.email ?? undefined,
+        name: profile?.full_name ?? session.user?.name ?? undefined,
+        company_id: profile?.company_id,
+        tenant_slug: profile?.tenant_slug,
+        loyalty_level: profile?.loyalty_level,
+        accumulated_points: profile?.accumulated_points,
+      }
+    : null;
+
+  const token = session?.accessToken ?? null;
+  const isLoading = status === "loading" || (status === "authenticated" && isProfileLoading);
+  const isAuthenticated = status === "authenticated";
+
+  const login = (_newToken: string, _newUser: User) => {
+    // Login is handled by Auth.js redirects to the configured OIDC provider.
+    void _newToken;
+    void _newUser;
   };
 
   const logout = async () => {
-    try {
-      if (token) {
-        await authApi.authControllerLogoutV1();
-      }
-    } catch (error) {
-      console.error("Erro ao fazer logout no servidor:", error);
-    } finally {
-      setToken(null);
-      setUser(null);
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("auth_user");
-      router.push("/");
-    }
+    const firstPathSegment =
+      typeof window === "undefined"
+        ? ""
+        : window.location.pathname.split("/").filter(Boolean)[0] ?? "";
+    const postLogoutRedirectUrl =
+      typeof window === "undefined"
+        ? "/"
+        : `${window.location.origin}/${firstPathSegment}`;
+    const logoutParams = {
+      idToken: session?.idToken,
+      postLogoutRedirectUrl,
+    };
+
+    await signOut({ redirect: false });
+    window.location.assign(buildOidcLogoutUrl(logoutParams));
   };
 
   return (
@@ -93,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         logout,
-        isAuthenticated: !!user,
+        isAuthenticated,
       }}
     >
       {children}

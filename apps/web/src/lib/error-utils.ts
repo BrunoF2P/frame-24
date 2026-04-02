@@ -1,15 +1,34 @@
 export function extractErrorMessage(
-  error: any,
+  error: unknown,
   defaultMessage: string = "Ocorreu um erro inesperado",
 ): string {
+  const safeStringify = (value: unknown): string => {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "[unserializable error payload]";
+    }
+  };
+
   if (!error) return defaultMessage;
 
   // Se for string direta
   if (typeof error === "string") return error;
 
   // Se tiver response.data (Axios)
-  if (error.response?.data) {
-    const data = error.response.data;
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "response" in error &&
+    typeof (error as { response?: unknown }).response === "object" &&
+    (error as { response?: unknown }).response !== null &&
+    "data" in
+      ((error as { response?: unknown }).response as {
+        data?: unknown;
+      })
+  ) {
+    const data = ((error as { response?: unknown }).response as { data?: unknown })
+      .data as { message?: unknown };
 
     // Caso 1: message é string direta no data
     if (typeof data.message === "string") {
@@ -27,10 +46,14 @@ export function extractErrorMessage(
 
       // Subcaso 3a: Validação do Zod/NestJS (array de errors)
       // Ex: { message: { errors: [{ message: "Senha muito curta" }] } }
-      if (Array.isArray((nestedMessage as any).errors)) {
-        const errors = (nestedMessage as any).errors;
+      if (
+        "errors" in nestedMessage &&
+        Array.isArray((nestedMessage as { errors?: unknown }).errors)
+      ) {
+        const errors = (nestedMessage as { errors: Array<{ message?: string }> })
+          .errors;
         return errors
-          .map((e: any) => e.message || JSON.stringify(e))
+          .map((e) => e.message || safeStringify(e))
           .join(", ");
       }
 
@@ -38,16 +61,21 @@ export function extractErrorMessage(
       // Ex: { message: { message: "Erro específico" } }
       if (
         "message" in nestedMessage &&
-        typeof (nestedMessage as any).message === "string"
+        typeof (nestedMessage as { message?: unknown }).message === "string"
       ) {
-        return (nestedMessage as any).message;
+        return (nestedMessage as { message: string }).message;
       }
     }
   }
 
   // Fallback para mensagem de erro do objeto Error
-  if (error.message && typeof error.message === "string") {
-    return error.message;
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
   }
 
   return defaultMessage;

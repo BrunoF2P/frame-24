@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useCompanies } from "@/hooks/use-companies";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import Image from "next/image";
 
 interface Company {
   id: string;
@@ -17,7 +18,10 @@ interface Company {
 export default function Home() {
   const { data: companies, isLoading } = useCompanies();
   const router = useRouter();
-  const companiesList = (companies as unknown as Company[] | undefined) ?? [];
+  const companiesList = useMemo(
+    () => ((companies as Company[] | undefined) ?? []),
+    [companies],
+  );
 
   // Se houver apenas uma empresa, redireciona automaticamente
   useEffect(() => {
@@ -65,9 +69,11 @@ export default function Home() {
               <div className="flex items-center gap-4">
                 {company.logo_url && (
                   <div className="w-16 h-16 flex items-center justify-center flex-shrink-0">
-                    <img
+                    <Image
                       src={company.logo_url}
                       alt={company.trade_name || company.corporate_name}
+                      width={64}
+                      height={64}
                       className="max-w-full max-h-full object-contain"
                     />
                   </div>

@@ -4,7 +4,7 @@ import { useState, use, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
-import { customerAuthApi } from "@/lib/api-client";
+import axios from "axios";
 import { useCompany } from "@/hooks/use-company";
 import { extractErrorMessage } from "@/lib/error-utils";
 
@@ -15,7 +15,7 @@ export default function RegisterPage({
 }) {
   const { tenant_slug } = use(params);
   const router = useRouter();
-  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { data: company } = useCompany(tenant_slug);
 
   const [formData, setFormData] = useState({
@@ -29,8 +29,15 @@ export default function RegisterPage({
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const companyData =
+    (company as { company?: { id?: unknown } } | undefined) ?? undefined;
+  const companyId =
+    typeof companyData?.company?.id === "string"
+      ? companyData.company.id
+      : undefined;
 
   // Redirect if already logged in
   useEffect(() => {
@@ -101,24 +108,26 @@ export default function RegisterPage({
     }
 
     try {
-      const response = await customerAuthApi.customerAuthControllerRegisterV1({
-        registerCustomerDto: {
-          full_name: formData.full_name,
-          email: formData.email,
-          cpf: formData.cpf.replace(/\D/g, ""),
-          phone: formData.phone.replace(/\D/g, ""),
-          password: formData.password,
-          company_id: (company as any)?.id,
-          accepts_marketing: true,
-          accepts_email: true,
-          accepts_sms: true,
-        },
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/v1/customer/auth/register`, {
+        full_name: formData.full_name,
+        email: formData.email,
+        cpf: formData.cpf.replace(/\D/g, ""),
+        phone: formData.phone.replace(/\D/g, ""),
+        password: formData.password,
+        company_id: companyId,
+        accepts_marketing: true,
+        accepts_email: true,
+        accepts_sms: true,
       });
 
-      const { access_token, customer } = response.data;
-      login(access_token, customer);
-      router.push(`/${tenant_slug}`);
-    } catch (err: any) {
+      setSuccessMessage(
+        "Cadastro concluído! Agora faça login na central de acesso do Frame24 para acessar sua conta.",
+      );
+
+      setTimeout(() => {
+        router.push(`/${tenant_slug}/auth/login`);
+      }, 1200);
+    } catch (err: unknown) {
       const errorMessage = extractErrorMessage(
         err,
         "Erro ao realizar cadastro. Tente novamente.",
@@ -150,6 +159,12 @@ export default function RegisterPage({
           {error && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm text-center">
               {error}
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300 text-sm text-center">
+              {successMessage}
             </div>
           )}
 

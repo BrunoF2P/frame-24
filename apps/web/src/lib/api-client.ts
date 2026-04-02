@@ -6,6 +6,7 @@ import {
   Configuration,
 } from "@repo/api-types";
 import axios from "axios";
+import { getSession } from "next-auth/react";
 
 // Criar instância do axios SEM /v1 para os clientes OpenAPI
 // (eles já adicionam /v1 automaticamente)
@@ -17,8 +18,9 @@ const apiInstance = axios.create({
 });
 
 // Interceptor para adicionar token JWT
-apiInstance.interceptors.request.use((config) => {
-  const token = localStorage.getItem("auth_token");
+apiInstance.interceptors.request.use(async (config) => {
+  const session = await getSession();
+  const token = session?.accessToken;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
