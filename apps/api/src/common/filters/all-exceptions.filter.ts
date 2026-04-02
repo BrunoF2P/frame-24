@@ -18,26 +18,77 @@ interface ErrorResponse {
   method: string;
   traceId: string;
   message: string | string[];
+  errors?: unknown;
   error?: unknown;
+}
+
+interface ValidationIssueLike {
+  path?: unknown;
+  message?: unknown;
+}
+
+function headerToString(
+  value: string | string[] | undefined,
+): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && value.length > 0) return value[0];
+  return undefined;
 }
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
+  private formatValidationErrors(errors: unknown): string | undefined {
+    if (!Array.isArray(errors)) {
+      return undefined;
+    }
+
+    const parsed = errors
+      .map((issue) => {
+        const entry = issue as ValidationIssueLike;
+        const path = Array.isArray(entry.path)
+          ? entry.path.filter((part) => typeof part === 'string').join('.')
+          : 'unknown';
+        const message =
+          typeof entry.message === 'string' ? entry.message : 'invalid value';
+
+        return `${path}: ${message}`;
+      })
+      .filter((line) => line.trim().length > 0);
+
+    if (parsed.length === 0) {
+      return undefined;
+    }
+
+    return parsed.join(' | ');
+  }
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+    const responseLocals = response.locals as
+      | { requestId?: unknown }
+      | undefined;
+    const responseRequestId =
+      typeof responseLocals?.requestId === 'string'
+        ? responseLocals.requestId
+        : undefined;
+    const requestIdHeader = headerToString(request.headers['x-request-id']);
+    const correlationIdHeader = headerToString(
+      request.headers['x-correlation-id'],
+    );
     const traceId =
-      response.locals?.requestId ??
-      request.headers['x-request-id']?.toString() ??
-      request.headers['x-correlation-id']?.toString() ??
+      responseRequestId ??
+      requestIdHeader ??
+      correlationIdHeader ??
       randomUUID();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = 'Internal server error';
     let code = 'INTERNAL_SERVER_ERROR';
+    let validationErrors: unknown;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -63,6 +114,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
             .toUpperCase()
             .replace(/[^A-Z0-9]+/g, '_');
         }
+
+        if ('errors' in record) {
+          validationErrors = record['errors'];
+        }
       }
 
       if (code === 'INTERNAL_SERVER_ERROR') {
@@ -75,6 +130,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
       exception instanceof Error ? exception.stack : String(exception),
     );
 
+    if (status === HttpStatus.BAD_REQUEST && validationErrors !== undefined) {
+      const details = this.formatValidationErrors(validationErrors);
+      if (details) {
+        this.logger.warn(`Validation details [traceId=${traceId}]: ${details}`);
+      }
+    }
+
     const errorResponse: ErrorResponse = {
       success: false,
       statusCode: status,
@@ -84,6 +146,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       method: request.method,
       traceId,
       message,
+      ...(validationErrors !== undefined && { errors: validationErrors }),
       ...(process.env.NODE_ENV === 'development' && {
         error:
           exception instanceof Error

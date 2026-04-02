@@ -220,7 +220,8 @@ async function bootstrap() {
       scheme: 'bearer',
       bearerFormat: 'JWT',
       name: 'Authorization',
-      description: 'Token JWT obtido no endpoint /auth/login',
+      description:
+        'Access token OIDC emitido pelo Authentik e enviado no header Authorization.',
     },
     'access-token',
   );

@@ -6,10 +6,10 @@ import { TenantContextService } from '../services/tenant-context.service';
 import type {
   RequestUser,
   CustomerUser,
-} from 'src/modules/identity/auth/strategies/jwt.strategy';
+} from 'src/modules/identity/auth/types/auth-user.types';
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {
+export class JwtAuthGuard extends AuthGuard('keycloak-jwt') {
   constructor(
     private reflector: Reflector,
     private readonly tenantContext: TenantContextService,

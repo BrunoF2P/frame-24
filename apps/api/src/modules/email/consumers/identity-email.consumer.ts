@@ -160,16 +160,12 @@ export class IdentityEmailConsumer implements OnModuleInit, OnModuleDestroy {
     switch (message.pattern) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
       case IdentityEventPattern.CREATED:
-        await this.handleIdentityCreated(
-          message.data as IdentityCreatedEventData,
-        );
+        this.handleIdentityCreated(message.data as IdentityCreatedEventData);
         break;
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
       case IdentityEventPattern.VERIFIED:
-        await this.handleIdentityVerified(
-          message.data as IdentityVerifiedEventData,
-        );
+        this.handleIdentityVerified(message.data as IdentityVerifiedEventData);
         break;
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
@@ -181,9 +177,7 @@ export class IdentityEmailConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleIdentityCreated(
-    data: IdentityCreatedEventData,
-  ): Promise<void> {
+  private handleIdentityCreated(data: IdentityCreatedEventData): void {
     this.logger.log(`Processando identity.created: ${data.email}`);
 
     // DISABLED: Auto-verification enabled, skipping email.
@@ -198,9 +192,7 @@ export class IdentityEmailConsumer implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  private async handleIdentityVerified(
-    data: IdentityVerifiedEventData,
-  ): Promise<void> {
+  private handleIdentityVerified(data: IdentityVerifiedEventData): void {
     this.logger.log(`Processando identity.verified: ${data.email}`);
 
     // DISABLED: User requested no emails.

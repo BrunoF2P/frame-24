@@ -68,7 +68,9 @@ describe('CustomerController', () => {
   });
 
   it('should update profile mapping optional birth_date', async () => {
-    customersRepository.findById.mockResolvedValue({ id: 'customer-1' } as never);
+    customersRepository.findById.mockResolvedValue({
+      id: 'customer-1',
+    } as never);
     customersRepository.update.mockResolvedValue({
       id: 'customer-1',
       email: 'maria@x.com',

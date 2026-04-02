@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { Resend } from 'resend';
 
 import { EmailService } from './services/email.service';
 import { IdentityEmailConsumer } from './consumers/identity-email.consumer';
@@ -10,11 +11,7 @@ import { IdentityEmailConsumer } from './consumers/identity-email.consumer';
     IdentityEmailConsumer,
     {
       provide: 'RESEND_CLIENT',
-      useFactory: () => {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { Resend } = require('resend');
-        return new Resend(process.env.RESEND_API_KEY || 're_disabled');
-      },
+      useFactory: () => new Resend(process.env.RESEND_API_KEY || 're_disabled'),
     },
   ],
   exports: [EmailService],

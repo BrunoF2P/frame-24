@@ -177,9 +177,15 @@ describe('CustomerPurchasesService', () => {
   it('should create purchase, accumulate and deduct points when use_points is provided', async () => {
     companyCustomersRepository.findByCompanyAndCustomer
       .mockResolvedValueOnce({ accumulated_points: 1000 } as never)
-      .mockResolvedValueOnce({ accumulated_points: 50, loyalty_level: 'BRONZE' } as never)
+      .mockResolvedValueOnce({
+        accumulated_points: 50,
+        loyalty_level: 'BRONZE',
+      } as never)
       .mockResolvedValueOnce({ accumulated_points: 50 } as never)
-      .mockResolvedValueOnce({ accumulated_points: 950, loyalty_level: 'BRONZE' } as never);
+      .mockResolvedValueOnce({
+        accumulated_points: 950,
+        loyalty_level: 'BRONZE',
+      } as never);
 
     salesService.create.mockResolvedValue({
       id: 'sale-1',
@@ -397,7 +403,9 @@ describe('CustomerPurchasesService', () => {
   });
 
   it('should return purchase and ticket history', async () => {
-    const findAllSpy = jest.spyOn(service, 'findAll').mockResolvedValue([] as any);
+    const findAllSpy = jest
+      .spyOn(service, 'findAll')
+      .mockResolvedValue([] as any);
     const findTicketsSpy = jest
       .spyOn(service, 'findTickets')
       .mockResolvedValue([] as any);

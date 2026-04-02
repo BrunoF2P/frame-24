@@ -14,7 +14,7 @@ export const TAG_GROUPS: TagGroup[] = [
   {
     name: 'Identity',
     description:
-      'Conjunto de endpoints responsáveis pela autenticação, autorização e gestão de identidade organizacional. Abrange login, controle de acesso baseado em papéis e cadastro de usuários e empresas. Essencial para o fluxo de segurança e controle de permissões do sistema.',
+      'Conjunto de endpoints responsáveis pela autorização e gestão de identidade organizacional. O login é realizado via OIDC/Authentik no frontend; a API valida access tokens RS256 e aplica controle de acesso baseado em papéis.',
     tags: ['Auth', 'Companies', 'Roles', 'User Management', 'Permissions'],
   },
   {
@@ -104,7 +104,7 @@ export const TAG_GROUPS: TagGroup[] = [
   {
     name: 'Customer',
     description:
-      'Endpoints para clientes finais. Inclui autenticação (registro/login), perfil do cliente, pontos de fidelidade e histórico de compras. Permite que clientes gerenciem suas próprias informações.',
+      'Endpoints para clientes finais. Inclui cadastro/provisioning, perfil do cliente, pontos de fidelidade e histórico de compras. O endpoint de login legado está desativado; autenticação deve ocorrer via OIDC/Authentik.',
     tags: ['Customer Auth', 'Customer'],
   },
 ];

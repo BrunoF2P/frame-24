@@ -5,6 +5,7 @@ import { SnowflakeService } from './services/snowflake.service';
 import { BrasilApiService } from './services/brasil-api.service';
 import { TenantContextService } from './services/tenant-context.service';
 import { SlugService } from './services/slug.service';
+import { KeycloakProvisioningService } from './services/keycloak-provisioning.service';
 import { RabbitMQModule } from 'src/common/rabbitmq/rabbitmq.module';
 import { CacheModule } from './cache/cache.module';
 
@@ -16,6 +17,7 @@ import { CacheModule } from './cache/cache.module';
     BrasilApiService,
     TenantContextService,
     SlugService,
+    KeycloakProvisioningService,
   ],
   exports: [
     RabbitMQModule,
@@ -24,6 +26,7 @@ import { CacheModule } from './cache/cache.module';
     BrasilApiService,
     TenantContextService,
     SlugService,
+    KeycloakProvisioningService,
     CacheModule,
   ],
 })

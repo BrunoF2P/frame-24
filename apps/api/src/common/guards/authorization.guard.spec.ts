@@ -82,7 +82,9 @@ describe('AuthorizationGuard', () => {
 
   it('should block when user lacks required permission', () => {
     reflector.get.mockReturnValue('finance:delete');
-    const context = createContext(buildEmployee({ permissions: ['finance:read'] }));
+    const context = createContext(
+      buildEmployee({ permissions: ['finance:read'] }),
+    );
 
     expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     expect(() => guard.canActivate(context)).toThrow('Acesso negado');

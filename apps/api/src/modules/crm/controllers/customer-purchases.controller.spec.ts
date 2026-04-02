@@ -26,8 +26,14 @@ describe('CustomerPurchasesController', () => {
     service.findOne.mockResolvedValue({ id: 'sale-1' } as never);
     service.findTickets.mockResolvedValue([{ id: 'ticket-1' }] as never);
     service.findTicketById.mockResolvedValue({ id: 'ticket-1' } as never);
-    service.getTicketQrCode.mockResolvedValue({ payload: 'x', base64: 'eA==' } as never);
-    service.getHistory.mockResolvedValue({ purchases: [], tickets: [] } as never);
+    service.getTicketQrCode.mockResolvedValue({
+      payload: 'x',
+      base64: 'eA==',
+    } as never);
+    service.getHistory.mockResolvedValue({
+      purchases: [],
+      tickets: [],
+    } as never);
     service.cancelPurchase.mockResolvedValue(undefined as never);
 
     await controller.purchase({ cinema_complex_id: 'complex-1' } as any);

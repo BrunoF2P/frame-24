@@ -8,9 +8,9 @@
     "generate": "openapi-generator-cli generate --generator-key frame24"
   },
   "devDependencies": {
-    "@openapitools/openapi-generator-cli": "^2.30.2"
+    "@openapitools/openapi-generator-cli": "^2.31.0"
   },
   "dependencies": {
-    "axios": "^1.13.6"
+    "axios": "^1.14.0"
   }
 }

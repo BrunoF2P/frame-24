@@ -4,7 +4,7 @@ import {
   ExecutionContext,
   ForbiddenException,
 } from '@nestjs/common';
-import { CustomerUser } from 'src/modules/identity/auth/strategies/jwt.strategy';
+import { CustomerUser } from 'src/modules/identity/auth/types/auth-user.types';
 
 @Injectable()
 export class CustomerGuard implements CanActivate {

@@ -9,7 +9,7 @@ import { LoggerService } from '../services/logger.service';
 import {
   RequestUser,
   CustomerUser,
-} from 'src/modules/identity/auth/strategies/jwt.strategy';
+} from 'src/modules/identity/auth/types/auth-user.types';
 
 @Injectable()
 export class AuthorizationGuard implements CanActivate {
@@ -76,7 +76,7 @@ export class AuthorizationGuard implements CanActivate {
       typeof user.role_hierarchy !== 'number'
     ) {
       this.logger.error(
-        `SECURITY ALERT: User ${user.email} tem hierarchy inválido: ${user.role_hierarchy}`,
+        `SECURITY ALERT: User ${user.email} tem hierarchy inválido: ${String(user.role_hierarchy)}`,
         AuthorizationGuard.name,
       );
       return false;

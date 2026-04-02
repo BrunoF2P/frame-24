@@ -1,9 +1,9 @@
 import { forwardRef, Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { CommonModule } from 'src/common/common.module';
 import { CompanyModule } from '../companies/company.module';
+import { TaxModule } from 'src/modules/tax/tax.module';
 
 import { IdentityRepository } from './repositories/identity.repository';
 import { PersonRepository } from './repositories/person.repository';
@@ -11,70 +11,40 @@ import { CompanyUserRepository } from './repositories/company-user.repository';
 import { CustomRoleRepository } from './repositories/custom-role.repository';
 import { CompanyRepository } from '../companies/repositories/company.repository';
 
-import { AuthService } from './services/auth.service';
-import { CredentialValidatorService } from './services/credential-validator.service';
-import { AccountStatusCheckerService } from './services/account-status-checker.service';
-import { LoginAttemptService } from './services/login-attempt.service';
-import { TokenGeneratorService } from './services/token-generator.service';
-import { LoginTrackerService } from './services/login-tracker.service';
-import { EmailVerificationService } from './services/email-verification.service';
-import { PasswordResetService } from './services/password-reset.service';
-import { IdentityCreatorService } from './services/identity-creator.service';
-import { CompanyUserLinkerService } from './services/company-user-linker.service';
-import { IdentityEventPublisherService } from './services/identity-event-publisher.service';
 import { EmployeeIdGeneratorService } from './services/employee-id-generator';
 
+import { KeycloakJwtStrategy } from './strategies/keycloak-jwt.strategy';
+import { PublicAuthController } from './controllers/public-auth.controller';
+import { PublicRegistrationService } from './services/public-registration.service';
 import { MasterDataSetupService } from 'src/modules/setup/services/master-data-setup.service';
-import { TaxModule } from 'src/modules/tax/tax.module';
-import { requireEnv } from 'src/config/env.util';
-
-import { JwtStrategy } from './strategies/jwt.strategy';
-
-import { AuthController } from './controllers/auth.controller';
 
 @Module({
   imports: [
     PrismaModule,
-    PassportModule.register({ defaultStrategy: 'jwt' }),
-    JwtModule.register({
-      secret: requireEnv('JWT_SECRET', 'test-jwt-secret'),
-      signOptions: { expiresIn: '8h' },
-    }),
+    PassportModule.register({ defaultStrategy: 'keycloak-jwt' }),
     CommonModule,
     forwardRef(() => CompanyModule),
     TaxModule,
   ],
+  controllers: [PublicAuthController],
   providers: [
     IdentityRepository,
     PersonRepository,
     CompanyUserRepository,
     CustomRoleRepository,
     CompanyRepository,
-    AuthService,
-    CredentialValidatorService,
-    AccountStatusCheckerService,
-    LoginAttemptService,
-    TokenGeneratorService,
-    LoginTrackerService,
-    EmailVerificationService,
-    PasswordResetService,
-    IdentityCreatorService,
-    CompanyUserLinkerService,
-    IdentityEventPublisherService,
     EmployeeIdGeneratorService,
+    KeycloakJwtStrategy,
+    PublicRegistrationService,
     MasterDataSetupService,
-    JwtStrategy,
   ],
-  controllers: [AuthController],
   exports: [
-    AuthService,
     IdentityRepository,
     PersonRepository,
     CompanyUserRepository,
     CustomRoleRepository,
     EmployeeIdGeneratorService,
-    JwtStrategy,
-    JwtModule,
+    KeycloakJwtStrategy,
   ],
 })
 export class AuthModule {}
