@@ -1,4 +1,4 @@
-import { UserManagementApi } from "@repo/api-types";
+import { UserManagementApi, CreateUserDto } from "@repo/api-types";
 import { apiConfig } from "./api-config";
 
 const api = new UserManagementApi(apiConfig);
@@ -20,7 +20,7 @@ export const UsersService = {
   },
 
   // POST /v1/users (Criar Usuário)
-  create: async (data: any) => {
+  create: async (data: CreateUserDto) => {
     const response = await api.userManagementControllerCreateUserV1({
       createUserDto: data,
     });

@@ -15,7 +15,8 @@ import {
   Popcorn,
   Truck,
 } from "lucide-react";
-import { AuthService } from "@/services/auth-service";
+import { getSession, signOut } from "next-auth/react";
+import { buildOidcLogoutUrl } from "@/services/oidc-logout";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
@@ -35,21 +36,19 @@ export function Sidebar() {
   const router = useRouter();
 
   const handleLogout = async () => {
-    try {
-      // Tenta avisar o backend (opcional, mas boa prática)
-      await AuthService.logout();
-    } catch (error) {
-      console.error("Erro silencioso no logout:", error);
-    } finally {
-      // Limpeza local obrigatória
-      localStorage.removeItem("admin_token");
+    const postLogoutRedirectUrl =
+      typeof window === "undefined"
+        ? "/login"
+        : `${window.location.origin}/login`;
 
-      // Limpa o cookie forçando a expiração
-      document.cookie = "admin_token=; path=/; max-age=0; SameSite=Strict";
+    const session = await getSession();
+    const logoutParams = {
+      idToken: session?.idToken,
+      postLogoutRedirectUrl,
+    };
 
-      router.replace("/login");
-      router.refresh();
-    }
+    await signOut({ redirect: false });
+    window.location.assign(buildOidcLogoutUrl(logoutParams));
   };
 
   return (

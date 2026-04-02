@@ -12,11 +12,6 @@ export const AuthService = {
       },
     });
   },
-
-  logout: async () => {
-    return api.authControllerLogoutV1();
-  },
-
   forgotPassword: async (email: string) => {
     return api.authControllerForgotPasswordV1({
       forgotPasswordDto: { email },

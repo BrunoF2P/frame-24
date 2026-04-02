@@ -1,61 +1,69 @@
 import { apiConfig } from "./api-config";
 import axios from "axios";
 import { ProductsApi, ProductCategoriesApi } from "@repo/api-types";
+import { getSession } from "next-auth/react";
 
 const productsApi = new ProductsApi(apiConfig);
 const categoriesApi = new ProductCategoriesApi(apiConfig);
 
-function getAuthHeaders() {
+type GenericObject = Record<string, unknown>;
+
+async function getAuthHeaders() {
+  const session = await getSession();
+  const keycloakToken = session?.accessToken;
+
   return {
-    Authorization:
-      typeof window !== "undefined"
-        ? `Bearer ${localStorage.getItem("admin_token") || ""}`
-        : "",
+    Authorization: keycloakToken ? `Bearer ${keycloakToken}` : "",
   };
 }
 
 export const SalesService = {
   // --- Tipos de Ingresso ---
   async getTicketTypes() {
+    const headers = await getAuthHeaders();
     const response = await axios.get(`${apiConfig.basePath}/v1/ticket-types`, {
-      headers: getAuthHeaders(),
+      headers,
     });
-    return (response.data ?? []) as any[];
+    return (response.data ?? []) as unknown[];
   },
 
   async getTicketTypeById(id: string) {
+    const headers = await getAuthHeaders();
     const response = await axios.get(
       `${apiConfig.basePath}/v1/ticket-types/${id}`,
       {
-        headers: getAuthHeaders(),
+        headers,
       },
     );
     return response.data;
   },
 
-  async createTicketType(data: any) {
+  async createTicketType(data: GenericObject) {
+    const headers = await getAuthHeaders();
     return await axios.post(
       `${apiConfig.basePath}/v1/ticket-types`,
       data,
       {
-        headers: getAuthHeaders(),
+        headers,
       },
     );
   },
 
-  async updateTicketType(id: string, data: any) {
+  async updateTicketType(id: string, data: GenericObject) {
+    const headers = await getAuthHeaders();
     return await axios.put(
       `${apiConfig.basePath}/v1/ticket-types/${id}`,
       data,
       {
-        headers: getAuthHeaders(),
+        headers,
       },
     );
   },
 
   async deleteTicketType(id: string) {
+    const headers = await getAuthHeaders();
     return await axios.delete(`${apiConfig.basePath}/v1/ticket-types/${id}`, {
-      headers: getAuthHeaders(),
+      headers,
     });
   },
 
@@ -67,13 +75,18 @@ export const SalesService = {
     return response.data;
   },
 
-  async createProduct(data: any) {
-    return await axios.post(`${apiConfig.basePath}/v1/products`, {
-      ...data,
-      active: true,
-    }, {
-      headers: getAuthHeaders(),
-    });
+  async createProduct(data: GenericObject) {
+    const headers = await getAuthHeaders();
+    return await axios.post(
+      `${apiConfig.basePath}/v1/products`,
+      {
+        ...data,
+        active: true,
+      },
+      {
+        headers,
+      },
+    );
   },
 
   async getProductCategories() {

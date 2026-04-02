@@ -9,6 +9,6 @@ export const SuppliersService = {
       headers: apiConfig.baseOptions?.headers,
     });
 
-    return (response.data ?? []) as any[];
+    return (response.data ?? []) as unknown[];
   },
 };
