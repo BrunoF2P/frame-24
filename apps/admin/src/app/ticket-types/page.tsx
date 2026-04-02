@@ -5,8 +5,14 @@ import { SalesService } from "@/services/sales-services";
 import { Edit2, Plus, Trash2, Ticket } from "lucide-react";
 import Link from "next/link";
 
+interface TicketTypeItem {
+  id: string;
+  name: string;
+  discount_percentage: number;
+}
+
 export default function TicketTypesPage() {
-  const [types, setTypes] = useState<any[]>([]);
+  const [types, setTypes] = useState<TicketTypeItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,7 +22,7 @@ export default function TicketTypesPage() {
   const loadData = async () => {
     try {
       const data = await SalesService.getTicketTypes();
-      setTypes(data || []);
+      setTypes(Array.isArray(data) ? (data as TicketTypeItem[]) : []);
     } catch (error) {
       console.error(error);
     } finally {
@@ -54,7 +60,13 @@ export default function TicketTypesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {types.map((t) => (
+            {loading ? (
+              <tr>
+                <td colSpan={3} className="px-6 py-8 text-center text-zinc-500">
+                  Carregando...
+                </td>
+              </tr>
+            ) : types.map((t) => (
               <tr key={t.id} className="hover:bg-zinc-800/50">
                 <td className="px-6 py-4 font-medium flex items-center gap-2">
                   <Ticket className="w-4 h-4 text-zinc-500" /> {t.name}

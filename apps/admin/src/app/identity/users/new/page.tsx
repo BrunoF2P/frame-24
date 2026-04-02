@@ -7,10 +7,15 @@ import { RolesService } from "@/services/roles-service"; // Importa RolesService
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import Link from "next/link";
 
+interface RoleOption {
+  id: string;
+  name: string;
+}
+
 export default function NewUserPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [roles, setRoles] = useState<any[]>([]); // Lista de perfis de acesso
+  const [roles, setRoles] = useState<RoleOption[]>([]);
 
   const [formData, setFormData] = useState({
     full_name: "",
@@ -24,9 +29,13 @@ export default function NewUserPage() {
     // Carrega todos os perfis para o select
     RolesService.getAll()
       .then((data) => {
-        setRoles(data as any[]);
-        if (data && data.length > 0) {
-          setFormData((prev) => ({ ...prev, role_id: (data as any[])[0].id }));
+        const rolesList = Array.isArray(data) ? (data as RoleOption[]) : [];
+        setRoles(rolesList);
+        if (rolesList.length > 0) {
+          const firstRole = rolesList[0];
+          if (firstRole) {
+            setFormData((prev) => ({ ...prev, role_id: firstRole.id }));
+          }
         }
       })
       .catch(console.error);
@@ -37,7 +46,11 @@ export default function NewUserPage() {
     setLoading(true);
 
     try {
-      await UsersService.create(formData);
+      await UsersService.create({
+        ...formData,
+        country: "BR",
+        active: true,
+      });
       alert("Usuário criado com sucesso!");
       router.push("/identity/users");
     } catch (error) {

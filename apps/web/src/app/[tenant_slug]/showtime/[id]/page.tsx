@@ -1,13 +1,21 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
+import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSeatsMap } from "@/hooks/use-seats";
 import { useSeatReservation } from "@/hooks/use-seat-reservation";
 import { useCompany } from "@/hooks/use-company";
 import { useAuth } from "@/contexts/auth-context";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+
+interface CompanySummary {
+  id?: string;
+}
+
+interface SeatsMapResponse {
+  seats?: Seat[];
+  available_seats?: number;
+  room_id?: string;
+}
 
 interface Seat {
   id: string;
@@ -36,16 +44,16 @@ export default function ShowtimePage({
   const { connected, reservation, reserveSeats, releaseSeats } =
     useSeatReservation({
       showtimeId: showtimeId,
-      companyId: (company as any)?.id,
+      companyId: (company as CompanySummary | undefined)?.id || "",
       user,
     });
 
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
 
-  const seats = (seatsData as any)?.seats || [];
-  const availableSeats = (seatsData as any)?.available_seats || 0;
-  const roomId = (seatsData as any)?.room_id;
-  const showtimeIdFromData = (seatsData as any)?.showtime_id;
+  const seatsMap = (seatsData as SeatsMapResponse | undefined) ?? undefined;
+  const seats = seatsMap?.seats ?? [];
+  const availableSeats = seatsMap?.available_seats ?? 0;
+  const roomId = seatsMap?.room_id;
 
   // Agrupar assentos por linha
   const seatsByRow = seats.reduce((acc: Record<string, Seat[]>, seat: Seat) => {
@@ -253,7 +261,7 @@ export default function ShowtimePage({
                       {rowCode}
                     </div>
                     <div className="flex gap-2 flex-wrap">
-                      {seatsByRow[rowCode]
+                      {(seatsByRow[rowCode] ?? [])
                         .sort(
                           (a: Seat, b: Seat) =>
                             a.column_number - b.column_number,

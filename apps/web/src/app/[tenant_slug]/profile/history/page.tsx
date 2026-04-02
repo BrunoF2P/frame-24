@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { customerApi } from "@/lib/api-client";
 import { extractErrorMessage } from "@/lib/error-utils";
 import { SaleResponseDto } from "@repo/api-types";
@@ -12,10 +13,50 @@ import {
   ArrowLeft,
   Calendar,
   MapPin,
-  Clock,
   Film,
-  ShoppingBag,
 } from "lucide-react";
+
+interface SaleTicket {
+  id: string;
+  seat: unknown;
+  ticket_number: string;
+  ticket_type?: string;
+}
+
+type SeatValue = {
+  seat_code?: unknown;
+  row_code?: unknown;
+  column_number?: unknown;
+};
+
+function resolveSeatCode(seat: unknown): string {
+  if (typeof seat === "string" && seat.trim().length > 0) {
+    return seat;
+  }
+
+  if (!seat || typeof seat !== "object" || Array.isArray(seat)) {
+    return "N/A";
+  }
+
+  const seatData = seat as SeatValue;
+
+  if (
+    typeof seatData.seat_code === "string" &&
+    seatData.seat_code.trim().length > 0
+  ) {
+    return seatData.seat_code;
+  }
+
+  const row = typeof seatData.row_code === "string" ? seatData.row_code : "";
+  const column =
+    typeof seatData.column_number === "number" ||
+    typeof seatData.column_number === "string"
+      ? String(seatData.column_number)
+      : "";
+
+  const combined = `${row}${column}`.trim();
+  return combined.length > 0 ? combined : "N/A";
+}
 
 export default function PurchaseHistoryPage({
   params,
@@ -43,7 +84,7 @@ export default function PurchaseHistoryPage({
           await customerApi.customerPurchasesControllerFindAllV1();
         setSales(response.data);
         setError(null);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Erro ao carregar histórico:", error);
         const errorMessage = extractErrorMessage(
           error,
@@ -123,12 +164,14 @@ export default function PurchaseHistoryPage({
               >
                 <div className="flex flex-col md:flex-row">
                   {/* Movie Poster */}
-                  <div className="w-full md:w-48 h-48 md:h-auto bg-zinc-950 flex-shrink-0">
+                  <div className="w-full md:w-48 h-48 md:h-auto bg-zinc-950 flex-shrink-0 relative">
                     {sale.movie?.poster_url ? (
-                      <img
+                      <Image
                         src={sale.movie.poster_url}
-                        alt={sale.movie.title}
-                        className="w-full h-full object-cover"
+                        alt={sale.movie.title || "Poster"}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 192px"
+                        className="object-cover"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
@@ -175,28 +218,20 @@ export default function PurchaseHistoryPage({
                           Ingressos ({sale.tickets.length})
                         </h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {sale.tickets.map((ticket: any) => {
-                            // Determinar o código do assento
-                            let seatCode = "N/A";
-                            if (ticket.seat) {
-                              if (typeof ticket.seat === "object") {
-                                seatCode =
-                                  ticket.seat.seat_code ||
-                                  `${ticket.seat.row_code}${ticket.seat.column_number}` ||
-                                  "N/A";
-                              } else {
-                                seatCode = ticket.seat;
-                              }
-                            }
+                          {sale.tickets.map((ticket) => {
+                            const ticketData = ticket as SaleTicket;
+                            const seatCode = resolveSeatCode(ticketData.seat);
 
                             return (
                               <div
-                                key={ticket.id}
+                                key={ticketData.id}
                                 className="bg-zinc-950 rounded-lg p-4 border border-zinc-800 flex items-center gap-4"
                               >
-                                <img
-                                  src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${ticket.ticket_number}`}
+                                <Image
+                                  src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${ticketData.ticket_number}`}
                                   alt="QR Code"
+                                  width={64}
+                                  height={64}
                                   className="w-16 h-16 bg-white p-1 rounded"
                                 />
                                 <div>
@@ -204,10 +239,10 @@ export default function PurchaseHistoryPage({
                                     Assento {seatCode}
                                   </div>
                                   <div className="text-xs text-zinc-500">
-                                    {ticket.ticket_type || "Ingresso"}
+                                    {ticketData.ticket_type || "Ingresso"}
                                   </div>
                                   <div className="text-xs text-zinc-600 font-mono">
-                                    {ticket.ticket_number}
+                                    {ticketData.ticket_number}
                                   </div>
                                 </div>
                               </div>

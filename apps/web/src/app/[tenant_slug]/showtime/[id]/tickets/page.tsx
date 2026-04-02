@@ -17,6 +17,10 @@ interface TicketType {
   price_modifier: number;
 }
 
+interface CompanySummary {
+  id?: string;
+}
+
 export default function TicketSelectionPage({
   params,
 }: {
@@ -25,7 +29,7 @@ export default function TicketSelectionPage({
   const { tenant_slug, id } = use(params);
   const router = useRouter();
   const { data: companyData } = useCompany(tenant_slug);
-  const company = companyData as any;
+  const company = companyData as CompanySummary | undefined;
 
   const { reservation, isInitialized } = useSeatReservation({
     showtimeId: id,

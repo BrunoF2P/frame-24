@@ -4,9 +4,15 @@ import { useState, useEffect } from "react";
 import { OperationsService } from "@/services/operations-service";
 import { Loader2, Plus, Building, MapPin } from "lucide-react";
 
+interface ComplexItem {
+  id: string;
+  name: string;
+  address: string;
+}
+
 export default function SetupPage() {
   const [loading, setLoading] = useState(false);
-  const [complexes, setComplexes] = useState<any[]>([]);
+  const [complexes, setComplexes] = useState<ComplexItem[]>([]);
 
   useEffect(() => {
     loadData();
@@ -15,7 +21,7 @@ export default function SetupPage() {
   const loadData = async () => {
     try {
       const data = await OperationsService.getComplexes();
-      setComplexes(data || []);
+      setComplexes(Array.isArray(data) ? (data as ComplexItem[]) : []);
     } catch (error) {
       console.error(error);
     }

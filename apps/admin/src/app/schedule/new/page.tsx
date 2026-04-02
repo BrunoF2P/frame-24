@@ -8,19 +8,46 @@ import { OperationsService } from "@/services/operations-service";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import Link from "next/link";
 
+interface MovieOption {
+  id: string;
+  brazil_title?: string;
+  original_title?: string;
+}
+
+interface RoomOption {
+  id: string;
+  name?: string;
+}
+
+interface BaseOption {
+  id: string;
+  name?: string;
+}
+
+interface ShowtimeFormData {
+  movie_id: string;
+  room_id: string;
+  start_time: string;
+  base_ticket_price: number;
+  session_language: string;
+  projection_type: string;
+  audio_type: string;
+  status: string;
+}
+
 export default function NewShowtimePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
-  const [movies, setMovies] = useState<any[]>([]);
-  const [rooms, setRooms] = useState<any[]>([]);
-  const [projTypes, setProjTypes] = useState<any[]>([]);
-  const [audioTypes, setAudioTypes] = useState<any[]>([]);
-  const [languages, setLanguages] = useState<any[]>([]);
-  const [statuses, setStatuses] = useState<any[]>([]); // <--- Novo State
+  const [movies, setMovies] = useState<MovieOption[]>([]);
+  const [rooms, setRooms] = useState<RoomOption[]>([]);
+  const [projTypes, setProjTypes] = useState<BaseOption[]>([]);
+  const [audioTypes, setAudioTypes] = useState<BaseOption[]>([]);
+  const [languages, setLanguages] = useState<BaseOption[]>([]);
+  const [statuses, setStatuses] = useState<BaseOption[]>([]);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ShowtimeFormData>({
     movie_id: "",
     room_id: "",
     start_time: "",
@@ -51,24 +78,43 @@ export default function NewShowtimePage() {
           OperationsService.getSessionStatuses(), // <--- Busca status
         ]);
 
-        setMovies((moviesData as any[]) || []);
-        setRooms((roomsData as any[]) || []);
-        setProjTypes((projData as any[]) || []);
-        setAudioTypes((audioData as any[]) || []);
-        setLanguages((langData as any[]) || []);
-        setStatuses((statusData as any[]) || []);
+        const moviesList = Array.isArray(moviesData)
+          ? (moviesData as MovieOption[])
+          : [];
+        const roomsList = Array.isArray(roomsData)
+          ? (roomsData as unknown as RoomOption[])
+          : [];
+        const projectionList = Array.isArray(projData)
+          ? (projData as BaseOption[])
+          : [];
+        const audioList = Array.isArray(audioData)
+          ? (audioData as BaseOption[])
+          : [];
+        const languageList = Array.isArray(langData)
+          ? (langData as BaseOption[])
+          : [];
+        const statusList = Array.isArray(statusData)
+          ? (statusData as BaseOption[])
+          : [];
+
+        setMovies(moviesList);
+        setRooms(roomsList);
+        setProjTypes(projectionList);
+        setAudioTypes(audioList);
+        setLanguages(languageList);
+        setStatuses(statusList);
 
         // Tenta achar o status "Aberta para Vendas" automaticamente
-        const openStatus = (statusData as any[])?.find(
-          (s: any) => s.name === "Aberta para Vendas",
+        const openStatus = statusList.find(
+          (status) => status.name === "Aberta para Vendas",
         );
 
         setFormData((prev) => ({
           ...prev,
-          projection_type: (projData as any[])?.[0]?.id || "",
-          audio_type: (audioData as any[])?.[0]?.id || "",
-          session_language: (langData as any[])?.[0]?.id || "",
-          status: openStatus?.id || (statusData as any[])?.[0]?.id || "", // Usa o ID correto
+          projection_type: projectionList[0]?.id || "",
+          audio_type: audioList[0]?.id || "",
+          session_language: languageList[0]?.id || "",
+          status: openStatus?.id || statusList[0]?.id || "",
         }));
       } catch (error) {
         console.error("Erro ao carregar dados:", error);

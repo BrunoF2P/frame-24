@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 
 export default function EditMoviePage() {
   const params = useParams();
-  const [movie, setMovie] = useState<any>(null);
+  const [movie, setMovie] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -34,7 +34,7 @@ export default function EditMoviePage() {
         } else {
           setErrorMsg("Filme não encontrado na API.");
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("❌ Erro ao buscar filme:", error);
         setErrorMsg("Erro ao carregar filme. Verifique o console.");
       } finally {

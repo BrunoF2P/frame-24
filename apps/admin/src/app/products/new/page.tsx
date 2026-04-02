@@ -4,11 +4,24 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SalesService } from "@/services/sales-services";
 
+interface ProductCategory {
+  id: string;
+  name: string;
+}
+
+interface ProductFormData {
+  name: string;
+  product_code: string;
+  description: string;
+  category_id: string;
+  unit: string;
+}
+
 export default function NewProductPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [formData, setFormData] = useState({
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [formData, setFormData] = useState<ProductFormData>({
     name: "",
     product_code: "",
     description: "",
@@ -18,7 +31,9 @@ export default function NewProductPage() {
 
   useEffect(() => {
     SalesService.getProductCategories()
-      .then(setCategories)
+      .then((data) => {
+        setCategories(Array.isArray(data) ? (data as ProductCategory[]) : []);
+      })
       .catch(console.error);
   }, []);
 
@@ -26,9 +41,11 @@ export default function NewProductPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await SalesService.createProduct(formData);
+      await SalesService.createProduct(
+        formData as unknown as Record<string, unknown>,
+      );
       router.push("/products");
-    } catch (error) {
+    } catch {
       alert("Erro ao criar produto");
     } finally {
       setLoading(false);

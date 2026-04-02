@@ -14,10 +14,8 @@ import {
   EyeOff,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 export default function CatalogPage() {
-  const router = useRouter();
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -31,7 +29,7 @@ export default function CatalogPage() {
     try {
       setLoading(true);
       const data = await CatalogService.getMovies();
-      setMovies(data as any);
+      setMovies(Array.isArray(data) ? (data as Movie[]) : []);
     } catch (error) {
       console.error("Erro ao buscar filmes:", error);
     } finally {

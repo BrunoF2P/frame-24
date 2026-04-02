@@ -2,11 +2,33 @@
 
 import { useEffect, useState } from "react";
 import { ScheduleService } from "@/services/schedule-service";
-import { Plus, Search, Calendar, MapPin, Trash2, Loader2 } from "lucide-react";
+import { Plus, Calendar, MapPin, Trash2 } from "lucide-react";
 import Link from "next/link";
 
+interface ShowtimeMovie {
+  brazil_title?: string;
+  original_title?: string;
+}
+
+interface ShowtimeRoom {
+  name?: string;
+}
+
+interface ShowtimeStatus {
+  name?: string;
+}
+
+interface ShowtimeItem {
+  id: string;
+  start_time: string;
+  movie?: ShowtimeMovie;
+  rooms?: ShowtimeRoom;
+  base_ticket_price?: number;
+  session_status?: ShowtimeStatus;
+}
+
 export default function SchedulePage() {
-  const [showtimes, setShowtimes] = useState<any[]>([]);
+  const [showtimes, setShowtimes] = useState<ShowtimeItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -17,7 +39,7 @@ export default function SchedulePage() {
     try {
       setLoading(true);
       const data = await ScheduleService.getShowtimes();
-      setShowtimes(data || []);
+      setShowtimes(Array.isArray(data) ? (data as ShowtimeItem[]) : []);
     } catch (error) {
       console.error("Erro ao buscar sessões:", error);
     } finally {
@@ -30,7 +52,7 @@ export default function SchedulePage() {
     try {
       await ScheduleService.deleteShowtime(id);
       setShowtimes((prev) => prev.filter((s) => s.id !== id));
-    } catch (error) {
+    } catch {
       alert("Erro ao excluir sessão");
     }
   };

@@ -15,9 +15,89 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
+
+interface MediaTypeRef {
+  name?: string;
+}
+
+interface MovieMedia {
+  media_type?: string;
+  media_types?: MediaTypeRef;
+  media_url?: string;
+}
+
+interface CategoryLink {
+  category_id: string;
+}
+
+interface InitialMovieData {
+  id?: string;
+  original_title?: string;
+  brazil_title?: string;
+  distributor_id?: string;
+  duration_minutes?: number;
+  production_year?: number;
+  national?: boolean;
+  age_rating?: { id?: string };
+  age_rating_id?: string;
+  synopsis?: string;
+  website?: string;
+  movie_media?: MovieMedia[];
+  category_links?: CategoryLink[];
+}
+
+interface Distributor {
+  id: string;
+  trade_name?: string;
+  corporate_name?: string;
+}
+
+interface AgeRating {
+  id: string;
+  code?: string;
+  name?: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+}
+
+interface FormDataState {
+  original_title: string;
+  brazil_title: string;
+  distributor_id: string;
+  duration_minutes: number;
+  production_year: number;
+  national: boolean;
+  age_rating: string;
+  synopsis: string;
+  website: string;
+  category_ids: string[];
+  poster_url: string;
+  backdrop_url: string;
+  trailer_url: string;
+}
+
+interface ApiMediaItem {
+  media_type: string;
+  media_url: string;
+  title: string;
+}
+
+type SavePayload = Omit<
+  FormDataState,
+  "poster_url" | "backdrop_url" | "trailer_url" | "website" | "age_rating" | "synopsis"
+> & {
+  website?: string;
+  age_rating?: string;
+  synopsis?: string;
+  media: ApiMediaItem[];
+};
 
 interface MovieFormProps {
-  initialData?: any;
+  initialData?: InitialMovieData;
   isEditing?: boolean;
 }
 
@@ -25,11 +105,13 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const inputFieldClass =
+    "w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-accent-red";
 
   // Dados auxiliares
-  const [distributors, setDistributors] = useState<any[]>([]);
-  const [ageRatings, setAgeRatings] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [distributors, setDistributors] = useState<Distributor[]>([]);
+  const [ageRatings, setAgeRatings] = useState<AgeRating[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   // Busca TMDB
   const [tmdbQuery, setTmdbQuery] = useState("");
@@ -37,7 +119,7 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
   const [showTmdbResults, setShowTmdbResults] = useState(false);
 
   // Estado do formulário
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormDataState>({
     original_title: "",
     brazil_title: "",
     distributor_id: "",
@@ -62,26 +144,26 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
           CatalogService.getAgeRatings(),
           CatalogService.getCategories(),
         ]);
-        setDistributors(dist);
-        setAgeRatings(ratings);
-        setCategories(cats);
+        setDistributors(Array.isArray(dist) ? (dist as Distributor[]) : []);
+        setAgeRatings(Array.isArray(ratings) ? (ratings as AgeRating[]) : []);
+        setCategories(Array.isArray(cats) ? (cats as Category[]) : []);
 
         // Se estiver editando, preencher o formulário
         if (initialData) {
           const poster =
             initialData.movie_media?.find(
-              (m: any) =>
+              (m) =>
                 m.media_type === "POSTER" || m.media_types?.name === "Poster",
             )?.media_url || "";
           const backdrop =
             initialData.movie_media?.find(
-              (m: any) =>
+              (m) =>
                 m.media_type === "BACKDROP" ||
                 m.media_types?.name === "Backdrop",
             )?.media_url || "";
           const trailer =
             initialData.movie_media?.find(
-              (m: any) =>
+              (m) =>
                 m.media_type === "TRAILER" || m.media_types?.name === "Trailer",
             )?.media_url || "";
 
@@ -98,7 +180,7 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
             synopsis: initialData.synopsis || "",
             website: initialData.website || "",
             category_ids:
-              initialData.category_links?.map((l: any) => l.category_id) || [],
+              initialData.category_links?.map((l) => l.category_id) || [],
             poster_url: poster,
             backdrop_url: backdrop,
             trailer_url: trailer,
@@ -173,7 +255,7 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
       }
 
       // 2. Montar Payload Base
-      const payload: any = {
+      const payload: SavePayload = {
         ...formData,
         duration_minutes: Number(formData.duration_minutes),
         production_year: Number(formData.production_year),
@@ -187,10 +269,6 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
       };
 
       // Limpeza de campos auxiliares
-      delete payload.poster_url;
-      delete payload.backdrop_url;
-      delete payload.trailer_url;
-
       // 3. Adicionar Mídias (AQUI ESTAVA O ERRO DE VALIDAÇÃO)
       // O DTO exige: { media_type: string, media_url: string }
 
@@ -227,16 +305,33 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
       alert("Filme salvo com sucesso!");
       router.push("/catalog");
       router.refresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao salvar:", error);
 
       let errorMessage = "Erro desconhecido.";
-      if (error.response?.data?.message) {
+      const hasResponseMessage =
+        error &&
+        typeof error === "object" &&
+        "response" in error &&
+        typeof (error as { response?: { data?: { message?: unknown } } }).response
+          ?.data?.message !== "undefined";
+
+      if (hasResponseMessage) {
         // Se for array de erros do Zod, junta eles
-        const msg = error.response.data.message;
-        errorMessage = Array.isArray(msg) ? msg.join(" | ") : msg;
-      } else if (error.message) {
-        errorMessage = error.message;
+        const msg = (error as { response?: { data?: { message?: unknown } } })
+          .response?.data?.message;
+        if (Array.isArray(msg)) {
+          errorMessage = msg.join(" | ");
+        } else if (typeof msg === "string") {
+          errorMessage = msg;
+        }
+      } else if (
+        error &&
+        typeof error === "object" &&
+        "message" in error &&
+        typeof (error as { message?: unknown }).message === "string"
+      ) {
+        errorMessage = (error as { message: string }).message;
       }
 
       alert(`Erro: ${errorMessage}`);
@@ -323,10 +418,12 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
                 >
                   <div className="aspect-[2/3] relative bg-zinc-900 rounded-md overflow-hidden mb-2">
                     {movie.poster_path ? (
-                      <img
+                      <Image
                         src={tmdbService.getImageUrl(movie.poster_path) || ""}
                         alt={movie.title}
-                        className="object-cover w-full h-full"
+                        fill
+                        sizes="160px"
+                        className="object-cover"
                       />
                     ) : (
                       <div className="flex items-center justify-center h-full text-zinc-700">
@@ -367,10 +464,12 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
               <div className="aspect-[2/3] bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden relative group">
                 {formData.poster_url ? (
                   <>
-                    <img
+                    <Image
                       src={formData.poster_url}
                       alt="Capa"
-                      className="w-full h-full object-cover"
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 33vw"
+                      className="object-cover"
                     />
                     <button
                       type="button"
@@ -456,7 +555,7 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
                   </label>
                   <input
                     required
-                    className="input-field"
+                    className={inputFieldClass}
                     value={formData.original_title}
                     onChange={(e) =>
                       setFormData({
@@ -471,7 +570,7 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
                     Título no Brasil
                   </label>
                   <input
-                    className="input-field"
+                    className={inputFieldClass}
                     value={formData.brazil_title}
                     onChange={(e) =>
                       setFormData({ ...formData, brazil_title: e.target.value })
@@ -484,7 +583,7 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
                   </label>
                   <select
                     required
-                    className="input-field"
+                    className={inputFieldClass}
                     value={formData.distributor_id}
                     onChange={(e) =>
                       setFormData({
@@ -510,7 +609,7 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
                       type="number"
                       required
                       min="1" // Validação para o backend
-                      className="input-field"
+                      className={inputFieldClass}
                       value={formData.duration_minutes}
                       onChange={(e) =>
                         setFormData({
@@ -529,7 +628,7 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
                       required
                       min="1900"
                       max="2100"
-                      className="input-field"
+                      className={inputFieldClass}
                       value={formData.production_year}
                       onChange={(e) =>
                         setFormData({
@@ -604,7 +703,7 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
                 </label>
                 <textarea
                   rows={5}
-                  className="input-field resize-none"
+                  className={`${inputFieldClass} resize-none`}
                   value={formData.synopsis}
                   onChange={(e) =>
                     setFormData({ ...formData, synopsis: e.target.value })
@@ -637,21 +736,6 @@ export function MovieForm({ initialData, isEditing = false }: MovieFormProps) {
         </div>
       </form>
 
-      <style jsx global>{`
-        .input-field {
-          width: 100%;
-          border-radius: 0.375rem;
-          border: 1px solid #27272a;
-          background-color: #09090b;
-          padding: 0.5rem 0.75rem;
-          color: white;
-          outline: none;
-        }
-        .input-field:focus {
-          border-color: #ef4444;
-          ring: 1px solid #ef4444;
-        }
-      `}</style>
     </div>
   );
 }

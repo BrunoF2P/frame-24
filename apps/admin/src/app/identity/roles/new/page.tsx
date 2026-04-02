@@ -60,11 +60,12 @@ export default function NewRolePage() {
       const payload = {
         name: formData.name,
         description: formData.description,
-        is_system_role: false, // Assumindo que não é role de sistema
-        role_permissions: selectedPermissions,
+        permissions: selectedPermissions.map((permission) => [
+          permission.permission_id,
+        ]),
       };
 
-      await RolesService.create(payload as any);
+      await RolesService.create(payload);
 
       alert("Perfil de Acesso criado com sucesso!");
       router.push("/identity/roles");

@@ -2,11 +2,45 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { api } from "@/lib/api";
 import { useShowtimes } from "@/hooks/use-showtimes";
 import { format, isToday, isTomorrow, parseISO, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar, Clock, MapPin, Film, ArrowLeft, Play } from "lucide-react";
+import { Calendar, Clock, MapPin, Film, ArrowLeft } from "lucide-react";
+
+interface MediaItem {
+  media_url?: string;
+  media_types?: {
+    name?: string;
+  };
+}
+
+interface MovieCast {
+  id: string;
+  photo_url?: string;
+  artist_name: string;
+  character_name?: string;
+}
+
+interface MovieDetails {
+  brazil_title?: string;
+  original_title?: string;
+  age_rating?: { code?: string };
+  duration_minutes?: number;
+  category_links?: Array<{ category: { name: string } }>;
+  synopsis?: string;
+  movie_cast?: MovieCast[];
+  movie_media?: MediaItem[];
+}
+
+interface ShowtimeItem {
+  id: string;
+  start_time: string;
+  cinema_complexes: { name: string };
+  projection_types?: { name?: string };
+  audio_types?: { name?: string };
+}
 
 export default function MovieDetailPage({
   params,
@@ -15,7 +49,7 @@ export default function MovieDetailPage({
 }) {
   const { tenant_slug, id } = use(params);
   const router = useRouter();
-  const [movie, setMovie] = useState<any>(null);
+  const [movie, setMovie] = useState<MovieDetails | null>(null);
   const [loading, setLoading] = useState(true);
 
   const { data: showtimes, isLoading: showtimesLoading } = useShowtimes({
@@ -28,7 +62,8 @@ export default function MovieDetailPage({
       try {
         const response = await api.get(`/public/movies/${id}`);
         setMovie(response.data);
-      } catch (error) {
+      } catch {
+        setMovie(null);
       } finally {
         setLoading(false);
       }
@@ -60,16 +95,17 @@ export default function MovieDetailPage({
   }
 
   const posterUrl =
-    movie.movie_media?.find((m: any) => m.media_types?.name === "Poster")
+    movie.movie_media?.find((m) => m.media_types?.name === "Poster")
       ?.media_url || movie.movie_media?.[0]?.media_url;
   // Use backdrop if available, otherwise fallback to poster or placeholder
   const backdropUrl =
-    movie.movie_media?.find((m: any) => m.media_types?.name === "Backdrop")
+    movie.movie_media?.find((m) => m.media_types?.name === "Backdrop")
       ?.media_url || posterUrl;
 
   // Group showtimes by date, then by cinema
-  const showtimesByDate = (showtimes || []).reduce(
-    (acc: any, showtime: any) => {
+  const showtimesByDate = ((showtimes ?? []) as ShowtimeItem[]).reduce<
+    Record<string, Record<string, ShowtimeItem[]>>
+  >((acc, showtime) => {
       const date = startOfDay(parseISO(showtime.start_time)).toISOString();
       if (!acc[date]) {
         acc[date] = {};
@@ -80,9 +116,7 @@ export default function MovieDetailPage({
       }
       acc[date][cinemaName].push(showtime);
       return acc;
-    },
-    {},
-  );
+    }, {});
 
   const getDateLabel = (dateString: string) => {
     const date = parseISO(dateString);
@@ -96,10 +130,12 @@ export default function MovieDetailPage({
       {/* Hero / Backdrop */}
       <div className="relative h-[50vh] md:h-[60vh] overflow-hidden">
         {backdropUrl ? (
-          <img
+          <Image
             src={backdropUrl}
-            alt={movie.brazil_title}
-            className="w-full h-full object-cover opacity-50"
+            alt={movie.brazil_title || movie.original_title || "Backdrop"}
+            fill
+            sizes="100vw"
+            className="object-cover opacity-50"
           />
         ) : (
           <div className="w-full h-full bg-zinc-900" />
@@ -119,9 +155,11 @@ export default function MovieDetailPage({
           {/* Poster */}
           <div className="w-48 md:w-72 flex-shrink-0 mx-auto md:mx-0 rounded-xl overflow-hidden shadow-2xl border-4 border-zinc-900">
             {posterUrl ? (
-              <img
+              <Image
                 src={posterUrl}
-                alt={movie.brazil_title}
+                alt={movie.brazil_title || movie.original_title || "Poster"}
+                width={288}
+                height={432}
                 className="w-full h-auto object-cover aspect-[2/3]"
               />
             ) : (
@@ -172,7 +210,7 @@ export default function MovieDetailPage({
                   <span className="hidden md:inline">•</span>
                   <span>
                     {movie.category_links
-                      .map((l: any) => l.category.name)
+                      .map((l) => l.category.name)
                       .join(", ")}
                   </span>
                 </>
@@ -192,16 +230,18 @@ export default function MovieDetailPage({
                   Elenco Principal
                 </h3>
                 <div className="flex flex-wrap justify-center md:justify-start gap-4">
-                  {movie.movie_cast.slice(0, 6).map((cast: any) => (
+                  {movie.movie_cast.slice(0, 6).map((cast) => (
                     <div
                       key={cast.id}
                       className="flex items-center gap-3 bg-zinc-900/50 p-2 pr-4 rounded-full border border-zinc-800/50"
                     >
                       <div className="w-10 h-10 bg-zinc-800 rounded-full overflow-hidden flex-shrink-0">
                         {cast.photo_url ? (
-                          <img
+                          <Image
                             src={cast.photo_url}
                             alt={cast.artist_name}
+                            width={40}
+                            height={40}
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -246,14 +286,14 @@ export default function MovieDetailPage({
           ) : (
             <div className="space-y-8">
               {Object.entries(showtimesByDate).map(
-                ([dateString, cinemas]: [string, any]) => (
+                ([dateString, cinemas]) => (
                   <div key={dateString} className="space-y-4">
                     <h3 className="text-xl font-bold capitalize text-red-500 sticky top-16 bg-zinc-950 py-2 z-10">
                       {getDateLabel(dateString)}
                     </h3>
                     <div className="grid gap-6">
                       {Object.entries(cinemas).map(
-                        ([cinemaName, sessions]: [string, any]) => (
+                        ([cinemaName, sessions]) => (
                           <div
                             key={cinemaName}
                             className="bg-zinc-900 rounded-xl p-6 border border-zinc-800"
@@ -263,7 +303,7 @@ export default function MovieDetailPage({
                               {cinemaName}
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                              {sessions.map((session: any) => (
+                              {sessions.map((session) => (
                                 <button
                                   key={session.id}
                                   onClick={() =>

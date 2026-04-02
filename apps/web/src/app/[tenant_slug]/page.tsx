@@ -4,6 +4,7 @@ import { useMovies } from "@/hooks/use-movies";
 import { useFilters } from "@/store/use-filters";
 import { use } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 interface Movie {
   id: string;
@@ -20,27 +21,6 @@ interface Movie {
     character_name?: string;
     photo_url?: string;
   }>;
-}
-
-interface Showtime {
-  id: string;
-  movie_id: string;
-  start_time: string;
-  cinema_complexes: {
-    id: string;
-    name: string;
-  };
-  rooms: {
-    name: string;
-  };
-  projection_types?: { name: string };
-  audio_types?: { name: string };
-  session_languages?: { name: string };
-  available_seats?: number;
-  movie?: {
-    title: string;
-    poster_url?: string;
-  };
 }
 
 export default function TenantPage({
@@ -88,10 +68,12 @@ export default function TenantPage({
               {/* Poster */}
               <div className="aspect-[2/3] bg-zinc-900 relative">
                 {posterUrl ? (
-                  <img
+                  <Image
                     src={posterUrl}
                     alt={movie.brazil_title || movie.original_title}
-                    className="w-full h-full object-cover"
+                    fill
+                    sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 20vw"
+                    className="object-cover"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-zinc-600">

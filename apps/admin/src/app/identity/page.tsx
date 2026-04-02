@@ -5,8 +5,19 @@ import { UsersService } from "@/services/users-service";
 import { Plus, Trash2, Edit2, User } from "lucide-react";
 import Link from "next/link";
 
+interface CompanyUserRole {
+  role_name?: string;
+}
+
+interface UserRow {
+  employee_id: string;
+  full_name?: string;
+  email?: string;
+  company_user?: CompanyUserRole;
+}
+
 export default function UsersPage() {
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,7 +34,7 @@ export default function UsersPage() {
     try {
       await UsersService.delete(id);
       setData((prev) => prev.filter((i) => i.employee_id !== id));
-    } catch (error) {
+    } catch {
       alert("Erro ao deletar usuário.");
     }
   };

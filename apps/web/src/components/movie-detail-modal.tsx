@@ -2,12 +2,56 @@
 
 import { X, Calendar, Clock, MapPin, Film, Info } from "lucide-react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+
+interface MovieCategory {
+  name: string;
+}
+
+interface AgeRating {
+  code: string;
+}
+
+interface MovieCast {
+  id: string;
+  photo_url?: string | null;
+  artist_name: string;
+  character_name?: string | null;
+}
+
+interface MovieMedia {
+  media_url?: string | null;
+}
+
+interface Movie {
+  brazil_title?: string | null;
+  original_title?: string | null;
+  movie_media?: MovieMedia[];
+  age_rating?: AgeRating | null;
+  duration_minutes?: number | null;
+  categories?: MovieCategory[];
+  synopsis?: string | null;
+  movie_cast?: MovieCast[];
+}
+
+interface Showtime {
+  id: string;
+  start_time: string | Date;
+  cinema_complexes: {
+    name: string;
+  };
+  projection_types?: {
+    name?: string | null;
+  } | null;
+  audio_types?: {
+    name?: string | null;
+  } | null;
+}
 
 interface MovieDetailModalProps {
-  movie: any;
-  showtimes: any[];
+  movie: Movie;
+  showtimes: Showtime[];
   onClose: () => void;
   tenantSlug: string;
   isLoading?: boolean;
@@ -24,14 +68,17 @@ export function MovieDetailModal({
   const posterUrl = movie.movie_media?.[0]?.media_url;
 
   // Agrupar sessões por cinema
-  const showtimesByCinema = showtimes.reduce((acc: any, showtime: any) => {
+  const showtimesByCinema = showtimes.reduce<Record<string, Showtime[]>>(
+    (acc, showtime) => {
     const cinemaName = showtime.cinema_complexes.name;
     if (!acc[cinemaName]) {
       acc[cinemaName] = [];
     }
     acc[cinemaName].push(showtime);
     return acc;
-  }, {});
+    },
+    {},
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
@@ -54,10 +101,12 @@ export function MovieDetailModal({
         {/* Movie Poster Side */}
         <div className="w-full md:w-2/5 relative h-64 md:h-auto bg-zinc-950">
           {posterUrl ? (
-            <img
+            <Image
               src={posterUrl}
-              alt={movie.brazil_title || movie.original_title}
-              className="w-full h-full object-cover"
+              alt={movie.brazil_title || movie.original_title || "Poster do filme"}
+              fill
+              sizes="(max-width: 768px) 100vw, 40vw"
+              className="object-cover"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-zinc-600">
@@ -111,7 +160,7 @@ export function MovieDetailModal({
                 <>
                   <span>•</span>
                   <span>
-                    {movie.categories.map((c: any) => c.name).join(", ")}
+                    {movie.categories.map((c) => c.name).join(", ")}
                   </span>
                 </>
               )}
@@ -130,16 +179,18 @@ export function MovieDetailModal({
                   Elenco
                 </h3>
                 <div className="flex flex-wrap gap-4">
-                  {movie.movie_cast.map((cast: any) => (
+                  {movie.movie_cast.map((cast) => (
                     <div
                       key={cast.id}
                       className="flex items-center gap-3 bg-zinc-950/50 p-2 rounded-lg border border-zinc-800/50 min-w-[200px]"
                     >
                       <div className="w-10 h-10 bg-zinc-800 rounded-full overflow-hidden flex-shrink-0">
                         {cast.photo_url ? (
-                          <img
+                          <Image
                             src={cast.photo_url}
                             alt={cast.artist_name}
+                            width={40}
+                            height={40}
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -185,14 +236,14 @@ export function MovieDetailModal({
               </div>
             ) : (
               Object.entries(showtimesByCinema).map(
-                ([cinemaName, sessions]: [string, any]) => (
+                ([cinemaName, sessions]) => (
                   <div key={cinemaName} className="space-y-3">
                     <div className="flex items-center gap-2 text-zinc-400 text-sm font-medium">
                       <MapPin className="w-4 h-4" />
                       {cinemaName}
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {sessions.map((session: any) => (
+                      {sessions.map((session) => (
                         <button
                           key={session.id}
                           onClick={() =>

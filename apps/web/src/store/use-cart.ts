@@ -6,7 +6,7 @@ interface CartItem {
   name: string;
   price: number;
   quantity: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 interface CartState {

@@ -2,16 +2,6 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { getSeatsSocket, SeatsSocket } from "@/lib/socket-client";
 import { differenceInSeconds } from "date-fns";
 
-interface SeatStatus {
-  id: string;
-  seat_code: string;
-  row_code: string;
-  column_number: number;
-  status: string;
-  reserved: boolean;
-  reserved_until: string | null;
-}
-
 interface UseSeatReservationParams {
   showtimeId: string;
   companyId: string;
@@ -27,6 +17,89 @@ interface ReservationState {
   error: string | null;
 }
 
+interface JoinShowtimePayload {
+  showtime_id: string;
+}
+
+interface ReservationEventData {
+  reservation_uuid: string;
+  expires_at: string;
+  seat_ids: string[];
+  message?: string;
+}
+
+interface ReservationConfirmedEventData {
+  reservation_uuid: string;
+  sale_id: string;
+}
+
+interface SeatsReleasedEventData {
+  reservation_uuid: string;
+  seat_ids: string[];
+}
+
+interface ErrorEventData {
+  message: string;
+}
+
+function getInitialReservation(showtimeId: string): ReservationState {
+  const defaultState: ReservationState = {
+    reservationUuid: null,
+    expiresAt: null,
+    reservedSeatIds: [],
+    timeRemaining: 0,
+    isReserving: false,
+    error: null,
+  };
+
+  if (typeof window === "undefined") {
+    return defaultState;
+  }
+
+  const savedReservationKey = `seat-reservation-${showtimeId}`;
+  const savedReservation = localStorage.getItem(savedReservationKey);
+
+  if (!savedReservation) {
+    return defaultState;
+  }
+
+  try {
+    const parsed = JSON.parse(savedReservation) as {
+      reservationUuid?: string;
+      expiresAt?: string;
+      reservedSeatIds?: string[];
+    };
+
+    if (!parsed.expiresAt) {
+      localStorage.removeItem(savedReservationKey);
+      return defaultState;
+    }
+
+    const expiresAt = new Date(parsed.expiresAt);
+    const now = new Date();
+
+    if (expiresAt <= now) {
+      localStorage.removeItem(savedReservationKey);
+      return defaultState;
+    }
+
+    return {
+      reservationUuid: parsed.reservationUuid ?? null,
+      expiresAt,
+      reservedSeatIds: Array.isArray(parsed.reservedSeatIds)
+        ? parsed.reservedSeatIds
+        : [],
+      timeRemaining: 0,
+      isReserving: false,
+      error: null,
+    };
+  } catch (error) {
+    console.error("[Reservation] Error parsing saved reservation:", error);
+    localStorage.removeItem(savedReservationKey);
+    return defaultState;
+  }
+}
+
 export const useSeatReservation = ({
   showtimeId,
   companyId,
@@ -34,103 +107,81 @@ export const useSeatReservation = ({
 }: UseSeatReservationParams) => {
   const [socket, setSocket] = useState<SeatsSocket | null>(null);
   const [connected, setConnected] = useState(false);
-  const [reservation, setReservation] = useState<ReservationState>({
-    reservationUuid: null,
-    expiresAt: null,
-    reservedSeatIds: [],
-    timeRemaining: 0,
-    isReserving: false,
-    error: null,
-  });
+  const [reservation, setReservation] = useState<ReservationState>(() =>
+    getInitialReservation(showtimeId),
+  );
 
   // Ref para timer de countdown
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
   // Conectar ao socket ao montar
   useEffect(() => {
-    const seatsSocket = getSeatsSocket();
-    setSocket(seatsSocket);
+    let cancelled = false;
 
-    const joinPayload = {
-      showtime_id: showtimeId,
-      user_id: user?.id,
+    const connectSocket = async () => {
+      const seatsSocket = await getSeatsSocket();
+      if (cancelled) {
+        return;
+      }
+
+      setSocket(seatsSocket);
+
+      const joinPayload = {
+        showtime_id: showtimeId,
+        user_id: user?.id,
+      };
+
+      // Se já está conectado, apenas entrar na sala
+      if (seatsSocket.connected) {
+        console.log("[Socket] Already connected, joining showtime");
+        setConnected(true);
+        seatsSocket.emit("join-showtime", joinPayload);
+      } else {
+        // Se não está conectado, conectar
+        seatsSocket.connect();
+      }
+
+      const onConnect = () => {
+        console.log("[Socket] Connected");
+        setConnected(true);
+        // Entrar na sala da sessão
+        seatsSocket.emit("join-showtime", joinPayload);
+      };
+
+      const onDisconnect = () => {
+        console.log("[Socket] Disconnected");
+        setConnected(false);
+      };
+
+      const onJoinedShowtime = (data: JoinShowtimePayload) => {
+        console.log("[Socket] Joined showtime:", data.showtime_id);
+      };
+
+      seatsSocket.on("connect", onConnect);
+      seatsSocket.on("disconnect", onDisconnect);
+      seatsSocket.on("joined-showtime", onJoinedShowtime);
+
+      return () => {
+        // Apenas limpar listeners, NÃO desconectar
+        // O socket é singleton e deve permanecer vivo
+        seatsSocket.off("connect", onConnect);
+        seatsSocket.off("disconnect", onDisconnect);
+        seatsSocket.off("joined-showtime", onJoinedShowtime);
+      };
     };
 
-    // Se já está conectado, apenas entrar na sala
-    if (seatsSocket.connected) {
-      console.log("[Socket] Already connected, joining showtime");
-      setConnected(true);
-      seatsSocket.emit("join-showtime", joinPayload);
-    } else {
-      // Se não está conectado, conectar
-      seatsSocket.connect();
-    }
-
-    const onConnect = () => {
-      console.log("[Socket] Connected");
-      setConnected(true);
-      // Entrar na sala da sessão
-      seatsSocket.emit("join-showtime", joinPayload);
-    };
-
-    const onDisconnect = () => {
-      console.log("[Socket] Disconnected");
-      setConnected(false);
-    };
-
-    const onJoinedShowtime = (data: any) => {
-      console.log("[Socket] Joined showtime:", data.showtime_id);
-    };
-
-    seatsSocket.on("connect", onConnect);
-    seatsSocket.on("disconnect", onDisconnect);
-    seatsSocket.on("joined-showtime", onJoinedShowtime);
+    let cleanup: (() => void) | undefined;
+    void connectSocket().then((fn) => {
+      cleanup = fn;
+    });
 
     return () => {
-      // Apenas limpar listeners, NÃO desconectar
-      // O socket é singleton e deve permanecer vivo
-      seatsSocket.off("connect", onConnect);
-      seatsSocket.off("disconnect", onDisconnect);
-      seatsSocket.off("joined-showtime", onJoinedShowtime);
+      cancelled = true;
+      cleanup?.();
     };
   }, [showtimeId, user?.id]);
 
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // Restaurar reserva do localStorage ao montar
-  useEffect(() => {
-    const savedReservationKey = `seat-reservation-${showtimeId}`;
-    const savedReservation = localStorage.getItem(savedReservationKey);
-
-    if (savedReservation) {
-      try {
-        const parsed = JSON.parse(savedReservation);
-        const expiresAt = new Date(parsed.expiresAt);
-        const now = new Date();
-
-        // Verificar se ainda não expirou
-        if (expiresAt > now) {
-          console.log("[Reservation] Restored from localStorage:", parsed);
-          setReservation({
-            reservationUuid: parsed.reservationUuid,
-            expiresAt,
-            reservedSeatIds: parsed.reservedSeatIds,
-            timeRemaining: 0, // Será calculado pelo countdown
-            isReserving: false,
-            error: null,
-          });
-        } else {
-          // Expirou, limpar
-          console.log("[Reservation] Saved reservation expired, clearing");
-          localStorage.removeItem(savedReservationKey);
-        }
-      } catch (error) {
-        console.error("[Reservation] Error parsing saved reservation:", error);
-        localStorage.removeItem(savedReservationKey);
-      }
-    }
-    setIsInitialized(true);
-  }, [showtimeId]);
+  const isInitialized = true;
 
   // Timer de countdown
   useEffect(() => {
@@ -185,14 +236,20 @@ export const useSeatReservation = ({
         }
       };
     }
-  }, [reservation.expiresAt]);
+  }, [
+    reservation.expiresAt,
+    reservation.reservationUuid,
+    socket,
+    companyId,
+    showtimeId,
+  ]);
 
   // Eventos do socket
   useEffect(() => {
     if (!socket) return;
 
     // Sucesso na reserva
-    const onReservationSuccess = (data: any) => {
+    const onReservationSuccess = (data: ReservationEventData) => {
       console.log("[Socket] Reservation success:", data);
       const reservationData = {
         reservationUuid: data.reservation_uuid,
@@ -219,7 +276,7 @@ export const useSeatReservation = ({
     };
 
     // Erro na reserva
-    const onReservationError = (data: any) => {
+    const onReservationError = (data: ErrorEventData) => {
       console.error("[Socket] Reservation error:", data.message);
       setReservation((prev) => ({
         ...prev,
@@ -229,7 +286,7 @@ export const useSeatReservation = ({
     };
 
     // Confirmação da venda
-    const onReservationConfirmed = (data: any) => {
+    const onReservationConfirmed = (data: ReservationConfirmedEventData) => {
       console.log("[Socket] Reservation confirmed:", data);
       setReservation({
         reservationUuid: null,
@@ -242,7 +299,7 @@ export const useSeatReservation = ({
     };
 
     // Erro na confirmação
-    const onConfirmationError = (data: any) => {
+    const onConfirmationError = (data: ErrorEventData) => {
       console.error("[Socket] Confirmation error:", data.message);
       setReservation((prev) => ({
         ...prev,
@@ -251,7 +308,7 @@ export const useSeatReservation = ({
     };
 
     // Reserva restaurada (pelo backend via user_id)
-    const onReservationRestored = (data: any) => {
+    const onReservationRestored = (data: ReservationEventData) => {
       console.log("[Socket] Reservation restored from backend:", data);
       const reservationData = {
         reservationUuid: data.reservation_uuid,
@@ -277,7 +334,7 @@ export const useSeatReservation = ({
     };
 
     // Assentos liberados (manual ou expiração)
-    const onSeatsReleased = (data: any) => {
+    const onSeatsReleased = (data: SeatsReleasedEventData) => {
       console.log("[Socket] Seats released:", data);
       // Só limpar se for a nossa reserva
       if (reservation.reservationUuid === data.reservation_uuid) {

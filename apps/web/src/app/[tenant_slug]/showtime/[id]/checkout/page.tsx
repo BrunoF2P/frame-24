@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useSeatReservation } from "@/hooks/use-seat-reservation";
 import { useShowtimeDetails } from "@/hooks/use-showtime-details";
 import { useAuth } from "@/contexts/auth-context";
@@ -25,6 +26,29 @@ interface Product {
   price: number;
 }
 
+interface CompanySummary {
+  id?: string;
+}
+
+interface PaymentMethod {
+  id: string;
+  name: string;
+}
+
+interface ShowtimeSeat {
+  id: string;
+  additional_value?: number | string;
+}
+
+interface ShowtimeSummary {
+  base_ticket_price: number | string;
+  seats: ShowtimeSeat[];
+  cinema?: { id?: string; name?: string };
+  room?: { name?: string };
+  movie?: { title?: string; poster_url?: string };
+  start_time?: string;
+}
+
 export default function CheckoutPage({
   params,
 }: {
@@ -33,7 +57,7 @@ export default function CheckoutPage({
   const { tenant_slug, id } = use(params);
   const router = useRouter();
   const { data: companyData } = useCompany(tenant_slug);
-  const company = companyData as any;
+  const company = companyData as CompanySummary | undefined;
   const { user } = useAuth(); // Pegar usuário logado
 
   // CORREÇÃO 1: Passar o usuário correto para manter a sessão do socket
@@ -44,6 +68,7 @@ export default function CheckoutPage({
   });
 
   const { data: showtime } = useShowtimeDetails(id);
+  const showtimeData = showtime as ShowtimeSummary | undefined;
 
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -53,7 +78,7 @@ export default function CheckoutPage({
   const [cart, setCart] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<
     string | null
   >(null);
@@ -82,17 +107,21 @@ export default function CheckoutPage({
         const [ticketsRes, productsRes, paymentsRes] = await Promise.all([
           api.get(`/public/companies/${tenant_slug}/ticket-types`),
           api.get(
-            `/public/companies/${tenant_slug}/products?complex_id=${showtime?.cinema?.id}`,
-          ), // Filtra produtos pelo cinema
+            `/public/companies/${tenant_slug}/products?complex_id=${showtimeData?.cinema?.id}`,
+          ),
           api.get(`/public/companies/${tenant_slug}/payment-methods`),
         ]);
 
         setTicketTypes(ticketsRes.data);
         setProducts(productsRes.data);
-        setPaymentMethods(paymentsRes.data);
+        setPaymentMethods(
+          Array.isArray(paymentsRes.data)
+            ? (paymentsRes.data as PaymentMethod[])
+            : [],
+        );
 
-        if (paymentsRes.data.length > 0) {
-          setSelectedPaymentMethod(paymentsRes.data[0].id);
+        if (Array.isArray(paymentsRes.data) && paymentsRes.data.length > 0) {
+          setSelectedPaymentMethod((paymentsRes.data[0] as PaymentMethod).id);
         }
       } catch (error) {
         console.error("Erro ao carregar dados do checkout", error);
@@ -101,22 +130,22 @@ export default function CheckoutPage({
       }
     }
 
-    if (showtime) {
+    if (showtimeData) {
       loadData();
     }
-  }, [tenant_slug, showtime, id]);
+  }, [tenant_slug, showtimeData, id]);
 
   const calculateTotal = () => {
-    if (!showtime) return 0;
+    if (!showtimeData) return 0;
 
     const ticketsTotal = reservation.reservedSeatIds.reduce((total, seatId) => {
       const ticketTypeId = selectedTickets[seatId];
       const ticketType = ticketTypes.find((t) => t.id === ticketTypeId);
       if (!ticketType) return total;
 
-      const seatDetails = showtime.seats.find((s) => s.id === seatId);
+      const seatDetails = showtimeData.seats.find((s) => s.id === seatId);
       const additionalValue = Number(seatDetails?.additional_value || 0);
-      const basePrice = Number(showtime.base_ticket_price);
+      const basePrice = Number(showtimeData.base_ticket_price);
       const seatBasePrice = basePrice + additionalValue;
 
       let multiplier = 1;
@@ -152,7 +181,7 @@ export default function CheckoutPage({
     setProcessing(true);
     try {
       const salePayload = {
-        cinema_complex_id: showtime?.cinema?.id,
+        cinema_complex_id: showtimeData?.cinema?.id,
         customer_id: user?.id,
         payment_method: selectedPaymentMethod,
         // Mapeia ingressos com segurança
@@ -183,15 +212,24 @@ export default function CheckoutPage({
         // Redireciona para confirmação
         router.push(`/${tenant_slug}/confirmation/${response.data.id}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro no checkout:", error);
-      alert(error.response?.data?.message || "Erro ao processar compra.");
+      const message =
+        error &&
+        typeof error === "object" &&
+        "response" in error &&
+        typeof (error as { response?: { data?: { message?: unknown } } }).response
+          ?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message
+          : "Erro ao processar compra.";
+      alert(message);
     } finally {
       setProcessing(false);
     }
   };
 
-  if (loading || !showtime) {
+  if (loading || !showtimeData) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
@@ -223,24 +261,26 @@ export default function CheckoutPage({
           <div className="bg-zinc-900 rounded-lg p-6 border border-zinc-800">
             <h3 className="font-bold text-lg mb-4 text-zinc-200">Sessão</h3>
             <div className="flex gap-4">
-              {showtime.movie?.poster_url && (
-                <img
-                  src={showtime.movie.poster_url}
+              {showtimeData.movie?.poster_url && (
+                <Image
+                  src={showtimeData.movie.poster_url}
                   alt="Poster"
+                  width={64}
+                  height={96}
                   className="w-16 h-24 object-cover rounded"
                 />
               )}
               <div>
                 <h4 className="font-bold text-white">
-                  {showtime.movie?.title}
+                  {showtimeData.movie?.title}
                 </h4>
                 <p className="text-zinc-400 text-sm">
-                  {showtime.cinema?.name} • Sala {showtime.room?.name}
+                  {showtimeData.cinema?.name} • Sala {showtimeData.room?.name}
                 </p>
                 <p className="text-zinc-400 text-sm">
-                  {showtime.start_time &&
+                  {showtimeData.start_time &&
                     format(
-                      new Date(showtime.start_time),
+                      new Date(showtimeData.start_time),
                       "dd 'de' MMMM 'às' HH:mm",
                       { locale: ptBR },
                     )}

@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { Users, Film, Ticket, TrendingUp } from "lucide-react";
 
+interface DashboardStat {
+  title: string;
+  value: string;
+  icon: typeof TrendingUp;
+  color: string;
+}
+
 export default function DashboardPage() {
-  // Estado local para dados do dashboard (pode vir da API futuramente)
-  const [stats, setStats] = useState([
+  const stats = useMemo<DashboardStat[]>(() => [
     {
       title: "Total de Vendas",
       value: "R$ 0,00",
@@ -30,7 +36,7 @@ export default function DashboardPage() {
       icon: Ticket,
       color: "text-orange-500",
     },
-  ]);
+  ], []);
 
   return (
     <div className="space-y-6">

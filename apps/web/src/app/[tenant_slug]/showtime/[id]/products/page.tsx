@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useSeatReservation } from "@/hooks/use-seat-reservation";
 import { useShowtimeDetails } from "@/hooks/use-showtime-details";
 import { useCompany } from "@/hooks/use-company";
@@ -16,6 +17,28 @@ interface Product {
   category_id: string;
 }
 
+interface CompanySummary {
+  id?: string;
+}
+
+interface TicketTypeOption {
+  id: string;
+  price_modifier?: number;
+  discount_percentage?: number;
+}
+
+interface ShowtimeSeat {
+  id: string;
+  additional_value?: number | string;
+}
+
+interface ShowtimeSummary {
+  base_ticket_price: number | string;
+  cinema?: { id?: string; name?: string };
+  movie?: { title?: string };
+  seats: ShowtimeSeat[];
+}
+
 export default function ProductSelectionPage({
   params,
 }: {
@@ -24,7 +47,7 @@ export default function ProductSelectionPage({
   const { tenant_slug, id } = use(params);
   const router = useRouter();
   const { data: companyData } = useCompany(tenant_slug);
-  const company = companyData as any;
+  const company = companyData as CompanySummary | undefined;
 
   const { reservation, isInitialized } = useSeatReservation({
     showtimeId: id,
@@ -33,6 +56,7 @@ export default function ProductSelectionPage({
   });
 
   const { data: showtime } = useShowtimeDetails(id);
+  const showtimeData = showtime as ShowtimeSummary | undefined;
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -68,10 +92,12 @@ export default function ProductSelectionPage({
         const ticketsRes = await api.get(
           `/public/companies/${tenant_slug}/ticket-types`,
         );
-        const ticketTypes = ticketsRes.data;
+        const ticketTypes = Array.isArray(ticketsRes.data)
+          ? (ticketsRes.data as TicketTypeOption[])
+          : [];
 
         // D. Buscar Produtos
-        const complexId = (showtime as any)?.cinema?.id;
+        const complexId = showtimeData?.cinema?.id;
         const productsRes = await api.get(
           `/public/companies/${tenant_slug}/products`,
           {
@@ -81,18 +107,16 @@ export default function ProductSelectionPage({
         setProducts(productsRes.data);
 
         // E. Calcular Total dos Ingressos (Lógica idêntica ao Checkout)
-        if (showtime && reservation.reservedSeatIds.length > 0) {
+        if (showtimeData && reservation.reservedSeatIds.length > 0) {
           const total = reservation.reservedSeatIds.reduce(
             (acc: number, seatId: string) => {
               const typeId = selectedTickets[seatId];
-              const type = ticketTypes.find((t: any) => t.id === typeId);
+              const type = ticketTypes.find((ticket) => ticket.id === typeId);
 
               // Detalhes do assento (preço extra)
-              const seat = (showtime as any).seats.find(
-                (s: any) => s.id === seatId,
-              );
+              const seat = showtimeData.seats.find((seatItem) => seatItem.id === seatId);
               const extra = Number(seat?.additional_value || 0);
-              const base = Number((showtime as any).base_ticket_price);
+              const base = Number(showtimeData.base_ticket_price);
 
               let multiplier = 1;
               if (type?.price_modifier !== undefined)
@@ -114,17 +138,18 @@ export default function ProductSelectionPage({
       }
     }
 
-    if (showtime && reservation.reservedSeatIds.length > 0) {
+    if (showtimeData && reservation.reservedSeatIds.length > 0) {
       loadData();
     }
-  }, [tenant_slug, showtime, id, reservation.reservedSeatIds]);
+  }, [tenant_slug, showtimeData, id, reservation.reservedSeatIds]);
 
   const updateQuantity = (productId: string, delta: number) => {
     setCart((prev) => {
       const currentQty = prev[productId] || 0;
       const newQty = Math.max(0, currentQty + delta);
       if (newQty === 0) {
-        const { [productId]: _, ...rest } = prev;
+        const rest = { ...prev };
+        delete rest[productId];
         return rest;
       }
       return { ...prev, [productId]: newQty };
@@ -146,7 +171,7 @@ export default function ProductSelectionPage({
     router.push(`/${tenant_slug}/showtime/${id}/checkout`);
   };
 
-  if (loading || !showtime) {
+  if (loading || !showtimeData) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
@@ -159,9 +184,9 @@ export default function ProductSelectionPage({
       <header className="bg-zinc-900 border-b border-zinc-800 p-4 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold">{showtime.movie?.title}</h1>
+            <h1 className="text-xl font-bold">{showtimeData.movie?.title}</h1>
             <p className="text-sm text-zinc-400">
-              Bomboniere • {showtime.cinema?.name}
+              Bomboniere • {showtimeData.cinema?.name}
             </p>
           </div>
           <div className="text-right">
@@ -189,9 +214,11 @@ export default function ProductSelectionPage({
               >
                 <div className="w-24 h-24 bg-zinc-800 rounded-md flex-shrink-0 flex items-center justify-center text-zinc-600">
                   {product.image_url ? (
-                    <img
+                    <Image
                       src={product.image_url}
                       alt={product.name}
+                      width={96}
+                      height={96}
                       className="w-full h-full object-cover rounded-md"
                     />
                   ) : (

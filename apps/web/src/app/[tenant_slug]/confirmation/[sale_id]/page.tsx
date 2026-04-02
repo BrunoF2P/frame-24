@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { api } from "@/lib/api";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -15,6 +16,44 @@ import {
   Home,
 } from "lucide-react";
 
+type TicketItem = {
+  id: string;
+  seat?: string;
+  ticket_number?: string;
+  ticket_types?: {
+    name?: string;
+  };
+};
+
+type ProductItem = {
+  id: string;
+  name: string;
+};
+
+type SaleData = {
+  sale_number?: string;
+  net_amount?: number | string;
+  showtime_details?: {
+    start_time: string;
+    cinema_complexes?: { name?: string };
+    rooms?: { name?: string };
+  };
+  movie_details?: {
+    title?: string;
+    poster_url?: string;
+  };
+  products_details?: ProductItem[];
+  tickets?: TicketItem[];
+  concession_sales?: Array<{
+    concession_sale_items: Array<{
+      id: string;
+      item_type?: string;
+      item_id?: string;
+      quantity?: number;
+    }>;
+  }>;
+};
+
 export default function ConfirmationPage({
   params,
 }: {
@@ -22,7 +61,7 @@ export default function ConfirmationPage({
 }) {
   const { tenant_slug, sale_id } = use(params);
   const router = useRouter();
-  const [sale, setSale] = useState<any>(null);
+  const [sale, setSale] = useState<SaleData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,7 +69,8 @@ export default function ConfirmationPage({
       try {
         const response = await api.get(`/public/sales/${sale_id}`);
         setSale(response.data);
-      } catch (error) {
+      } catch {
+        setSale(null);
       } finally {
         setLoading(false);
       }
@@ -68,11 +108,11 @@ export default function ConfirmationPage({
   const concessionSales = sale.concession_sales || [];
 
   // Agrupar produtos
-  const productItems: any[] = [];
-  concessionSales.forEach((cs: any) => {
-    cs.concession_sale_items.forEach((item: any) => {
+  const productItems: Array<{ id: string; quantity?: number; name: string }> = [];
+  concessionSales.forEach((cs) => {
+    cs.concession_sale_items.forEach((item) => {
       if (item.item_type === "PRODUCT") {
-        const product = products.find((p: any) => p.id === item.item_id);
+        const product = products.find((p) => p.id === item.item_id);
         if (product) {
           productItems.push({
             ...item,
@@ -106,10 +146,12 @@ export default function ConfirmationPage({
             <div className="flex">
               <div className="w-32 h-48 bg-zinc-800 relative">
                 {movie.poster_url ? (
-                  <img
+                  <Image
                     src={movie.poster_url}
-                    alt={movie.title}
-                    className="w-full h-full object-cover"
+                    alt={movie.title || "Poster"}
+                    fill
+                    sizes="128px"
+                    className="object-cover"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-zinc-600">
@@ -154,7 +196,7 @@ export default function ConfirmationPage({
               <h3 className="font-semibold">Ingressos</h3>
             </div>
             <div className="space-y-3">
-              {tickets.map((ticket: any) => (
+              {tickets.map((ticket) => (
                 <div
                   key={ticket.id}
                   className="flex justify-between items-center bg-zinc-950/50 p-3 rounded-lg border border-zinc-800/50"
@@ -162,9 +204,11 @@ export default function ConfirmationPage({
                   <div className="flex items-center gap-4">
                     {/* QR Code */}
                     <div className="bg-white p-1 rounded">
-                      <img
+                      <Image
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${ticket.ticket_number}`}
                         alt="QR Code"
+                        width={64}
+                        height={64}
                         className="w-16 h-16"
                       />
                     </div>
@@ -194,7 +238,7 @@ export default function ConfirmationPage({
               <h3 className="font-semibold">Produtos</h3>
             </div>
             <div className="space-y-3">
-              {productItems.map((item: any) => (
+              {productItems.map((item) => (
                 <div
                   key={item.id}
                   className="flex justify-between items-center"

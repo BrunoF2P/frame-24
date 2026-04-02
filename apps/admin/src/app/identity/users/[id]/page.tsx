@@ -1,18 +1,31 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { UsersService } from "@/services/users-service";
 import { RolesService } from "@/services/roles-service";
 import { ArrowLeft, Save, Loader2, KeyRound } from "lucide-react";
 import Link from "next/link";
 
+interface RoleOption {
+  id: string;
+  name: string;
+}
+
+interface UserResponse {
+  full_name?: string;
+  email: string;
+  company_user?: {
+    role_id?: string;
+  };
+}
+
 export default function EditUserPage({ params }: { params: { id: string } }) {
   const { id: userId } = params;
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [roles, setRoles] = useState<any[]>([]);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
 
   // Estado para o formulário principal
   const [formData, setFormData] = useState({
@@ -36,15 +49,17 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           RolesService.getAll(),
         ]);
 
-        setRoles(rolesData as any[]);
+        const rolesList = Array.isArray(rolesData)
+          ? (rolesData as RoleOption[])
+          : [];
+        const user = userData as UserResponse;
+
+        setRoles(rolesList);
 
         setFormData({
-          full_name: userData.full_name || "",
-          email: userData.email,
-          role_id:
-            userData.company_user?.role_id ||
-            (rolesData as any[])?.[0]?.id ||
-            "",
+          full_name: user.full_name || "",
+          email: user.email,
+          role_id: user.company_user?.role_id || rolesList[0]?.id || "",
         });
       } catch (error) {
         console.error("Erro ao carregar dados do usuário:", error);
@@ -62,15 +77,6 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     setLoading(true);
 
     try {
-      // A API de Users espera os dados no corpo.
-      // Os dados de pessoa (full_name) e identity (email) são mapeados no backend.
-      const payload = {
-        full_name: formData.full_name,
-        email: formData.email,
-        role_id: formData.role_id,
-        // Adicione outros campos que a sua rota de update aceitar
-      };
-
       // Assumindo que você tem uma função update no UsersService
       // await UsersService.update(userId, payload);
 

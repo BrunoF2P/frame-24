@@ -5,11 +5,21 @@ import { SalesService } from "@/services/sales-services";
 import { Plus, Trash2, Package } from "lucide-react";
 import Link from "next/link";
 
+interface ProductItem {
+  id: string;
+  name: string;
+  product_code: string;
+}
+
 export default function ProductsPage() {
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<ProductItem[]>([]);
 
   useEffect(() => {
-    SalesService.getProducts().then(setProducts).catch(console.error);
+    SalesService.getProducts()
+      .then((data) => {
+        setProducts(Array.isArray(data) ? (data as ProductItem[]) : []);
+      })
+      .catch(console.error);
   }, []);
 
   return (
