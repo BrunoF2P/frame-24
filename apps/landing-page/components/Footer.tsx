@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Linkedin, Twitter } from "lucide-react";
+import { ExternalLink, Globe } from "lucide-react";
 
 const footerLinks = {
   empresa: [
@@ -42,7 +42,7 @@ export default function Footer() {
                 aria-label="Twitter"
                 className="text-gray-300 hover:text-red-500 transition-colors"
               >
-                <Twitter className="w-5 h-5" />
+                <ExternalLink className="w-5 h-5" />
               </a>
               <a
                 href="#"
@@ -51,7 +51,7 @@ export default function Footer() {
                 aria-label="LinkedIn"
                 className="text-gray-300 hover:text-red-500 transition-colors"
               >
-                <Linkedin className="w-5 h-5" />
+                <Globe className="w-5 h-5" />
               </a>
             </div>
           </div>

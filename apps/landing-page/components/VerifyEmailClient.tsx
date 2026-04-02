@@ -2,22 +2,27 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api-client";
+import type { AxiosError } from "axios";
 
 type VerifyState = "loading" | "success" | "error";
+
+type ApiErrorPayload = {
+  message?: string | string[];
+};
 
 export default function VerifyEmailClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [state, setState] = useState<VerifyState>("loading");
-  const [message, setMessage] = useState("");
+  const token = searchParams.get("token");
+  const [state, setState] = useState<VerifyState>(token ? "loading" : "error");
+  const [message, setMessage] = useState(
+    token ? "" : "Token de verificação não encontrado.",
+  );
 
   useEffect(() => {
-    const token = searchParams.get("token");
-
     if (!token) {
-      setState("error");
-      setMessage("Token de verificação não encontrado.");
       return;
     }
 
@@ -33,21 +38,24 @@ export default function VerifyEmailClient() {
         setTimeout(() => {
           router.push("http://localhost:3002/login");
         }, 3000);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Erro ao verificar email:", error);
 
+        const axiosError = error as AxiosError<ApiErrorPayload>;
+        const payloadMessage = axiosError.response?.data?.message;
+
         const errorMessage =
-          error.response?.data?.message?.message ||
-          error.response?.data?.message ||
-          "Token inválido ou expirado.";
+          (Array.isArray(payloadMessage)
+            ? payloadMessage[0]
+            : payloadMessage) ?? "Token inválido ou expirado.";
 
         setState("error");
         setMessage(errorMessage);
       }
     }
 
-    verifyEmail(token);
-  }, [searchParams, router]);
+    void verifyEmail(token);
+  }, [token, router]);
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-6">
@@ -83,18 +91,18 @@ export default function VerifyEmailClient() {
             </h1>
             <p className="text-gray-300 mb-6">{message}</p>
             <div className="space-y-3">
-              <a
+              <Link
                 href="/register-tenant"
                 className="block px-6 py-3 bg-red-700 hover:bg-red-600 text-white rounded-lg font-semibold transition"
               >
                 Cadastrar Novamente
-              </a>
-              <a
+              </Link>
+              <Link
                 href="/"
                 className="block px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition"
               >
                 Voltar para Home
-              </a>
+              </Link>
             </div>
           </>
         )}

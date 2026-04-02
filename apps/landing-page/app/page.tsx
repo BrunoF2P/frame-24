@@ -21,6 +21,12 @@ const LandingPageLayout = ({ children }: { children: React.ReactNode }) => (
         {/* Links de navegação */}
         <div className="hidden md:flex items-center space-x-8 text-sm font-medium">
           <Link
+            href="/auth/login"
+            className="text-gray-300 hover:text-white transition-colors"
+          >
+            Entrar
+          </Link>
+          <Link
             href="#features"
             className="text-gray-300 hover:text-white transition-colors"
           >
