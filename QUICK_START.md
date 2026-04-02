@@ -6,7 +6,7 @@
 
 - Node.js >= 18
 - pnpm 10.20.0
-- Docker Desktop
+- Podman 5+
 
 ### 2. Clonar e Instalar
 
@@ -34,12 +34,31 @@ touch apps/admin/.env.local
 ### 4. Iniciar Infraestrutura
 
 ```bash
-# Iniciar Docker (PostgreSQL, RabbitMQ, etc.)
-docker-compose up -d
+# Iniciar infraestrutura local (PostgreSQL, RabbitMQ, MinIO e Authentik com bootstrap automatico)
+podman compose -f docker-compose.yaml up -d
 
-# Aguardar serviços ficarem prontos (~30 segundos)
-docker-compose ps
+# Aguardar serviços ficarem prontos
+podman compose -f docker-compose.yaml ps
 ```
+
+### 4.1 Bootstrap do Authentik (automatico)
+
+O compose agora sobe o Authentik e roda automaticamente o container `authentik-bootstrap`,
+que cria/atualiza o provider OIDC compartilhado `frame24-app` para `web`, `admin` e `landing`.
+
+Se voce estiver vindo de um ambiente antigo com Keycloak, execute:
+
+```bash
+podman compose -f docker-compose.yaml down
+podman volume rm frame-24_keycloak_data frame-24_authentik_data frame-24_authentik_postgres_data || true
+podman compose -f docker-compose.yaml up -d
+```
+
+Endpoints uteis:
+
+- Authentik: <http://localhost:9080/if/admin/> (admin@frame24.local / admin)
+- Issuer OIDC compartilhado: <http://localhost:9080/application/o/frame24-app/>
+- Token de bootstrap/provisioning local: `frame24-authentik-bootstrap-token`
 
 ### 5. Configurar Banco de Dados
 
@@ -60,6 +79,25 @@ pnpm dev:api
 # API rodando em http://localhost:4000
 ```
 
+Contrato de autenticação (padrão do projeto):
+
+- Login canônico: OIDC/Authentik (frontend web/admin/landing via Auth.js).
+- A API valida access token RS256 emitido pelo Authentik (issuer/JWKS).
+- `POST /v1/auth/register` e `POST /v1/customer/auth/register` fazem provisioning de usuários no Authentik.
+- `POST /v1/customer/auth/login` permanece apenas por compatibilidade e retorna 401 (fluxo legado desativado).
+
+Para o fluxo de autenticacao OIDC/Authentik, confira em `apps/api/.env`:
+
+```env
+AUTH_PROVIDER=authentik
+OIDC_ISSUER=http://localhost:9080/application/o/frame24-app/
+OIDC_JWKS_URI=http://localhost:9080/application/o/frame24-app/jwks/
+OIDC_API_AUDIENCE=frame24-app
+AUTHENTIK_URL=http://localhost:9080
+AUTHENTIK_TOKEN=frame24-authentik-bootstrap-token
+AUTHENTIK_PROVISIONING_ENABLED=true
+```
+
 **Terminal 2 - Frontend:**
 
 ```bash
@@ -69,16 +107,16 @@ pnpm dev:web
 
 ### 7. Acessar Sistema
 
-- **Frontend:** http://localhost:3000
-- **API Docs:** http://localhost:4000/api/docs
-- **Dashboard:** http://localhost:3000/dashboard
+- **Frontend:** <http://localhost:3000>
+- **API Docs:** <http://localhost:4000/api/docs>
+- **Dashboard:** <http://localhost:3000/dashboard>
 
 ## 📱 Módulos Disponíveis
 
 | Módulo          | URL                 | Descrição                |
 | --------------- | ------------------- | ------------------------ |
 | 🏠 Dashboard    | `/dashboard`        | Métricas e ações rápidas |
-| 🔐 Login        | `/login`            | Autenticação JWT         |
+| 🔐 Login        | `/:tenant_slug/auth/login` | Login OIDC (Authentik) |
 | 👥 Usuários     | `/users`            | Gestão de usuários       |
 | 🎬 Filmes       | `/movies`           | Catálogo de filmes       |
 | 📦 Produtos     | `/products`         | Gestão de produtos       |
@@ -90,21 +128,23 @@ pnpm dev:web
 
 ## 🔑 Credenciais de Teste
 
-Para criar um usuário de teste, use a landing page ou a API diretamente:
+Para criar um usuário/empresa de teste, use a landing page ou a API diretamente:
 
 ```bash
-# Registrar nova empresa via API
+# Registrar nova empresa (provisiona admin no Keycloak)
 curl -X POST http://localhost:4000/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
-    "company_name": "Cinema Teste",
+    "corporate_name": "Cinema Teste LTDA",
+    "trade_name": "Cinema Teste",
+    "cnpj": "12345678000195",
+    "full_name": "Admin Teste",
     "email": "admin@teste.com",
-    "password": "senha123",
-    "name": "Admin Teste"
+    "password": "SenhaForte123"
   }'
 ```
 
-Ou acesse: http://localhost:3003 (Landing Page) para registro.
+Ou acesse: <http://localhost:3003> (Landing Page) para registro.
 
 ## 🐛 Problemas Comuns
 
@@ -121,11 +161,11 @@ pnpm dev:api
 ### Erro: "Database connection failed"
 
 ```bash
-# Verificar Docker
-docker-compose ps
+# Verificar containers
+podman compose -f docker-compose.yaml ps
 
 # Reiniciar se necessário
-docker-compose restart postgres
+podman compose -f docker-compose.yaml restart postgres
 ```
 
 ### Erro: "Port 3000 already in use"
@@ -166,7 +206,7 @@ Se encontrar problemas:
 
 1. Verifique a documentação completa
 2. Consulte os logs do backend e frontend
-3. Verifique se todos os serviços Docker estão rodando
+3. Verifique se todos os serviços do Podman estão rodando
 4. Limpe cache do navegador se necessário
 
 ---

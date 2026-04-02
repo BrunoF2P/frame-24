@@ -95,7 +95,7 @@ O repositório utiliza Turborepo + pnpm workspaces, organizado em apps e package
 - React `19`
 - Tailwind CSS `4`
 
-### Infraestrutura local (Docker)
+### Infraestrutura local (Podman)
 
 - PostgreSQL
 - RabbitMQ
@@ -108,7 +108,7 @@ O repositório utiliza Turborepo + pnpm workspaces, organizado em apps e package
 | --- | --- |
 | Node.js | `>= 18` |
 | pnpm | `10.20.0` |
-| Docker / Docker Compose | latest |
+| Podman / Podman Compose | latest |
 | Git | latest |
 
 ### Instalar pnpm
@@ -149,8 +149,8 @@ cd frame-24
 ### 2. Suba a infraestrutura
 
 ```bash
-docker-compose up -d
-docker-compose ps
+podman compose -f docker-compose.yaml up -d
+podman compose -f docker-compose.yaml ps
 ```
 
 ### 3. Configure variáveis de ambiente
@@ -246,12 +246,12 @@ pnpm db:reset
 
 | Serviço | URL | Credenciais |
 | --- | --- | --- |
-| API (Swagger) | http://localhost:4000/api/docs | - |
-| Web App | http://localhost:3000 | - |
-| Admin App | http://localhost:3004 | - |
-| Landing Page | http://localhost:3003 | - |
-| RabbitMQ Management | http://localhost:15672 | `frame24` / `frame24pass` |
-| MailHog | http://localhost:8025 | - |
+| API (Swagger) | <http://localhost:4000/api/docs> | - |
+| Web App | <http://localhost:3000> | - |
+| Admin App | <http://localhost:3004> | - |
+| Landing Page | <http://localhost:3003> | - |
+| RabbitMQ Management | <http://localhost:15672> | `frame24` / `frame24pass` |
+| MailHog | <http://localhost:8025> | - |
 
 Prisma Studio:
 
@@ -282,15 +282,35 @@ Schemas principais:
 
 ## Autenticação
 
-Fluxo básico JWT na API:
+Contrato de autenticação (padrão do projeto):
 
-1. `POST /v1/auth/signup`
-2. `POST /v1/auth/login`
-3. Enviar o token no header:
+- Login canônico: OIDC/Authentik (frontend web/admin/landing via Auth.js).
+- A API valida access token RS256 emitido pelo Authentik (issuer/JWKS).
+- `POST /v1/auth/register` e `POST /v1/customer/auth/register` fazem provisioning de usuários no Authentik.
+- `POST /v1/customer/auth/login` permanece apenas por compatibilidade e retorna 401 (fluxo legado desativado).
+
+Headers aceitos na API:
 
 ```http
-Authorization: Bearer <seu-token-jwt>
+Authorization: Bearer <access-token>
 ```
+
+Variáveis principais da API para o fluxo OIDC/Authentik:
+
+```env
+AUTH_PROVIDER=authentik
+OIDC_ISSUER=http://localhost:9080/application/o/frame24-app/
+OIDC_JWKS_URI=http://localhost:9080/application/o/frame24-app/jwks/
+OIDC_API_AUDIENCE=frame24-app
+
+# Provisioning de usuarios (cadastro publico / cadastro de cliente)
+AUTHENTIK_URL=http://localhost:9080
+AUTHENTIK_TOKEN=frame24-authentik-bootstrap-token
+AUTHENTIK_PROVISIONING_ENABLED=true
+```
+
+Observação: as credenciais de provisioning são separadas do runtime normal da API.
+Sem `AUTHENTIK_PROVISIONING_ENABLED=true`, os fluxos de cadastro/provisioning no Authentik ficam desabilitados.
 
 ## Multi-Tenancy
 
@@ -306,7 +326,7 @@ Arquitetura multi-tenant com separação lógica de dados por empresa:
 ### Porta em uso
 
 ```bash
-docker-compose ps
+podman compose -f docker-compose.yaml ps
 ```
 
 Se necessário, ajuste portas no `docker-compose.yaml` e arquivos `.env`.
@@ -314,15 +334,15 @@ Se necessário, ajuste portas no `docker-compose.yaml` e arquivos `.env`.
 ### Banco não conecta
 
 ```bash
-docker-compose ps postgres
-docker-compose restart postgres
+podman compose -f docker-compose.yaml ps postgres
+podman compose -f docker-compose.yaml restart postgres
 ```
 
 ### RabbitMQ indisponível
 
 ```bash
-docker-compose ps rabbitmq
-docker-compose logs -f rabbitmq
+podman compose -f docker-compose.yaml ps rabbitmq
+podman compose -f docker-compose.yaml logs -f rabbitmq
 ```
 
 ### Prisma Client desatualizado

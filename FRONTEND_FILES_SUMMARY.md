@@ -1,108 +1,78 @@
-# Resumo dos Arquivos Criados/Modificados no Frontend
+# Frontend Files Summary (Estado Atual)
 
-## ✅ Arquivos Criados
+## Escopo
 
-### Autenticação e Contextos
+Resumo dos arquivos e areas frontend relevantes no estado atual do projeto, com foco em autenticacao OIDC/Keycloak e estrutura real de apps.
 
-1. `apps/frontend/app/contexts/AuthContext.tsx` - Context de autenticação com JWT
-2. `apps/frontend/app/login/page.tsx` - Página de login
+Apps:
 
-### Serviços de API
+- `apps/web`
+- `apps/admin`
+- `apps/landing-page`
 
-1. `apps/frontend/app/services/api.ts` - Serviços completos de integração com backend (REESCRITO)
+## Auth.js + Keycloak
 
-### Páginas de Gestão
+### `apps/web`
 
-1. `apps/frontend/app/users/page.tsx` - Listagem de usuários
-2. `apps/frontend/app/products/page.tsx` - Listagem de produtos
-3. `apps/frontend/app/movie-categories/page.tsx` - Gerenciamento de categorias de filmes
-4. `apps/frontend/app/cinema-complexes/page.tsx` - Gerenciamento de complexos
-5. `apps/frontend/app/rooms/page.tsx` - Gerenciamento de salas
-6. `apps/frontend/app/showtimes/page.tsx` - Programação de sessões
-7. `apps/frontend/app/suppliers/page.tsx` - Gerenciamento de fornecedores
+- `apps/web/src/auth.ts`
+- `apps/web/src/app/api/auth/[...nextauth]/route.ts`
+- `apps/web/src/proxy.ts`
+- `apps/web/src/components/providers.tsx`
+- `apps/web/src/contexts/auth-context.tsx`
+- `apps/web/src/lib/api-client.ts`
+- `apps/web/src/lib/api.ts`
+- `apps/web/src/lib/socket-client.ts`
+- `apps/web/src/app/[tenant_slug]/auth/login/page.tsx`
+- `apps/web/src/app/[tenant_slug]/auth/register/page.tsx`
 
-### Dashboard e Configuração
+### `apps/admin`
 
-1. `apps/frontend/app/dashboard/page.tsx` - Dashboard com métricas (REESCRITO)
-2. `apps/frontend/app/config/navigation.tsx` - Navegação completa (REESCRITO)
+- `apps/admin/src/auth.ts`
+- `apps/admin/src/app/api/auth/[...nextauth]/route.ts`
+- `apps/admin/src/proxy.ts`
+- `apps/admin/src/app/layout.tsx`
+- `apps/admin/src/app/login/page.tsx`
+- `apps/admin/src/services/api-config.ts`
+- `apps/admin/src/services/sales-services.ts`
 
-### Configuração
+### `apps/landing-page`
 
-1. `apps/*/.env.example` - Exemplos de variáveis de ambiente por app (padrão Turborepo)
+- `apps/landing-page/auth.ts`
+- `apps/landing-page/app/api/auth/[...nextauth]/route.ts`
+- `apps/landing-page/app/auth/login/page.tsx`
+- `apps/landing-page/app/auth/logout/page.tsx`
+- `apps/landing-page/app/actions/register.ts`
+- `apps/landing-page/components/RegisterForm.tsx`
 
-### Documentação
+## Ambiente por App
 
-1. `/home/ubuntu/frame-24/FRONTEND_DEVELOPMENT.md` - Documentação completa do frontend
-2. `/home/ubuntu/frame-24/API_ENDPOINTS.md` - Mapeamento de endpoints
-3. `/home/ubuntu/frame-24/FRONTEND_FILES_SUMMARY.md` - Este arquivo
+- `apps/web/.env.example`
+- `apps/admin/.env.example`
+- `apps/landing-page/.env.example`
 
-## 🔧 Arquivos Modificados
+Variaveis centrais:
 
-1. `apps/frontend/app/layout.tsx` - Adicionado AuthProvider
+- `AUTH_TRUST_HOST`
+- `AUTH_SECRET`
+- `AUTH_KEYCLOAK_ID`
+- `AUTH_KEYCLOAK_SECRET`
+- `AUTH_KEYCLOAK_ISSUER`
+- `NEXT_PUBLIC_API_URL`
 
-## 📦 Arquivos Mantidos (já existentes)
+## Backend/Contrato Relacionado
 
-- `apps/frontend/app/movies/page.tsx` - Listagem de filmes
-- `apps/frontend/app/movies/cadastrar/page.tsx` - Cadastro de filmes
-- `apps/frontend/app/movies/editar/[id]/page.tsx` - Edição de filmes
-- `apps/frontend/app/components/MovieCard.tsx` - Card de filme
-- `apps/frontend/app/components/SidebarNav.tsx` - Navegação lateral
-- `apps/frontend/app/components/theme-provider.tsx` - Provider de tema
+Arquivos backend que definem o contrato consumido pelos frontends:
 
-## 📊 Estatísticas
+- `apps/api/src/main.ts` (bearer auth no OpenAPI)
+- `apps/api/src/swagger.config.ts` (descricao de auth por dominio)
+- `apps/api/src/modules/identity/auth/controllers/public-auth.controller.ts`
+- `apps/api/src/modules/identity/auth/services/public-registration.service.ts`
+- `apps/api/src/modules/crm/controllers/customer-auth.controller.ts`
+- `apps/api/src/modules/crm/services/customer-auth.service.ts`
 
-- **Total de arquivos criados:** 16
-- **Total de arquivos modificados:** 1
-- **Total de módulos implementados:** 9
-- **Total de endpoints integrados:** 50+
+## Documentacao Relacionada
 
-## 🎯 Módulos Completos
-
-1. ✅ Autenticação (Login, Context, JWT)
-2. ✅ Usuários (Listagem, CRUD preparado)
-3. ✅ Filmes (Listagem, Cadastro, Categorias)
-4. ✅ Produtos (Listagem, CRUD preparado)
-5. ✅ Complexos de Cinema (Listagem, CRUD preparado)
-6. ✅ Salas (Listagem, CRUD preparado)
-7. ✅ Sessões (Listagem, CRUD preparado)
-8. ✅ Fornecedores (Listagem, CRUD preparado)
-9. ✅ Dashboard (Métricas e ações rápidas)
-
-## 🔜 Próximas Implementações Sugeridas
-
-### Páginas de Formulário (Create/Edit)
-
-- `/users/create` e `/users/edit/[id]`
-- `/products/create` e `/products/edit/[id]`
-- `/product-categories` (página completa)
-- `/cinema-complexes/create` e `/cinema-complexes/edit/[id]`
-- `/rooms/create` e `/rooms/edit/[id]`
-- `/showtimes/create` e `/showtimes/edit/[id]`
-- `/suppliers/create` e `/suppliers/edit/[id]`
-
-### Funcionalidades Avançadas
-
-- Paginação
-- Filtros avançados
-- Upload de imagens
-- Relatórios
-- Gráficos e visualizações
-- Sistema de vendas
-- Gestão financeira
-
-## 🚀 Como Usar
-
-1. Instalar dependências: `pnpm install`
-2. Configurar `apps/web/.env` (a partir de `apps/web/.env.example`) com `NEXT_PUBLIC_API_URL=http://localhost:4000`
-3. Iniciar backend: `pnpm dev:api`
-4. Iniciar frontend: `pnpm dev:web`
-5. Acessar: <http://localhost:3000>
-
-## 📝 Notas Importantes
-
-- Todos os serviços de API estão centralizados em `app/services/api.ts`
-- Autenticação JWT é gerenciada pelo `AuthContext`
-- Tokens são armazenados no localStorage
-- Todas as páginas usam o hook `useAuth()` para acessar dados de autenticação
-- A navegação está configurada em `app/config/navigation.tsx`
-- O layout principal inclui o `AuthProvider` para acesso global ao estado de autenticação
+- `README.md`
+- `QUICK_START.md`
+- `API_ENDPOINTS.md`
+- `FRONTEND_DEVELOPMENT.md`

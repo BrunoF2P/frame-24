@@ -2,12 +2,14 @@
 
 ## Autenticação (Identity/Auth)
 
-- POST /v1/auth/register - Registrar nova empresa
-- POST /v1/auth/login - Login
-- POST /v1/auth/verify-email - Verificar email
-- POST /v1/auth/forgot-password - Recuperar senha
-- POST /v1/auth/reset-password - Resetar senha
-- POST /v1/auth/select-company - Selecionar empresa
+- POST /v1/auth/register - Registrar nova empresa e provisionar admin no Keycloak
+
+Contrato de autenticação (padrão do projeto):
+
+- Login canônico: OIDC/Keycloak (frontend web/admin/landing via Auth.js).
+- A API valida access token RS256 emitido pelo Keycloak (issuer/JWKS).
+- `POST /v1/auth/register` e `POST /v1/customer/auth/register` fazem provisioning de usuários no Keycloak.
+- `POST /v1/customer/auth/login` permanece apenas por compatibilidade e retorna 401 (fluxo legado desativado).
 
 ## Usuários (Identity/Users)
 
