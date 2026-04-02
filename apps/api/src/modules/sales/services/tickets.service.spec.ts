@@ -13,8 +13,8 @@ import { TicketsRepository } from '../repositories/tickets.repository';
 import { TicketsService } from './tickets.service';
 
 jest.mock('@nestjs-cls/transactional', () => ({
-  Transactional: () =>
-    (_target: unknown, _key: string, descriptor: PropertyDescriptor) =>
+  Transactional:
+    () => (_target: unknown, _key: string, descriptor: PropertyDescriptor) =>
       descriptor,
 }));
 
@@ -85,7 +85,10 @@ describe('TicketsService', () => {
     showtimesRepository.findById.mockResolvedValue(null);
 
     await expect(
-      service.validateAndReserveSeats({ showtimeId: 'show-1', seatIds: ['s1'] }),
+      service.validateAndReserveSeats({
+        showtimeId: 'show-1',
+        seatIds: ['s1'],
+      }),
     ).rejects.toThrow(NotFoundException);
   });
 
@@ -97,7 +100,10 @@ describe('TicketsService', () => {
     } as never);
 
     await expect(
-      service.validateAndReserveSeats({ showtimeId: 'show-1', seatIds: ['s1'] }),
+      service.validateAndReserveSeats({
+        showtimeId: 'show-1',
+        seatIds: ['s1'],
+      }),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -107,21 +113,33 @@ describe('TicketsService', () => {
       start_time: new Date(Date.now() + 100000),
       cinema_complexes: { company_id: 'company-1' },
     } as never);
-    seatStatusRepository.findByNameAndCompany.mockResolvedValue({ id: 'sold-status' } as never);
-    seatsRepository.findById.mockResolvedValue({ id: 's1', seat_code: 'A1' } as never);
+    seatStatusRepository.findByNameAndCompany.mockResolvedValue({
+      id: 'sold-status',
+    } as never);
+    seatsRepository.findById.mockResolvedValue({
+      id: 's1',
+      seat_code: 'A1',
+    } as never);
     sessionSeatStatusRepository.findBySeatAndShowtime.mockResolvedValue({
       status: 'sold-status',
       sale_id: 'sale-1',
     } as never);
 
     await expect(
-      service.validateAndReserveSeats({ showtimeId: 'show-1', seatIds: ['s1'] }),
+      service.validateAndReserveSeats({
+        showtimeId: 'show-1',
+        seatIds: ['s1'],
+      }),
     ).rejects.toThrow(ConflictException);
   });
 
   it('should reserve seats and update showtime counters', async () => {
-    seatStatusRepository.findByNameAndCompany.mockResolvedValue({ id: 'sold-status' } as never);
-    sessionSeatStatusRepository.updateMany.mockResolvedValue({ count: 1 } as never);
+    seatStatusRepository.findByNameAndCompany.mockResolvedValue({
+      id: 'sold-status',
+    } as never);
+    sessionSeatStatusRepository.updateMany.mockResolvedValue({
+      count: 1,
+    } as never);
     showtimesRepository.reserveSeatsCountersAtomically.mockResolvedValue(true);
 
     await service.reserveSeats({
@@ -131,20 +149,22 @@ describe('TicketsService', () => {
     });
 
     expect(sessionSeatStatusRepository.updateMany).toHaveBeenCalledTimes(2);
-    expect(showtimesRepository.reserveSeatsCountersAtomically).toHaveBeenCalledWith(
-      'show-1',
-      2,
-    );
+    expect(
+      showtimesRepository.reserveSeatsCountersAtomically,
+    ).toHaveBeenCalledWith('show-1', 2);
   });
 
   it('should release sold seats and rollback counters', async () => {
-    seatStatusRepository.findByNameAndCompany
-      .mockResolvedValueOnce({ id: 'available-status' } as never);
+    seatStatusRepository.findByNameAndCompany.mockResolvedValueOnce({
+      id: 'available-status',
+    } as never);
 
     sessionSeatStatusRepository.findBySeatAndShowtime
       .mockResolvedValueOnce({ sale_id: 'sale-1' } as never)
       .mockResolvedValueOnce({ sale_id: null } as never);
-    sessionSeatStatusRepository.updateStatus.mockResolvedValue({ id: 'row-1' } as never);
+    sessionSeatStatusRepository.updateStatus.mockResolvedValue({
+      id: 'row-1',
+    } as never);
     showtimesRepository.releaseSeatsCountersSafely.mockResolvedValue(true);
 
     await service.releaseSeats({ showtimeId: 'show-1', seatIds: ['s1', 's2'] });

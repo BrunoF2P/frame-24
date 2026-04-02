@@ -33,7 +33,10 @@ describe('TicketsController', () => {
   });
 
   it('should mark ticket as used', async () => {
-    repository.markAsUsed.mockResolvedValue({ id: 'ticket-1', used: true } as never);
+    repository.markAsUsed.mockResolvedValue({
+      id: 'ticket-1',
+      used: true,
+    } as never);
 
     const result = await controller.markAsUsed('ticket-1');
 

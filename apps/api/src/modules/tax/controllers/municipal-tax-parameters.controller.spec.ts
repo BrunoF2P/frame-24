@@ -42,7 +42,10 @@ describe('MunicipalTaxParametersController', () => {
 
   it('should delegate update and delete', async () => {
     const dto = { municipality_name: 'São Paulo' } as any;
-    service.update.mockResolvedValue({ id: 'mun-1', municipality_name: 'São Paulo' } as never);
+    service.update.mockResolvedValue({
+      id: 'mun-1',
+      municipality_name: 'São Paulo',
+    } as never);
     service.delete.mockResolvedValue(undefined as never);
 
     const updated = await controller.update('mun-1', dto);

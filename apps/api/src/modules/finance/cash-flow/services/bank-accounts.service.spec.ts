@@ -62,7 +62,9 @@ describe('BankAccountsService', () => {
   it('should throw NotFoundException on findOne for unknown account', async () => {
     repository.findById.mockResolvedValue(null);
 
-    await expect(service.findOne('bank-404')).rejects.toThrow(NotFoundException);
+    await expect(service.findOne('bank-404')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('should update account and return refreshed entity', async () => {
@@ -79,18 +81,24 @@ describe('BankAccountsService', () => {
     expect(repository.update).toHaveBeenCalledWith(
       'bank-1',
       'company-1',
-      expect.objectContaining({ bank_name: 'Banco Y', description: 'principal' }),
+      expect.objectContaining({
+        bank_name: 'Banco Y',
+        description: 'principal',
+      }),
     );
     expect(result).toEqual({ id: 'bank-1', bank_name: 'Banco Y' });
   });
 
   it('should throw when update has no affected rows', async () => {
-    repository.findById.mockResolvedValue({ id: 'bank-1', active: true } as never);
+    repository.findById.mockResolvedValue({
+      id: 'bank-1',
+      active: true,
+    } as never);
     repository.update.mockResolvedValue({ count: 0 } as never);
 
-    await expect(service.update('bank-1', { bank_name: 'Novo' } as any)).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(
+      service.update('bank-1', { bank_name: 'Novo' } as any),
+    ).rejects.toThrow(BadRequestException);
   });
 
   it('should return current account balance payload', async () => {
@@ -99,11 +107,17 @@ describe('BankAccountsService', () => {
 
     const result = await service.getBalance('bank-1');
 
-    expect(result).toEqual({ bank_account_id: 'bank-1', current_balance: 123.45 });
+    expect(result).toEqual({
+      bank_account_id: 'bank-1',
+      current_balance: 123.45,
+    });
   });
 
   it('should soft delete account by setting active false', async () => {
-    repository.findById.mockResolvedValue({ id: 'bank-1', active: true } as never);
+    repository.findById.mockResolvedValue({
+      id: 'bank-1',
+      active: true,
+    } as never);
     repository.update.mockResolvedValue({ count: 1 } as never);
 
     const result = await service.delete('bank-1');

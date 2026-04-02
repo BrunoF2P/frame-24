@@ -1,6 +1,5 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
-import { ClsService } from 'nestjs-cls';
 import type { SeatStatusResponse } from '../../shared/dto/seat-status-response.dto';
 import { SeatStatusRepository } from '../repositories/seat-status.repository';
 

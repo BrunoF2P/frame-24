@@ -2,7 +2,6 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
 import { cinema_complexes as CinemaComplex } from '@repo/db';
@@ -12,7 +11,6 @@ import { CreateCinemaComplexDto } from '../dto/create-cinema-complex.dto';
 import { UpdateCinemaComplexDto } from '../dto/update-cinema-complex.dto';
 import { RabbitMQPublisherService } from 'src/common/rabbitmq/rabbitmq-publisher.service';
 import { Transactional } from '@nestjs-cls/transactional';
-import { ClsService } from 'nestjs-cls';
 
 @Injectable()
 export class CinemaComplexesService {

@@ -6,10 +6,18 @@ type LogMetadata = Record<string, unknown>;
 export class LoggerService {
   private logger = new NestLogger();
 
+  private serializeMetadata(metadata: LogMetadata): string {
+    try {
+      return JSON.stringify(metadata, null, 2);
+    } catch {
+      return '[unserializable metadata]';
+    }
+  }
+
   log(message: string, context?: string, metadata?: LogMetadata) {
     this.logger.log(message, context);
     if (metadata) {
-      this.logger.log(JSON.stringify(metadata, null, 2), context);
+      this.logger.log(this.serializeMetadata(metadata), context);
     }
   }
 
@@ -24,7 +32,7 @@ export class LoggerService {
   debug(message: string, context?: string, metadata?: LogMetadata) {
     this.logger.debug(message, context);
     if (metadata) {
-      this.logger.debug(JSON.stringify(metadata, null, 2), context);
+      this.logger.debug(this.serializeMetadata(metadata), context);
     }
   }
 

@@ -62,7 +62,9 @@ describe('BankReconciliationService', () => {
   });
 
   it('should block duplicate reconciliation for same month/account', async () => {
-    bankAccountsRepository.findById.mockResolvedValue({ id: 'bank-1' } as never);
+    bankAccountsRepository.findById.mockResolvedValue({
+      id: 'bank-1',
+    } as never);
     repository.findByMonth.mockResolvedValue({ id: 'existing' } as never);
 
     await expect(
@@ -77,7 +79,9 @@ describe('BankReconciliationService', () => {
   });
 
   it('should create reconciliation with calculated balances and difference', async () => {
-    bankAccountsRepository.findById.mockResolvedValue({ id: 'bank-1' } as never);
+    bankAccountsRepository.findById.mockResolvedValue({
+      id: 'bank-1',
+    } as never);
     repository.findByMonth.mockResolvedValue(null);
     repository.getMonthlyTotals.mockResolvedValue({
       total_receipts: 300,
@@ -151,7 +155,9 @@ describe('BankReconciliationService', () => {
       status: 'pending',
     } as never);
 
-    await expect(service.complete('recon-1')).rejects.toThrow(BadRequestException);
+    await expect(service.complete('recon-1')).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('should complete reconciliation when difference is zero', async () => {
@@ -160,7 +166,10 @@ describe('BankReconciliationService', () => {
       difference: 0,
       status: 'pending',
     } as never);
-    repository.update.mockResolvedValue({ id: 'recon-1', status: 'completed' } as never);
+    repository.update.mockResolvedValue({
+      id: 'recon-1',
+      status: 'completed',
+    } as never);
 
     const result = await service.complete('recon-1');
 

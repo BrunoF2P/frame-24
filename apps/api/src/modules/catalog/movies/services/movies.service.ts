@@ -1,11 +1,9 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
-import { ClsService } from 'nestjs-cls';
 import { Prisma } from '@repo/db';
 import { MovieRepository } from '../repositories/movie.repository';
 import { CreateMovieDto } from '../dto/create-movie.dto';

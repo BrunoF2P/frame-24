@@ -105,9 +105,9 @@ describe('AccountsReceivableService', () => {
       transactions: [],
     } as never);
 
-    await expect(service.update('ar-1', { description: 'novo' } as any)).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(
+      service.update('ar-1', { description: 'novo' } as any),
+    ).rejects.toThrow(BadRequestException);
 
     expect(repository.update).not.toHaveBeenCalled();
   });
@@ -120,7 +120,9 @@ describe('AccountsReceivableService', () => {
     } as never);
     repository.update.mockResolvedValue({ id: 'ar-1' } as never);
 
-    const result = await service.update('ar-1', { description: 'ajuste' } as any);
+    const result = await service.update('ar-1', {
+      description: 'ajuste',
+    } as any);
 
     expect(repository.update).toHaveBeenCalledWith('ar-1', {
       description: 'ajuste',

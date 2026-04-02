@@ -23,7 +23,9 @@ describe('AgingAutomationService', () => {
   });
 
   it('should update overdue status for pending and partially paid titles', async () => {
-    prisma.accounts_receivable.updateMany.mockResolvedValue({ count: 2 } as never);
+    prisma.accounts_receivable.updateMany.mockResolvedValue({
+      count: 2,
+    } as never);
     prisma.accounts_payable.updateMany.mockResolvedValue({ count: 3 } as never);
 
     await service.updateOverdueStatus();
@@ -69,7 +71,9 @@ describe('AgingAutomationService', () => {
       },
     ] as never);
 
-    prisma.accounts_receivable.update.mockResolvedValue({ id: 'ar-1' } as never);
+    prisma.accounts_receivable.update.mockResolvedValue({
+      id: 'ar-1',
+    } as never);
     prisma.accounts_payable.update.mockResolvedValue({ id: 'ap-1' } as never);
 
     await service.calculatePenalties();
@@ -101,7 +105,9 @@ describe('AgingAutomationService', () => {
       },
     ] as never);
     prisma.accounts_payable.findMany.mockResolvedValue([] as never);
-    prisma.accounts_receivable.update.mockResolvedValue({ id: 'ar-2' } as never);
+    prisma.accounts_receivable.update.mockResolvedValue({
+      id: 'ar-2',
+    } as never);
 
     await service.calculatePenalties();
 

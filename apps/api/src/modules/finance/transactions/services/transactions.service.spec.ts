@@ -8,8 +8,8 @@ import { TenantContextService } from 'src/common/services/tenant-context.service
 import { TransactionsService } from './transactions.service';
 
 jest.mock('@nestjs-cls/transactional', () => ({
-  Transactional: () =>
-    (_target: unknown, _key: string, descriptor: PropertyDescriptor) =>
+  Transactional:
+    () => (_target: unknown, _key: string, descriptor: PropertyDescriptor) =>
       descriptor,
 }));
 
@@ -117,8 +117,12 @@ describe('TransactionsService', () => {
       document_number: 'AR-001',
       customer_id: 'customer-1',
     } as never);
-    prisma.receivable_transactions.create.mockResolvedValue({ id: 'tx-1' } as never);
-    receivablesRepository.updateStatus.mockResolvedValue({ id: 'ar-1' } as never);
+    prisma.receivable_transactions.create.mockResolvedValue({
+      id: 'tx-1',
+    } as never);
+    receivablesRepository.updateStatus.mockResolvedValue({
+      id: 'ar-1',
+    } as never);
     cashFlowService.createForCompany.mockResolvedValue({ id: 'cf-1' } as never);
 
     const result = await service.settleReceivableForCompany({
@@ -165,7 +169,9 @@ describe('TransactionsService', () => {
       document_number: 'AP-001',
       supplier_id: 'supplier-1',
     } as never);
-    prisma.payable_transactions.create.mockResolvedValue({ id: 'tx-2' } as never);
+    prisma.payable_transactions.create.mockResolvedValue({
+      id: 'tx-2',
+    } as never);
     payablesRepository.updateStatus.mockResolvedValue({ id: 'ap-1' } as never);
     cashFlowService.createForCompany.mockResolvedValue({ id: 'cf-2' } as never);
 

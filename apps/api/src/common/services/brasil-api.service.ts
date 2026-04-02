@@ -57,6 +57,14 @@ export class BrasilApiService {
     baseURL: 'https://brasilapi.com.br/api',
   });
 
+  private safeStringify(value: unknown): string {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '[unserializable payload]';
+    }
+  }
+
   async getCnpjData(cnpj: string): Promise<CnpjData | null> {
     try {
       const sanitizedCnpj = cnpj.replace(/\D/g, '');
@@ -152,7 +160,7 @@ export class BrasilApiService {
       // Log para debug - ver estrutura da resposta
       if (response.data.length > 0) {
         this.logger.log(
-          `Sample municipality structure: ${JSON.stringify(response.data[0])}`,
+          `Sample municipality structure: ${this.safeStringify(response.data[0])}`,
         );
       }
 
@@ -195,7 +203,7 @@ export class BrasilApiService {
 
       if (!normalized.codigo_ibge) {
         this.logger.warn(
-          `Municipality found but no IBGE code: ${JSON.stringify(municipality)}`,
+          `Municipality found but no IBGE code: ${this.safeStringify(municipality)}`,
         );
         return null;
       }

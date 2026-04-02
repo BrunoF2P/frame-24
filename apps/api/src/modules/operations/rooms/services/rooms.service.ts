@@ -3,12 +3,10 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
 import { Prisma, rooms as Room } from '@repo/db';
 import { Transactional } from '@nestjs-cls/transactional';
-import { ClsService } from 'nestjs-cls';
 
 import { SnowflakeService } from 'src/common/services/snowflake.service';
 import { RabbitMQPublisherService } from 'src/common/rabbitmq/rabbitmq-publisher.service';

@@ -56,9 +56,15 @@ describe('DistributorSettlementsService', () => {
   });
 
   it('should list settlements scoped by company complexes and contracts', async () => {
-    prisma.cinema_complexes.findMany.mockResolvedValue([{ id: 'complex-1' }] as never);
-    prisma.exhibition_contracts.findMany.mockResolvedValue([{ id: 'contract-1' }] as never);
-    prisma.distributor_settlements.findMany.mockResolvedValue([{ id: 'sett-1' }] as never);
+    prisma.cinema_complexes.findMany.mockResolvedValue([
+      { id: 'complex-1' },
+    ] as never);
+    prisma.exhibition_contracts.findMany.mockResolvedValue([
+      { id: 'contract-1' },
+    ] as never);
+    prisma.distributor_settlements.findMany.mockResolvedValue([
+      { id: 'sett-1' },
+    ] as never);
 
     const result = await service.findAll();
 
@@ -103,12 +109,18 @@ describe('DistributorSettlementsService', () => {
       movie_id: 'movie-1',
     } as never);
     prisma.suppliers.findFirst.mockResolvedValue({ id: 'supplier-1' } as never);
-    prisma.cinema_complexes.findFirst.mockResolvedValue({ id: 'complex-1' } as never);
+    prisma.cinema_complexes.findFirst.mockResolvedValue({
+      id: 'complex-1',
+    } as never);
     prisma.$queryRaw.mockResolvedValue([
       { gross_revenue: 1200, total_tickets_sold: 100 },
     ] as never);
-    prisma.distributor_settlements.create.mockResolvedValue({ id: 'sett-1' } as never);
-    accountsPayableService.createForCompany.mockResolvedValue({ id: 'ap-1' } as never);
+    prisma.distributor_settlements.create.mockResolvedValue({
+      id: 'sett-1',
+    } as never);
+    accountsPayableService.createForCompany.mockResolvedValue({
+      id: 'ap-1',
+    } as never);
 
     const result = await service.create({
       contract_id: 'contract-1',
@@ -154,12 +166,18 @@ describe('DistributorSettlementsService', () => {
       movie_id: 'movie-1',
     } as never);
     prisma.suppliers.findFirst.mockResolvedValue({ id: 'supplier-1' } as never);
-    prisma.cinema_complexes.findFirst.mockResolvedValue({ id: 'complex-1' } as never);
+    prisma.cinema_complexes.findFirst.mockResolvedValue({
+      id: 'complex-1',
+    } as never);
     prisma.$queryRaw.mockResolvedValue([
       { gross_revenue: 100, total_tickets_sold: 10 },
     ] as never);
-    prisma.distributor_settlements.create.mockResolvedValue({ id: 'sett-1' } as never);
-    accountsPayableService.createForCompany.mockRejectedValue(new Error('ap error'));
+    prisma.distributor_settlements.create.mockResolvedValue({
+      id: 'sett-1',
+    } as never);
+    accountsPayableService.createForCompany.mockRejectedValue(
+      new Error('ap error'),
+    );
 
     const result = await service.create({
       contract_id: 'contract-1',

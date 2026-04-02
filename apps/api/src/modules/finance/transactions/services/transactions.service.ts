@@ -1,5 +1,4 @@
 import {
-  ForbiddenException,
   Injectable,
   NotFoundException,
   BadRequestException,
@@ -7,7 +6,6 @@ import {
 import { Transactional } from '@nestjs-cls/transactional';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
 import { payable_transactions, receivable_transactions } from '@repo/db';
-import { ClsService } from 'nestjs-cls';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SnowflakeService } from 'src/common/services/snowflake.service';
 import { AccountsReceivableRepository } from 'src/modules/finance/accounts-receivable/repositories/accounts-receivable.repository';

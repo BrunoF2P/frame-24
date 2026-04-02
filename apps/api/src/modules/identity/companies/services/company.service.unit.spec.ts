@@ -10,11 +10,7 @@ describe('CompanyService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new CompanyService(
-      {} as any,
-      {} as any,
-      logger as any,
-    );
+    service = new CompanyService({} as any, {} as any, logger as any);
   });
 
   it('throws a clear bad request when a company field exceeds the column limit', () => {
@@ -49,11 +45,11 @@ describe('CompanyService', () => {
         corporate_name: 'CASH TIME PAY PRODUTOS E SERVICOS DIGITAIS LTDA',
         cnpj: '37202552000192',
         trade_name: 'Cash Time Pay',
-      zip_code: '12345678',
-      street_address: 'Rua Teste',
-      address_number: '100',
-      neighborhood: 'Centro',
-      city: 'Salvador',
+        zip_code: '12345678',
+        street_address: 'Rua Teste',
+        address_number: '100',
+        neighborhood: 'Centro',
+        city: 'Salvador',
         state: 'BA',
         country: 'BR',
         phone: '71999999999',
@@ -68,7 +64,9 @@ describe('CompanyService', () => {
       '37202552000192',
     );
 
-    expect(tenantSlug).toBe('cash-time-pay-produtos-e-servicos-digitais-lt-0192');
+    expect(tenantSlug).toBe(
+      'cash-time-pay-produtos-e-servicos-digitais-lt-0192',
+    );
     expect(tenantSlug).toHaveLength(50);
   });
 });

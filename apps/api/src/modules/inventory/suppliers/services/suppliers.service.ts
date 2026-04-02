@@ -1,12 +1,10 @@
 import {
-  ForbiddenException,
   Injectable,
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
 import { Prisma } from '@repo/db';
-import { ClsService } from 'nestjs-cls';
 
 import { SupplierRepository } from '../repositories/supplier.repository';
 import { CreateSupplierDto } from '../dto/create-supplier.dto';

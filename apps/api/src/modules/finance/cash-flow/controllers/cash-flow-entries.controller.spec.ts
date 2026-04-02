@@ -34,7 +34,12 @@ describe('CashFlowEntriesController', () => {
   });
 
   it('should delegate list/detail/reconcile/delete methods', async () => {
-    service.findAll.mockResolvedValue({ entries: [], total: 0, skip: 0, take: 20 } as never);
+    service.findAll.mockResolvedValue({
+      entries: [],
+      total: 0,
+      skip: 0,
+      take: 20,
+    } as never);
     service.findOne.mockResolvedValue({ id: 'cfe-1' } as never);
     service.reconcile.mockResolvedValue({ message: 'ok' } as never);
     service.delete.mockResolvedValue({ message: 'deleted' } as never);

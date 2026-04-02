@@ -28,9 +28,24 @@ describe('CashFlowReportsService', () => {
 
   it('should build daily report summary with net balance', async () => {
     prisma.cash_flow_entries.findMany.mockResolvedValue([
-      { entry_type: 'receipt', amount: 100, created_at: new Date(), bank_accounts: {} },
-      { entry_type: 'payment', amount: 25, created_at: new Date(), bank_accounts: {} },
-      { entry_type: 'receipt', amount: 10, created_at: new Date(), bank_accounts: {} },
+      {
+        entry_type: 'receipt',
+        amount: 100,
+        created_at: new Date(),
+        bank_accounts: {},
+      },
+      {
+        entry_type: 'payment',
+        amount: 25,
+        created_at: new Date(),
+        bank_accounts: {},
+      },
+      {
+        entry_type: 'receipt',
+        amount: 10,
+        created_at: new Date(),
+        bank_accounts: {},
+      },
     ] as never);
 
     const result = await service.getDailyReport({ date: '2026-03-22' } as any);
@@ -46,7 +61,11 @@ describe('CashFlowReportsService', () => {
 
   it('should group period report by day and keep total entries', async () => {
     prisma.cash_flow_entries.findMany.mockResolvedValue([
-      { entry_type: 'receipt', amount: 100, entry_date: new Date('2026-03-01') },
+      {
+        entry_type: 'receipt',
+        amount: 100,
+        entry_date: new Date('2026-03-01'),
+      },
       { entry_type: 'payment', amount: 50, entry_date: new Date('2026-03-01') },
       { entry_type: 'receipt', amount: 30, entry_date: new Date('2026-03-02') },
     ] as never);
@@ -99,10 +118,16 @@ describe('CashFlowReportsService', () => {
   it('should summarize by category and entry type', async () => {
     prisma.cash_flow_entries.groupBy.mockResolvedValue([
       { category: 'ticket_sale', entry_type: 'receipt', _sum: { amount: 500 } },
-      { category: 'supplier_payment', entry_type: 'payment', _sum: { amount: 300 } },
+      {
+        category: 'supplier_payment',
+        entry_type: 'payment',
+        _sum: { amount: 300 },
+      },
     ] as never);
 
-    const result = await service.getCategorySummary({ month: '2026-03' } as any);
+    const result = await service.getCategorySummary({
+      month: '2026-03',
+    } as any);
 
     expect(result.period).toBe('2026-03');
     expect(result.categories).toEqual([

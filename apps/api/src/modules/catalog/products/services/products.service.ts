@@ -3,12 +3,10 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
 import { products } from '@repo/db';
-import { ClsService } from 'nestjs-cls';
 import { ProductRepository } from '../repositories/product.repository';
 import { ProductCategoryRepository } from '../repositories/product-category.repository';
 import { CreateProductDto } from '../dto/create-product.dto';

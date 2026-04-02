@@ -42,7 +42,10 @@ describe('FederalTaxRatesController', () => {
 
   it('should delegate update and delete', async () => {
     const dto = { cofins_rate: 7.6 } as any;
-    service.update.mockResolvedValue({ id: 'fed-1', cofins_rate: 7.6 } as never);
+    service.update.mockResolvedValue({
+      id: 'fed-1',
+      cofins_rate: 7.6,
+    } as never);
     service.delete.mockResolvedValue(undefined as never);
 
     const updated = await controller.update('fed-1', dto);

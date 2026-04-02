@@ -1,12 +1,10 @@
 import {
-  ForbiddenException,
   Injectable,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
 import { accounts_receivable, Prisma } from '@repo/db';
-import { ClsService } from 'nestjs-cls';
 import { AccountsReceivableRepository } from '../repositories/accounts-receivable.repository';
 import { CreateAccountReceivableDto } from '../dto/create-account-receivable.dto';
 import { UpdateAccountReceivableDto } from '../dto/update-account-receivable.dto';

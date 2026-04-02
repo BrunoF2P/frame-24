@@ -6,7 +6,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
-import { ClsService } from 'nestjs-cls';
 import {
   movies,
   Prisma,
@@ -225,7 +224,7 @@ export class ShowtimesService {
   async preview(dto: CreateShowtimeDto): Promise<ShowtimeFinancialBreakdown> {
     const companyId = this.tenantContext.getCompanyId();
 
-    const { movie, room } = await this.loadMovieAndRoom(
+    const { room } = await this.loadMovieAndRoom(
       dto.movie_id,
       dto.room_id,
       companyId,

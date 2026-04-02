@@ -55,8 +55,10 @@ export class AuditConsumerService implements OnModuleInit, OnModuleDestroy {
 
       this.connection = await connect(url);
 
-      this.connection.on('error', (err) => {
-        this.logger.error(`Connection error: ${err.message}`);
+      this.connection.on('error', (err: unknown) => {
+        this.logger.error(
+          `Connection error: ${err instanceof Error ? err.message : String(err)}`,
+        );
         this.handleDisconnect();
       });
 
@@ -67,8 +69,10 @@ export class AuditConsumerService implements OnModuleInit, OnModuleDestroy {
 
       this.channel = await this.connection.createChannel();
 
-      this.channel.on('error', (err) => {
-        this.logger.error(`Channel error: ${err.message}`);
+      this.channel.on('error', (err: unknown) => {
+        this.logger.error(
+          `Channel error: ${err instanceof Error ? err.message : String(err)}`,
+        );
       });
 
       this.channel.on('close', () => {
@@ -90,7 +94,7 @@ export class AuditConsumerService implements OnModuleInit, OnModuleDestroy {
         (msg: ConsumeMessage | null) => {
           if (!msg) return;
 
-          this.processMessage(msg).catch((error) => {
+          void this.processMessage(msg).catch((error) => {
             this.logger.error(
               `Error processing message: ${error instanceof Error ? error.message : 'Unknown'}`,
               error instanceof Error ? error.stack : '',
@@ -123,7 +127,9 @@ export class AuditConsumerService implements OnModuleInit, OnModuleDestroy {
     this.connection = null;
     this.channel = null;
     if (!this.isConnecting) {
-      setTimeout(() => this.connect(), 5000);
+      setTimeout(() => {
+        void this.connect();
+      }, 5000);
     }
   }
 
@@ -148,7 +154,9 @@ export class AuditConsumerService implements OnModuleInit, OnModuleDestroy {
 
       this.channel?.ack(msg);
     } catch (error) {
-      this.logger.error(`Failed to parse or process message: ${error}`);
+      this.logger.error(
+        `Failed to parse or process message: ${error instanceof Error ? error.message : String(error)}`,
+      );
       // If JSON parse fails, we should probably ack or nack without requeue as it will never succeed
       this.channel?.nack(msg, false, false);
     }

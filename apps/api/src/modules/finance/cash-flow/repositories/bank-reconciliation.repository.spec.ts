@@ -22,7 +22,9 @@ describe('BankReconciliationRepository', () => {
   });
 
   it('should list reconciliations filtered by company and optional bank account', async () => {
-    prisma.bank_reconciliations.findMany.mockResolvedValue([{ id: 'recon-1' }] as never);
+    prisma.bank_reconciliations.findMany.mockResolvedValue([
+      { id: 'recon-1' },
+    ] as never);
 
     const result = await repository.findAll('company-1', 'bank-1');
 
@@ -45,7 +47,9 @@ describe('BankReconciliationRepository', () => {
   });
 
   it('should find month reconciliation by compound key', async () => {
-    prisma.bank_reconciliations.findUnique.mockResolvedValue({ id: 'recon-1' } as never);
+    prisma.bank_reconciliations.findUnique.mockResolvedValue({
+      id: 'recon-1',
+    } as never);
 
     const month = new Date('2026-03-01');
     const result = await repository.findByMonth('bank-1', month);

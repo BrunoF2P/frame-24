@@ -28,8 +28,12 @@ describe('CashFlowReportsController', () => {
     await controller.getCategorySummary({ month: '2026-03' } as any);
 
     expect(service.getDailyReport).toHaveBeenCalledWith({ date: '2026-03-22' });
-    expect(service.getPeriodReport).toHaveBeenCalledWith({ start_date: '2026-03-01' });
+    expect(service.getPeriodReport).toHaveBeenCalledWith({
+      start_date: '2026-03-01',
+    });
     expect(service.getProjection).toHaveBeenCalledWith({ days: 30 });
-    expect(service.getCategorySummary).toHaveBeenCalledWith({ month: '2026-03' });
+    expect(service.getCategorySummary).toHaveBeenCalledWith({
+      month: '2026-03',
+    });
   });
 });

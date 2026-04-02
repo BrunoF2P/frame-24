@@ -21,7 +21,7 @@ export class CompanyRepository {
     const rows = await this.prisma.companies.findMany({
       where: { id: { in: ids } },
     });
-    return rows.map(CompanyMapper.toDomain);
+    return rows.map((row) => CompanyMapper.toDomain(row));
   }
 
   async findByCnpj(cnpj: string): Promise<companies | null> {

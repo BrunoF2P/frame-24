@@ -176,7 +176,9 @@ describe('AgingReportsService', () => {
   it('should query receivables scoped by company and optional complex', async () => {
     prisma.accounts_receivable.findMany.mockResolvedValue([] as never);
 
-    await service.getReceivablesAging({ cinema_complex_id: 'complex-9' } as any);
+    await service.getReceivablesAging({
+      cinema_complex_id: 'complex-9',
+    } as any);
 
     expect(prisma.accounts_receivable.findMany).toHaveBeenCalledWith(
       expect.objectContaining({

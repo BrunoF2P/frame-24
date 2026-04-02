@@ -64,9 +64,13 @@ describe('RabbitMQPublisherService', () => {
     await service.onModuleInit();
 
     expect(connect).toHaveBeenCalledWith('amqp://user:secret@localhost:5672');
-    expect(channel.assertExchange).toHaveBeenCalledWith('frame24-events', 'topic', {
-      durable: true,
-    });
+    expect(channel.assertExchange).toHaveBeenCalledWith(
+      'frame24-events',
+      'topic',
+      {
+        durable: true,
+      },
+    );
     expect(loggerService.log).toHaveBeenCalledWith(
       expect.stringContaining('amqp://user:***@localhost:5672'),
       'RabbitMQPublisher',
@@ -85,7 +89,9 @@ describe('RabbitMQPublisherService', () => {
 
     await service.onModuleInit();
 
-    expect(connect).toHaveBeenCalledWith('amqp://user-x:pass-x@rabbit-host:5679');
+    expect(connect).toHaveBeenCalledWith(
+      'amqp://user-x:pass-x@rabbit-host:5679',
+    );
     expect(loggerService.log).toHaveBeenCalledWith(
       expect.stringContaining('rabbit-host:5679'),
       'RabbitMQPublisher',
@@ -140,7 +146,9 @@ describe('RabbitMQPublisherService', () => {
       },
     });
 
-    const payload = JSON.parse((channel.publish.mock.calls[0][2] as Buffer).toString());
+    const payload = JSON.parse(
+      (channel.publish.mock.calls[0][2] as Buffer).toString(),
+    );
     expect(payload.metadata).toMatchObject({
       companyId: 'company-explicit',
       userId: 'user-explicit',
@@ -211,8 +219,12 @@ describe('RabbitMQPublisherService', () => {
     await service.onModuleInit();
 
     const connectionOnCalls = connection.on.mock.calls;
-    const onConnectionError = connectionOnCalls.find((c) => c[0] === 'error')?.[1];
-    const onConnectionClose = connectionOnCalls.find((c) => c[0] === 'close')?.[1];
+    const onConnectionError = connectionOnCalls.find(
+      (c) => c[0] === 'error',
+    )?.[1];
+    const onConnectionClose = connectionOnCalls.find(
+      (c) => c[0] === 'close',
+    )?.[1];
 
     const channelOnCalls = channel.on.mock.calls;
     const onChannelError = channelOnCalls.find((c) => c[0] === 'error')?.[1];
@@ -266,7 +278,10 @@ describe('RabbitMQPublisherService', () => {
   });
 
   it('does not schedule reconnect in handleDisconnect when already connecting', () => {
-    const scheduleReconnectSpy = jest.spyOn(service as any, 'scheduleReconnect');
+    const scheduleReconnectSpy = jest.spyOn(
+      service as any,
+      'scheduleReconnect',
+    );
     (service as any).isConnecting = true;
 
     (service as any).handleDisconnect();

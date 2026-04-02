@@ -6,7 +6,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
-import { ClsService } from 'nestjs-cls';
 import { Prisma } from '@repo/db';
 import {
   ExhibitionContractWithRelations,

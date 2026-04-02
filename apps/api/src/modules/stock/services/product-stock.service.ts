@@ -1,11 +1,6 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
 import { product_stock } from '@repo/db';
-import { ClsService } from 'nestjs-cls';
 import { ProductStockRepository } from '../repositories/product-stock.repository';
 import { ProductStockResponseDto } from '../dto/product-stock-response.dto';
 import { ProductRepository } from 'src/modules/catalog/products/repositories/product.repository';

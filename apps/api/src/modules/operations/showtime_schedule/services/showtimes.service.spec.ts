@@ -26,7 +26,9 @@ import { RabbitMQPublisherService } from 'src/common/rabbitmq/rabbitmq-publisher
 import { CacheService } from 'src/common/cache/cache.service';
 
 jest.mock('@nestjs-cls/transactional', () => ({
-  Transactional: () => (_target: unknown, _key: string, descriptor: PropertyDescriptor) => descriptor,
+  Transactional:
+    () => (_target: unknown, _key: string, descriptor: PropertyDescriptor) =>
+      descriptor,
 }));
 
 describe('ShowtimesService', () => {
@@ -849,7 +851,9 @@ describe('ShowtimesService', () => {
     it('deve lançar not found quando sessão não existe', async () => {
       showtimesRepository.findById.mockResolvedValue(null as any);
 
-      await expect(service.findOne('show-404')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('show-404')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('deve lançar forbidden para sessão de outra empresa', async () => {
@@ -865,7 +869,9 @@ describe('ShowtimesService', () => {
         cinema_complexes: { company_id: 'other-company' },
       } as any);
 
-      await expect(service.findOne('show-1')).rejects.toThrow(ForbiddenException);
+      await expect(service.findOne('show-1')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('deve retornar sessão mapeada quando válida', async () => {
@@ -879,7 +885,11 @@ describe('ShowtimesService', () => {
         sold_seats: 10,
         blocked_seats: 5,
         rooms: { id: 'room-1', name: 'Sala 1', capacity: 100 },
-        cinema_complexes: { id: 'cx-1', name: 'Complexo', company_id: COMPANY_ID },
+        cinema_complexes: {
+          id: 'cx-1',
+          name: 'Complexo',
+          company_id: COMPANY_ID,
+        },
         projection_types: null,
         audio_types: null,
         session_languages: null,
@@ -939,7 +949,10 @@ describe('ShowtimesService', () => {
 
     it('deve rejeitar quando filme não possui duração no recálculo', async () => {
       jest.spyOn(service, 'findOne').mockResolvedValue(baseExisting);
-      moviesRepository.findById.mockResolvedValue({ id: 'movie-1', duration_minutes: null } as any);
+      moviesRepository.findById.mockResolvedValue({
+        id: 'movie-1',
+        duration_minutes: null,
+      } as any);
 
       await expect(
         service.update('show-1', {
@@ -950,8 +963,13 @@ describe('ShowtimesService', () => {
 
     it('deve rejeitar quando novo horário conflita', async () => {
       jest.spyOn(service, 'findOne').mockResolvedValue(baseExisting);
-      moviesRepository.findById.mockResolvedValue({ id: 'movie-1', duration_minutes: 120 } as any);
-      showtimesRepository.findOverlappingSessions.mockResolvedValue([{ id: 'conflict' }] as any);
+      moviesRepository.findById.mockResolvedValue({
+        id: 'movie-1',
+        duration_minutes: 120,
+      } as any);
+      showtimesRepository.findOverlappingSessions.mockResolvedValue([
+        { id: 'conflict' },
+      ] as any);
 
       await expect(
         service.update('show-1', {
@@ -965,7 +983,7 @@ describe('ShowtimesService', () => {
         ...baseExisting,
         room: { id: 'room-1' },
         movie: { id: 'movie-1' },
-      } as any;
+      };
 
       jest.spyOn(service, 'findOne').mockResolvedValue(existing);
       moviesRepository.findById.mockResolvedValue({
@@ -1058,14 +1076,18 @@ describe('ShowtimesService', () => {
   describe('remove', () => {
     it('deve rejeitar quando status Cancelada não existe', async () => {
       jest.spyOn(service, 'findOne').mockResolvedValue({ id: 'show-1' } as any);
-      sessionStatusRepository.findByNameAndCompany.mockResolvedValue(null as any);
+      sessionStatusRepository.findByNameAndCompany.mockResolvedValue(
+        null as any,
+      );
 
       await expect(service.remove('show-1')).rejects.toThrow(NotFoundException);
     });
 
     it('deve cancelar sessão e publicar auditoria', async () => {
       jest.spyOn(service, 'findOne').mockResolvedValue({ id: 'show-1' } as any);
-      sessionStatusRepository.findByNameAndCompany.mockResolvedValue({ id: 'cancelled-1' } as any);
+      sessionStatusRepository.findByNameAndCompany.mockResolvedValue({
+        id: 'cancelled-1',
+      } as any);
       showtimesRepository.update.mockResolvedValue({ id: 'show-1' } as any);
 
       const result = await service.remove('show-1');
@@ -1111,14 +1133,15 @@ describe('ShowtimesService', () => {
       sessionSeatStatusRepository.findBySeatAndShowtime.mockResolvedValue({
         status: 'status-blocked',
       } as any);
-      showtimesRepository.unblockSeatsCountersSafely.mockResolvedValue(true as any);
+      showtimesRepository.unblockSeatsCountersSafely.mockResolvedValue(
+        true as any,
+      );
 
       await service.updateSeatStatus('show-1', 'seat-1', 'Disponível');
 
-      expect(showtimesRepository.unblockSeatsCountersSafely).toHaveBeenCalledWith(
-        'show-1',
-        1,
-      );
+      expect(
+        showtimesRepository.unblockSeatsCountersSafely,
+      ).toHaveBeenCalledWith('show-1', 1);
 
       expect(sessionSeatStatusRepository.updateStatus).toHaveBeenCalledWith(
         'show-1',
@@ -1139,18 +1162,21 @@ describe('ShowtimesService', () => {
       seatStatusRepository.findByNameAndCompany
         .mockResolvedValueOnce({ id: 'status-blocked' } as any)
         .mockResolvedValueOnce(null as any);
-      seatStatusRepository.findDefaultByCompany.mockResolvedValue({ id: 'status-default' } as any);
+      seatStatusRepository.findDefaultByCompany.mockResolvedValue({
+        id: 'status-default',
+      } as any);
       sessionSeatStatusRepository.findBySeatAndShowtime.mockResolvedValue({
         status: 'status-default',
       } as any);
-      showtimesRepository.blockSeatsCountersAtomically.mockResolvedValue(true as any);
+      showtimesRepository.blockSeatsCountersAtomically.mockResolvedValue(
+        true as any,
+      );
 
       await service.updateSeatStatus('show-1', 'seat-1', 'Bloqueado');
 
-      expect(showtimesRepository.blockSeatsCountersAtomically).toHaveBeenCalledWith(
-        'show-1',
-        1,
-      );
+      expect(
+        showtimesRepository.blockSeatsCountersAtomically,
+      ).toHaveBeenCalledWith('show-1', 1);
 
       expect(sessionSeatStatusRepository.updateStatus).toHaveBeenCalledWith(
         'show-1',
@@ -1172,7 +1198,9 @@ describe('ShowtimesService', () => {
       sessionSeatStatusRepository.findBySeatAndShowtime.mockResolvedValue({
         status: 'status-available',
       } as any);
-      showtimesRepository.blockSeatsCountersAtomically.mockResolvedValue(false as any);
+      showtimesRepository.blockSeatsCountersAtomically.mockResolvedValue(
+        false as any,
+      );
 
       await expect(
         service.updateSeatStatus('show-1', 'seat-1', 'Bloqueado'),

@@ -1,12 +1,10 @@
 import {
-  ForbiddenException,
   Injectable,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
 import { bank_accounts, Prisma } from '@repo/db';
-import { ClsService } from 'nestjs-cls';
 import { BankAccountsRepository } from '../repositories/bank-accounts.repository';
 import { SnowflakeService } from 'src/common/services/snowflake.service';
 import { CreateBankAccountDto } from '../dto/create-bank-account.dto';

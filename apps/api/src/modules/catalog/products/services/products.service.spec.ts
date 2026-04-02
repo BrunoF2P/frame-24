@@ -11,7 +11,9 @@ import { ProductRepository } from '../repositories/product.repository';
 import { ProductsService } from './products.service';
 
 jest.mock('@nestjs-cls/transactional', () => ({
-  Transactional: () => (_target: unknown, _key: string, descriptor: PropertyDescriptor) => descriptor,
+  Transactional:
+    () => (_target: unknown, _key: string, descriptor: PropertyDescriptor) =>
+      descriptor,
 }));
 
 describe('ProductsService', () => {
@@ -81,7 +83,10 @@ describe('ProductsService', () => {
   });
 
   it('should throw conflict when barcode already exists', async () => {
-    categoryRepo.findById.mockResolvedValue({ id: 'cat-1', name: 'Bebidas' } as never);
+    categoryRepo.findById.mockResolvedValue({
+      id: 'cat-1',
+      name: 'Bebidas',
+    } as never);
     productRepo.findLastByCategory.mockResolvedValue(null);
     productRepo.findByBarcode.mockResolvedValue({ id: 'prod-1' } as never);
 
@@ -95,8 +100,13 @@ describe('ProductsService', () => {
   });
 
   it('should create product with generated code and uploaded image', async () => {
-    categoryRepo.findById.mockResolvedValue({ id: 'cat-1', name: 'Bebidas' } as never);
-    productRepo.findLastByCategory.mockResolvedValue({ product_code: 'BEB-0012' } as never);
+    categoryRepo.findById.mockResolvedValue({
+      id: 'cat-1',
+      name: 'Bebidas',
+    } as never);
+    productRepo.findLastByCategory.mockResolvedValue({
+      product_code: 'BEB-0012',
+    } as never);
     productRepo.findByBarcode.mockResolvedValue(null);
     storageService.uploadFile.mockResolvedValue('https://cdn/products/new.png');
     productRepo.create.mockResolvedValue({
@@ -142,7 +152,9 @@ describe('ProductsService', () => {
   it('should throw not found on findOne when product does not exist', async () => {
     productRepo.findById.mockResolvedValue(null);
 
-    await expect(service.findOne('prod-404')).rejects.toThrow(NotFoundException);
+    await expect(service.findOne('prod-404')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('should return mapped product in findOne', async () => {
@@ -238,7 +250,9 @@ describe('ProductsService', () => {
       { originalname: 'new.png' } as Express.Multer.File,
     );
 
-    expect(storageService.deleteFile).toHaveBeenCalledWith('https://cdn/products/old.png');
+    expect(storageService.deleteFile).toHaveBeenCalledWith(
+      'https://cdn/products/old.png',
+    );
     expect(storageService.uploadFile).toHaveBeenCalled();
     expect(productRepo.update).toHaveBeenCalled();
     expect(result.name).toBe('Refrigerante Zero');
@@ -247,9 +261,9 @@ describe('ProductsService', () => {
   it('should throw not found on update when product does not exist', async () => {
     productRepo.findById.mockResolvedValue(null);
 
-    await expect(service.update('prod-404', { name: 'x' } as any)).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(
+      service.update('prod-404', { name: 'x' } as any),
+    ).rejects.toThrow(NotFoundException);
   });
 
   it('should throw bad request on update when new category does not exist', async () => {
@@ -290,7 +304,10 @@ describe('ProductsService', () => {
   });
 
   it('should list products by category when category exists', async () => {
-    categoryRepo.findById.mockResolvedValue({ id: 'cat-1', name: 'Bebidas' } as never);
+    categoryRepo.findById.mockResolvedValue({
+      id: 'cat-1',
+      name: 'Bebidas',
+    } as never);
     productRepo.findByCategory.mockResolvedValue([
       {
         id: 'prod-1',
@@ -313,14 +330,20 @@ describe('ProductsService', () => {
 
     const result = await service.findByCategory('cat-1');
 
-    expect(productRepo.findByCategory).toHaveBeenCalledWith('cat-1', 'company-1', undefined);
+    expect(productRepo.findByCategory).toHaveBeenCalledWith(
+      'cat-1',
+      'company-1',
+      undefined,
+    );
     expect(result[0].category_name).toBe('Bebidas');
   });
 
   it('should throw when filtering by unknown category', async () => {
     categoryRepo.findById.mockResolvedValue(null);
 
-    await expect(service.findByCategory('cat-404')).rejects.toThrow(NotFoundException);
+    await expect(service.findByCategory('cat-404')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('should search products and map category name from relation', async () => {
@@ -347,7 +370,11 @@ describe('ProductsService', () => {
 
     const result = await service.search('agu');
 
-    expect(productRepo.search).toHaveBeenCalledWith('company-1', 'agu', undefined);
+    expect(productRepo.search).toHaveBeenCalledWith(
+      'company-1',
+      'agu',
+      undefined,
+    );
     expect(result[0].category_name).toBe('Bebidas');
   });
 

@@ -1,12 +1,10 @@
 import {
-  ForbiddenException,
   Injectable,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
 import { accounts_payable, Prisma } from '@repo/db';
-import { ClsService } from 'nestjs-cls';
 import { AccountsPayableRepository } from '../repositories/accounts-payable.repository';
 import { CreateAccountPayableDto } from '../dto/create-account-payable.dto';
 import { UpdateAccountPayableDto } from '../dto/update-account-payable.dto';

@@ -101,14 +101,23 @@ describe('ExhibitionContractsService', () => {
   });
 
   it('deve criar contrato quando dados e relacionamentos são válidos', async () => {
-    movieRepository.findById.mockResolvedValue({ id: 'movie-1', company_id: 'company-123' });
-    cinemaComplexesRepository.findById.mockResolvedValue({ id: 'complex-1', company_id: 'company-123' });
+    movieRepository.findById.mockResolvedValue({
+      id: 'movie-1',
+      company_id: 'company-123',
+    });
+    cinemaComplexesRepository.findById.mockResolvedValue({
+      id: 'complex-1',
+      company_id: 'company-123',
+    });
     supplierRepository.findById.mockResolvedValue({
       id: 'supplier-1',
       company_id: 'company-123',
       is_film_distributor: true,
     });
-    contractTypesRepository.findById.mockResolvedValue({ id: 'ct-1', company_id: 'company-123' });
+    contractTypesRepository.findById.mockResolvedValue({
+      id: 'ct-1',
+      company_id: 'company-123',
+    });
     repository.findAll.mockResolvedValue([]);
     repository.create.mockResolvedValue({ id: 'contract-1' } as any);
 
@@ -128,8 +137,14 @@ describe('ExhibitionContractsService', () => {
   });
 
   it('deve rejeitar create com soma de percentuais inválida', async () => {
-    movieRepository.findById.mockResolvedValue({ id: 'movie-1', company_id: 'company-123' });
-    cinemaComplexesRepository.findById.mockResolvedValue({ id: 'complex-1', company_id: 'company-123' });
+    movieRepository.findById.mockResolvedValue({
+      id: 'movie-1',
+      company_id: 'company-123',
+    });
+    cinemaComplexesRepository.findById.mockResolvedValue({
+      id: 'complex-1',
+      company_id: 'company-123',
+    });
     supplierRepository.findById.mockResolvedValue({
       id: 'supplier-1',
       company_id: 'company-123',
@@ -151,8 +166,14 @@ describe('ExhibitionContractsService', () => {
   });
 
   it('deve rejeitar create com sobreposição de contrato', async () => {
-    movieRepository.findById.mockResolvedValue({ id: 'movie-1', company_id: 'company-123' });
-    cinemaComplexesRepository.findById.mockResolvedValue({ id: 'complex-1', company_id: 'company-123' });
+    movieRepository.findById.mockResolvedValue({
+      id: 'movie-1',
+      company_id: 'company-123',
+    });
+    cinemaComplexesRepository.findById.mockResolvedValue({
+      id: 'complex-1',
+      company_id: 'company-123',
+    });
     supplierRepository.findById.mockResolvedValue({
       id: 'supplier-1',
       company_id: 'company-123',
@@ -192,9 +213,15 @@ describe('ExhibitionContractsService', () => {
       distributor_percentage: 60,
       exhibitor_percentage: 40,
     } as any);
-    cinemaComplexesRepository.findById.mockResolvedValue({ id: 'complex-1', company_id: 'company-123' });
+    cinemaComplexesRepository.findById.mockResolvedValue({
+      id: 'complex-1',
+      company_id: 'company-123',
+    });
     repository.findAll.mockResolvedValue([]);
-    repository.update.mockResolvedValue({ id: 'contract-1', notes: 'novo' } as any);
+    repository.update.mockResolvedValue({
+      id: 'contract-1',
+      notes: 'novo',
+    } as any);
 
     const result = await service.update('contract-1', { notes: 'novo' } as any);
 
@@ -207,7 +234,10 @@ describe('ExhibitionContractsService', () => {
       id: 'contract-1',
       cinema_complex_id: 'complex-1',
     } as any);
-    cinemaComplexesRepository.findById.mockResolvedValue({ id: 'complex-1', company_id: 'company-123' });
+    cinemaComplexesRepository.findById.mockResolvedValue({
+      id: 'complex-1',
+      company_id: 'company-123',
+    });
 
     await service.delete('contract-1');
 

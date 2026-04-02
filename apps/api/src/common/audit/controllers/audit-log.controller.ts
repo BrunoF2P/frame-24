@@ -18,7 +18,7 @@ import {
   AuditLogResponseDto,
   AuditLogsListResponseDto,
 } from '../dto/audit-log-response.dto';
-import type { RequestUser } from 'src/modules/identity/auth/strategies/jwt.strategy';
+import type { RequestUser } from 'src/modules/identity/auth/types/auth-user.types';
 import {
   ApiTags,
   ApiOperation,

@@ -67,13 +67,9 @@ describe('SlugService', () => {
         .mockResolvedValueOnce(null),
     };
 
-    await service.createUniqueSlug(
-      model,
-      'Cinema Central',
-      'movie-1',
-      'slug',
-      { company_id: 'company-1' },
-    );
+    await service.createUniqueSlug(model, 'Cinema Central', 'movie-1', 'slug', {
+      company_id: 'company-1',
+    });
 
     expect(model.findFirst).toHaveBeenNthCalledWith(1, {
       where: {

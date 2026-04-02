@@ -63,7 +63,9 @@ describe('FinanceReportsService', () => {
   });
 
   it('should calculate income statement from aggregated sources', async () => {
-    prisma.cinema_complexes.findMany.mockResolvedValue([{ id: 'complex-1' }] as never);
+    prisma.cinema_complexes.findMany.mockResolvedValue([
+      { id: 'complex-1' },
+    ] as never);
 
     prisma.sales.aggregate.mockResolvedValue({
       _sum: {

@@ -45,12 +45,16 @@ describe('JournalEntriesService', () => {
   });
 
   it('should create balanced journal entry with generated number and items', async () => {
-    prisma.cinema_complexes.findFirst.mockResolvedValue({ id: 'complex-1' } as never);
+    prisma.cinema_complexes.findFirst.mockResolvedValue({
+      id: 'complex-1',
+    } as never);
     prisma.chart_of_accounts.findMany.mockResolvedValue([
       { id: 'acc-1' },
       { id: 'acc-2' },
     ] as never);
-    prisma.cinema_complexes.findMany.mockResolvedValue([{ id: 'complex-1' }] as never);
+    prisma.cinema_complexes.findMany.mockResolvedValue([
+      { id: 'complex-1' },
+    ] as never);
     prisma.journal_entries.count.mockResolvedValue(0);
     prisma.journal_entries.create.mockResolvedValue({ id: 'entry-1' } as never);
     prisma.journal_entries.findUnique.mockResolvedValue({
@@ -128,7 +132,9 @@ describe('JournalEntriesService', () => {
   });
 
   it('should throw when debit and credit totals do not match', async () => {
-    prisma.cinema_complexes.findFirst.mockResolvedValue({ id: 'complex-1' } as never);
+    prisma.cinema_complexes.findFirst.mockResolvedValue({
+      id: 'complex-1',
+    } as never);
     prisma.chart_of_accounts.findMany.mockResolvedValue([
       { id: 'acc-1' },
       { id: 'acc-2' },
@@ -162,7 +168,9 @@ describe('JournalEntriesService', () => {
       { id: 'complex-1' },
       { id: 'complex-2' },
     ] as never);
-    prisma.journal_entries.findMany.mockResolvedValue([{ id: 'entry-1' }] as never);
+    prisma.journal_entries.findMany.mockResolvedValue([
+      { id: 'entry-1' },
+    ] as never);
 
     const result = await service.findAll({
       cinema_complex_id: 'complex-1',

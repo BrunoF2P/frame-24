@@ -1,12 +1,10 @@
 import {
-  ForbiddenException,
   Injectable,
   ConflictException,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
-import { ClsService } from 'nestjs-cls';
 import { Transactional } from '@nestjs-cls/transactional';
 import { LoggerService } from 'src/common/services/logger.service';
 

@@ -1,10 +1,5 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
-import { ClsService } from 'nestjs-cls';
 import { SnowflakeService } from 'src/common/services/snowflake.service';
 import { PromotionTypesRepository } from '../repositories/promotion-types.repository';
 import { CreatePromotionTypeDto } from '../dto/create-promotion-type.dto';

@@ -3,12 +3,10 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
 import { Prisma, product_categories } from '@repo/db';
-import { ClsService } from 'nestjs-cls';
 import { ProductCategoryRepository } from '../repositories/product-category.repository';
 import { CreateProductCategoryDto } from '../dto/create-product-category.dto';
 import { UpdateProductCategoryDto } from '../dto/update-product-category.dto';

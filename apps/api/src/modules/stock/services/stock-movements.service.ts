@@ -1,12 +1,7 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
 import { stock_movements } from '@repo/db';
-import { ClsService } from 'nestjs-cls';
 import { StockMovementsRepository } from '../repositories/stock-movements.repository';
 import { ProductStockRepository } from '../repositories/product-stock.repository';
 import { StockMovementTypesRepository } from '../repositories/stock-movement-types.repository';

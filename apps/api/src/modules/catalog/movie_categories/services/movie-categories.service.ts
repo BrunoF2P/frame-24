@@ -1,10 +1,5 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
-import { ClsService } from 'nestjs-cls';
 import { movie_categories, Prisma } from '@repo/db';
 import { MovieCategoryRepository } from '../repositories/movie-category.repository';
 import { CreateMovieCategoryDto } from '../dto/create-movie-category.dto';

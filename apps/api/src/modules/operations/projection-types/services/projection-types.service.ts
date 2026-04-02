@@ -1,6 +1,5 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
-import { ClsService } from 'nestjs-cls';
 import type { OperationTypeResponse } from '../../shared/dto/operation-type-response.dto';
 import { ProjectionTypesRepository } from '../repositories/projection-types.repository';
 

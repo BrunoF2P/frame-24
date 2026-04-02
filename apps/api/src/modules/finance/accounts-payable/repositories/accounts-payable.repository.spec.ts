@@ -81,7 +81,9 @@ describe('AccountsPayableRepository', () => {
   });
 
   it('should find payable by id and company', async () => {
-    prisma.accounts_payable.findFirst.mockResolvedValue({ id: 'ap-1' } as never);
+    prisma.accounts_payable.findFirst.mockResolvedValue({
+      id: 'ap-1',
+    } as never);
 
     const result = await repository.findById('ap-1', 'company-1');
 

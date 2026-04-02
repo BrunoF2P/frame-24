@@ -12,6 +12,9 @@ interface DiscoveredPermission {
 
 @Injectable()
 export class PermissionDiscoveryService implements OnModuleInit {
+  private readonly retryDelayMs = 5000;
+  private syncInProgress = false;
+
   constructor(
     private readonly discoveryService: DiscoveryService,
     private readonly metadataScanner: MetadataScanner,
@@ -21,7 +24,44 @@ export class PermissionDiscoveryService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.syncAllCompanies();
+    this.scheduleSync(1);
+  }
+
+  private scheduleSync(attempt: number): void {
+    setTimeout(() => {
+      void this.runSyncWithRetry(attempt);
+    }, attempt === 1 ? 0 : this.retryDelayMs);
+  }
+
+  private async runSyncWithRetry(attempt: number): Promise<void> {
+    if (this.syncInProgress) {
+      this.logger.warn(
+        'Permission sync already in progress; skipping overlapping run.',
+        PermissionDiscoveryService.name,
+      );
+      return;
+    }
+
+    this.syncInProgress = true;
+
+    try {
+      await this.syncAllCompanies();
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown startup sync error';
+
+      this.logger.warn(
+        `Permission sync failed (attempt ${attempt}): ${message}`,
+        PermissionDiscoveryService.name,
+      );
+      this.logger.warn(
+        `Retrying permission sync in ${this.retryDelayMs}ms...`,
+        PermissionDiscoveryService.name,
+      );
+      this.scheduleSync(attempt + 1);
+    } finally {
+      this.syncInProgress = false;
+    }
   }
 
   async syncAllCompanies(): Promise<void> {

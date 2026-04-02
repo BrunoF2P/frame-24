@@ -1,16 +1,20 @@
-import { JwtService } from '@nestjs/jwt';
 import { LoggerService } from 'src/common/services/logger.service';
 import { SeatStatusRepository } from 'src/modules/operations/seat-status/repositories/seat-status.repository';
 import { SessionSeatStatusRepository } from 'src/modules/operations/session_seat_status/repositories/session-seat-status.repository';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SeatsReservationGateway } from './seats-reservation.gateway';
 
+jest.mock('jwks-rsa', () => {
+  return jest.fn(() => ({
+    getSigningKey: jest.fn(),
+  }));
+});
+
 describe('SeatsReservationGateway', () => {
   let gateway: SeatsReservationGateway;
   let logger: jest.Mocked<LoggerService>;
   let prisma: jest.Mocked<PrismaService>;
   let seatStatusRepository: jest.Mocked<SeatStatusRepository>;
-  let jwtService: jest.Mocked<JwtService>;
   let sessionSeatStatusFindMany: jest.Mock;
   let sessionSeatStatusUpdateMany: jest.Mock;
   let showtimeFindUnique: jest.Mock;
@@ -59,16 +63,11 @@ describe('SeatsReservationGateway', () => {
       findByNameAndCompany: jest.fn(),
     } as unknown as jest.Mocked<SeatStatusRepository>;
 
-    jwtService = {
-      verify: jest.fn(),
-    } as unknown as jest.Mocked<JwtService>;
-
     gateway = new SeatsReservationGateway(
       logger,
       prisma,
       {} as SessionSeatStatusRepository,
       seatStatusRepository,
-      jwtService,
     );
 
     (gateway as any).server = {
@@ -104,22 +103,24 @@ describe('SeatsReservationGateway', () => {
     expect(reservations.get('res-1').seat_ids).toEqual(['A1', 'A2']);
   });
 
-  it('should authenticate socket connection with token', () => {
+  it('should authenticate socket connection with token', async () => {
     const client = makeClient();
     client.handshake.auth.token = 'jwt-token';
-    jwtService.verify.mockReturnValue({ sub: 'user-1' } as never);
+    const authContext = { sub: 'user-1', company_id: 'company-1' };
+    jest
+      .spyOn(gateway as any, 'buildSocketUserContext')
+      .mockResolvedValue(authContext);
 
-    gateway.handleConnection(client);
+    await gateway.handleConnection(client);
 
-    expect(jwtService.verify).toHaveBeenCalledWith('jwt-token');
-    expect(client.data.user).toEqual({ sub: 'user-1' });
+    expect(client.data.user).toEqual(authContext);
     expect(client.disconnect).not.toHaveBeenCalled();
   });
 
-  it('should disconnect unauthorized socket connection', () => {
+  it('should disconnect unauthorized socket connection', async () => {
     const client = makeClient();
 
-    gateway.handleConnection(client);
+    await gateway.handleConnection(client);
 
     expect(client.disconnect).toHaveBeenCalledWith(true);
     expect(logger.error).toHaveBeenCalled();
@@ -141,7 +142,9 @@ describe('SeatsReservationGateway', () => {
     gateway.handleJoinShowtime(client, { showtime_id: 'show-1' });
 
     expect(client.join).toHaveBeenCalledWith('showtime:show-1');
-    expect(client.emit).toHaveBeenCalledWith('joined-showtime', { showtime_id: 'show-1' });
+    expect(client.emit).toHaveBeenCalledWith('joined-showtime', {
+      showtime_id: 'show-1',
+    });
     expect(client.emit).toHaveBeenCalledWith(
       'reservation-restored',
       expect.objectContaining({ reservation_uuid: 'res-1' }),
@@ -180,7 +183,9 @@ describe('SeatsReservationGateway', () => {
       id: 'show-1',
       cinema_complexes: { company_id: 'company-1' },
     } as never);
-    seatStatusRepository.findByNameAndCompany.mockResolvedValue({ id: 'reserved-status' } as never);
+    seatStatusRepository.findByNameAndCompany.mockResolvedValue({
+      id: 'reserved-status',
+    } as never);
     prisma.$transaction.mockImplementation(async (cb: any) => {
       const tx = {
         session_seat_status: {
@@ -213,7 +218,9 @@ describe('SeatsReservationGateway', () => {
       id: 'show-1',
       cinema_complexes: { company_id: 'company-1' },
     } as never);
-    seatStatusRepository.findByNameAndCompany.mockResolvedValue({ id: 'reserved-status' } as never);
+    seatStatusRepository.findByNameAndCompany.mockResolvedValue({
+      id: 'reserved-status',
+    } as never);
     prisma.$transaction.mockImplementation(async (cb: any) => {
       const tx = {
         session_seat_status: {
@@ -231,7 +238,9 @@ describe('SeatsReservationGateway', () => {
 
     expect(client.emit).toHaveBeenCalledWith(
       'reservation-error',
-      expect.objectContaining({ message: expect.stringContaining('não está disponível') }),
+      expect.objectContaining({
+        message: expect.stringContaining('não está disponível'),
+      }),
     );
   });
 
@@ -242,7 +251,9 @@ describe('SeatsReservationGateway', () => {
       id: 'show-1',
       cinema_complexes: { company_id: 'company-1' },
     } as never);
-    seatStatusRepository.findByNameAndCompany.mockResolvedValue({ id: 'reserved-status' } as never);
+    seatStatusRepository.findByNameAndCompany.mockResolvedValue({
+      id: 'reserved-status',
+    } as never);
     prisma.$transaction.mockImplementation(async (cb: any) => {
       const tx = {
         session_seat_status: {
@@ -260,7 +271,9 @@ describe('SeatsReservationGateway', () => {
 
     expect(client.emit).toHaveBeenCalledWith(
       'reservation-error',
-      expect.objectContaining({ message: expect.stringContaining('Não foi possível reservar todos') }),
+      expect.objectContaining({
+        message: expect.stringContaining('Não foi possível reservar todos'),
+      }),
     );
   });
 
@@ -401,7 +414,9 @@ describe('SeatsReservationGateway', () => {
       company_id: 'company-1',
     });
 
-    seatStatusRepository.findByNameAndCompany.mockResolvedValue({ id: 'available-status' } as never);
+    seatStatusRepository.findByNameAndCompany.mockResolvedValue({
+      id: 'available-status',
+    } as never);
     sessionSeatStatusUpdateMany.mockResolvedValue({ count: 1 } as never);
 
     await (gateway as any).expireReservation('res-1');
@@ -455,7 +470,9 @@ describe('SeatsReservationGateway', () => {
       .mockResolvedValueOnce([
         { showtime_id: 'show-1', seat_id: 'A1' },
       ] as never);
-    seatStatusRepository.findByNameAndCompany.mockResolvedValue({ id: 'available-status' } as never);
+    seatStatusRepository.findByNameAndCompany.mockResolvedValue({
+      id: 'available-status',
+    } as never);
     sessionSeatStatusUpdateMany.mockResolvedValue({ count: 1 } as never);
 
     await (gateway as any).expireReservation('res-fallback');
@@ -463,7 +480,10 @@ describe('SeatsReservationGateway', () => {
     expect(sessionSeatStatusUpdateMany).toHaveBeenCalled();
     expect(roomEmit).toHaveBeenCalledWith(
       'seats-released',
-      expect.objectContaining({ seat_ids: ['A1'], reservation_uuid: 'res-fallback' }),
+      expect.objectContaining({
+        seat_ids: ['A1'],
+        reservation_uuid: 'res-fallback',
+      }),
     );
   });
 
@@ -497,7 +517,9 @@ describe('SeatsReservationGateway', () => {
         showtime_schedule: { cinema_complexes: { company_id: 'company-1' } },
       },
     ] as never);
-    seatStatusRepository.findByNameAndCompany.mockResolvedValue({ id: 'available-status' } as never);
+    seatStatusRepository.findByNameAndCompany.mockResolvedValue({
+      id: 'available-status',
+    } as never);
     sessionSeatStatusUpdateMany.mockResolvedValue({ count: 1 } as never);
 
     await (gateway as any).cleanExpiredReservations();

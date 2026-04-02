@@ -4,6 +4,38 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { PublicService } from '../services/public.service';
 import { PublicController } from './public.controller';
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+const getJsonResponseSchema = (response: unknown): unknown => {
+  if (!isRecord(response) || '$ref' in response) {
+    return undefined;
+  }
+
+  const content = response.content;
+  if (!isRecord(content)) {
+    return undefined;
+  }
+
+  const jsonContent = content['application/json'];
+  if (!isRecord(jsonContent)) {
+    return undefined;
+  }
+
+  return jsonContent.schema;
+};
+
+const getSchemaProperties = (
+  schema: unknown,
+): Record<string, unknown> | undefined => {
+  if (!isRecord(schema) || '$ref' in schema) {
+    return undefined;
+  }
+
+  return isRecord(schema.properties) ? schema.properties : undefined;
+};
+
 describe('Public storefront OpenAPI contract', () => {
   let app: INestApplication;
 
@@ -41,8 +73,9 @@ describe('Public storefront OpenAPI contract', () => {
     const storefrontGet = document.paths[storefrontPath!]?.get;
     expect(storefrontGet).toBeDefined();
 
-    const responseSchema =
-      storefrontGet?.responses?.['200']?.content?.['application/json']?.schema;
+    const responseSchema = getJsonResponseSchema(
+      storefrontGet?.responses?.['200'],
+    );
 
     expect(responseSchema).toEqual(
       expect.objectContaining({
@@ -56,9 +89,17 @@ describe('Public storefront OpenAPI contract', () => {
     expect(schemas.StorefrontDataDto).toBeDefined();
     expect(schemas.StorefrontShowtimeDto).toBeDefined();
 
-    expect(
-      schemas.StorefrontResponseDto?.properties,
-    ).toEqual(
+    const storefrontResponseProperties = getSchemaProperties(
+      schemas.StorefrontResponseDto,
+    );
+    const storefrontDataProperties = getSchemaProperties(
+      schemas.StorefrontDataDto,
+    );
+    const storefrontShowtimeProperties = getSchemaProperties(
+      schemas.StorefrontShowtimeDto,
+    );
+
+    expect(storefrontResponseProperties).toEqual(
       expect.objectContaining({
         success: expect.any(Object),
         meta: expect.any(Object),
@@ -66,7 +107,7 @@ describe('Public storefront OpenAPI contract', () => {
       }),
     );
 
-    expect(schemas.StorefrontDataDto?.properties).toEqual(
+    expect(storefrontDataProperties).toEqual(
       expect.objectContaining({
         company: expect.any(Object),
         complexes: expect.any(Object),
@@ -79,7 +120,7 @@ describe('Public storefront OpenAPI contract', () => {
       }),
     );
 
-    expect(schemas.StorefrontShowtimeDto?.properties).toEqual(
+    expect(storefrontShowtimeProperties).toEqual(
       expect.objectContaining({
         id: expect.any(Object),
         movie_id: expect.any(Object),

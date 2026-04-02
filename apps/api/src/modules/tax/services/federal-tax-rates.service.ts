@@ -1,10 +1,5 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
-import { ClsService } from 'nestjs-cls';
 import { Prisma, federal_tax_rates } from '@repo/db';
 import { FederalTaxRatesRepository } from '../repositories/federal-tax-rates.repository';
 import { SnowflakeService } from 'src/common/services/snowflake.service';

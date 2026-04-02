@@ -22,7 +22,10 @@ describe('BankReconciliationController', () => {
     service.findAll.mockResolvedValue([{ id: 'recon-1' }] as never);
     service.findOne.mockResolvedValue({ id: 'recon-1' } as never);
     service.update.mockResolvedValue({ id: 'recon-1', notes: 'ok' } as never);
-    service.complete.mockResolvedValue({ id: 'recon-1', status: 'completed' } as never);
+    service.complete.mockResolvedValue({
+      id: 'recon-1',
+      status: 'completed',
+    } as never);
 
     await controller.create({ bank_account_id: 'bank-1' } as any);
     await controller.findAll('bank-1');

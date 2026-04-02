@@ -28,7 +28,11 @@ describe('PublicService', () => {
 
     prisma = {
       companies: { findMany: jest.fn(), findUnique: companiesFindUnique },
-      showtime_schedule: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
+      showtime_schedule: {
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        count: jest.fn(),
+      },
       movies: { findMany: jest.fn(), findUnique: jest.fn() },
       product_prices: { findFirst: productPricesFindFirst },
       ticket_types: { findMany: jest.fn() },
@@ -87,14 +91,20 @@ describe('PublicService', () => {
 
   it('should throw when company by slug is missing or inactive', async () => {
     companiesFindUnique.mockResolvedValue(null);
-    await expect(service.getCompanyBySlug('tenant-a')).rejects.toThrow(NotFoundException);
+    await expect(service.getCompanyBySlug('tenant-a')).rejects.toThrow(
+      NotFoundException,
+    );
 
     companiesFindUnique.mockResolvedValue({ active: false, suspended: false });
-    await expect(service.getCompanyBySlug('tenant-b')).rejects.toThrow(NotFoundException);
+    await expect(service.getCompanyBySlug('tenant-b')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('should return empty list when company has no active movie showtimes', async () => {
-    cinemaComplexesRepository.findAllByCompany.mockResolvedValue([{ id: 'cx-1' }] as never);
+    cinemaComplexesRepository.findAllByCompany.mockResolvedValue([
+      { id: 'cx-1' },
+    ] as never);
     showtimesRepository.findAll.mockResolvedValue([] as never);
 
     const result = await service.getMoviesByCompany('company-1');
@@ -104,13 +114,18 @@ describe('PublicService', () => {
   });
 
   it('should fetch unique movies from active showtimes', async () => {
-    cinemaComplexesRepository.findAllByCompany.mockResolvedValue([{ id: 'cx-1' }] as never);
+    cinemaComplexesRepository.findAllByCompany.mockResolvedValue([
+      { id: 'cx-1' },
+    ] as never);
     showtimesRepository.findAll.mockResolvedValue([
       { movie_id: 'm1' },
       { movie_id: 'm1' },
       { movie_id: 'm2' },
     ] as never);
-    moviesRepository.findByIds.mockResolvedValue([{ id: 'm1' }, { id: 'm2' }] as never);
+    moviesRepository.findByIds.mockResolvedValue([
+      { id: 'm1' },
+      { id: 'm2' },
+    ] as never);
 
     const result = await service.getMoviesByCompany('company-1');
 
@@ -119,7 +134,10 @@ describe('PublicService', () => {
   });
 
   it('should return priced products only when complexId is provided', async () => {
-    productsRepository.findAll.mockResolvedValue([{ id: 'p1' }, { id: 'p2' }] as never);
+    productsRepository.findAll.mockResolvedValue([
+      { id: 'p1' },
+      { id: 'p2' },
+    ] as never);
     productPricesFindFirst
       .mockResolvedValueOnce({ sale_price: 10 } as never)
       .mockResolvedValueOnce(null as never);
@@ -130,16 +148,20 @@ describe('PublicService', () => {
   });
 
   it('should throw not found when sale details are absent', async () => {
-    cinemaComplexesRepository.findAllByCompany.mockResolvedValue([{ id: 'cx-1' }] as never);
+    cinemaComplexesRepository.findAllByCompany.mockResolvedValue([
+      { id: 'cx-1' },
+    ] as never);
     salesFindFirst.mockResolvedValue(null);
 
-    await expect(service.getSaleDetails('company-1', 'PUB-123')).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(
+      service.getSaleDetails('company-1', 'PUB-123'),
+    ).rejects.toThrow(NotFoundException);
   });
 
   it('should list future showtimes with movie enrichments', async () => {
-    cinemaComplexesRepository.findAllByCompany.mockResolvedValue([{ id: 'cx-1' }] as never);
+    cinemaComplexesRepository.findAllByCompany.mockResolvedValue([
+      { id: 'cx-1' },
+    ] as never);
     const future = new Date(Date.now() + 60 * 60 * 1000);
     (prisma.showtime_schedule.findMany as jest.Mock).mockResolvedValue([
       {
@@ -242,15 +264,15 @@ describe('PublicService', () => {
   });
 
   it('should return detailed sale payload when sale exists', async () => {
-    cinemaComplexesRepository.findAllByCompany.mockResolvedValue([{ id: 'cx-1' }] as never);
+    cinemaComplexesRepository.findAllByCompany.mockResolvedValue([
+      { id: 'cx-1' },
+    ] as never);
     salesFindFirst.mockResolvedValue({
       id: 'sale-1',
       tickets: [{ showtime_id: 'show-1', ticket_types: { name: 'Inteira' } }],
       concession_sales: [
         {
-          concession_sale_items: [
-            { item_type: 'PRODUCT', item_id: 'prod-1' },
-          ],
+          concession_sale_items: [{ item_type: 'PRODUCT', item_id: 'prod-1' }],
         },
       ],
     } as never);
@@ -260,8 +282,13 @@ describe('PublicService', () => {
       rooms: { name: 'Sala 1' },
       cinema_complexes: { name: 'Complexo' },
     } as never);
-    (prisma.movies.findUnique as jest.Mock).mockResolvedValue({ id: 'm1', brazil_title: 'Filme 1' } as never);
-    (prisma.products.findMany as jest.Mock).mockResolvedValue([{ id: 'prod-1', name: 'Pipoca' }] as never);
+    (prisma.movies.findUnique as jest.Mock).mockResolvedValue({
+      id: 'm1',
+      brazil_title: 'Filme 1',
+    } as never);
+    (prisma.products.findMany as jest.Mock).mockResolvedValue([
+      { id: 'prod-1', name: 'Pipoca' },
+    ] as never);
 
     const result = await service.getSaleDetails('company-1', 'PUB-1');
 

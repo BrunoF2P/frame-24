@@ -53,7 +53,9 @@ describe('AgingReportsController', () => {
     positionService.getCustomerPositionById.mockResolvedValue(null as never);
     positionService.getSupplierPosition.mockResolvedValue([] as never);
     positionService.getSupplierPositionById.mockResolvedValue(null as never);
-    financeService.getIncomeStatement.mockResolvedValue({ period: '2026-03' } as never);
+    financeService.getIncomeStatement.mockResolvedValue({
+      period: '2026-03',
+    } as never);
 
     await controller.getCustomerPosition({} as any);
     await controller.getCustomerPositionById('cust-1');
@@ -62,9 +64,13 @@ describe('AgingReportsController', () => {
     await controller.getIncomeStatement('2026-03');
 
     expect(positionService.getCustomerPosition).toHaveBeenCalledWith({});
-    expect(positionService.getCustomerPositionById).toHaveBeenCalledWith('cust-1');
+    expect(positionService.getCustomerPositionById).toHaveBeenCalledWith(
+      'cust-1',
+    );
     expect(positionService.getSupplierPosition).toHaveBeenCalledWith({});
-    expect(positionService.getSupplierPositionById).toHaveBeenCalledWith('sup-1');
+    expect(positionService.getSupplierPositionById).toHaveBeenCalledWith(
+      'sup-1',
+    );
     expect(financeService.getIncomeStatement).toHaveBeenCalledWith('2026-03');
   });
 });

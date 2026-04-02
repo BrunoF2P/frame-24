@@ -32,9 +32,7 @@ describe('BrasilApiService', () => {
     const result = await service.getCnpjData('12.345.678/0001-99');
 
     expect(clientGet).toHaveBeenCalledWith('/cnpj/v1/12345678000199');
-    expect(result).toEqual(
-      expect.objectContaining({ cnpj: '12345678000199' }),
-    );
+    expect(result).toEqual(expect.objectContaining({ cnpj: '12345678000199' }));
   });
 
   it('should return null for cnpj when brasil api responds 404', async () => {
@@ -76,7 +74,10 @@ describe('BrasilApiService', () => {
 
   it('should return null for cep on any axios error', async () => {
     jest.spyOn(axios, 'isAxiosError').mockReturnValue(true);
-    clientGet.mockRejectedValue({ response: { status: 500 }, message: 'error' });
+    clientGet.mockRejectedValue({
+      response: { status: 500 },
+      message: 'error',
+    });
 
     await expect(service.getCepData('01001-000')).resolves.toBeNull();
   });
@@ -92,7 +93,10 @@ describe('BrasilApiService', () => {
       ],
     });
 
-    const result = await service.getMunicipalityByCityAndState('São Paulo', 'SP');
+    const result = await service.getMunicipalityByCityAndState(
+      'São Paulo',
+      'SP',
+    );
 
     expect(clientGet).toHaveBeenCalledWith('/ibge/municipios/v1/SP');
     expect(result).toEqual({

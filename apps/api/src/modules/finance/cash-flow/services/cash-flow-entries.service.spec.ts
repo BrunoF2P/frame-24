@@ -6,7 +6,9 @@ import { CashFlowEntriesRepository } from '../repositories/cash-flow-entries.rep
 import { CashFlowEntriesService } from './cash-flow-entries.service';
 
 jest.mock('@nestjs-cls/transactional', () => ({
-  Transactional: () => (_target: unknown, _key: string, descriptor: PropertyDescriptor) => descriptor,
+  Transactional:
+    () => (_target: unknown, _key: string, descriptor: PropertyDescriptor) =>
+      descriptor,
 }));
 
 describe('CashFlowEntriesService', () => {
@@ -103,7 +105,9 @@ describe('CashFlowEntriesService', () => {
       total_payments: 20,
       net_balance: 60,
     });
-    bankAccountsRepository.updateBalance.mockResolvedValue({ id: 'bank-1' } as never);
+    bankAccountsRepository.updateBalance.mockResolvedValue({
+      id: 'bank-1',
+    } as never);
 
     const result = await service.create({
       bank_account_id: 'bank-1',

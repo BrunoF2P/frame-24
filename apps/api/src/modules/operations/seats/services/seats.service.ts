@@ -1,10 +1,9 @@
 import {
+  ForbiddenException,
   Injectable,
   NotFoundException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
-import { ClsService } from 'nestjs-cls';
 import { seats as Seat } from '@repo/db';
 
 import { RabbitMQPublisherService } from 'src/common/rabbitmq/rabbitmq-publisher.service';

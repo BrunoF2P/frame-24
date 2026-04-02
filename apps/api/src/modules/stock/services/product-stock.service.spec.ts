@@ -72,7 +72,9 @@ describe('ProductStockService', () => {
 
   it('should return stock with fallback defaults when stock row does not exist but product exists', async () => {
     productStockRepository.findById.mockResolvedValue(null);
-    productsRepository.findById.mockResolvedValue({ minimum_stock: 12 } as never);
+    productsRepository.findById.mockResolvedValue({
+      minimum_stock: 12,
+    } as never);
 
     const result = await service.findOne('p-1', 'c-1');
 

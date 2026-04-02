@@ -64,7 +64,9 @@ describe('ChartOfAccountsService', () => {
   });
 
   it('should throw BadRequestException on duplicated account code', async () => {
-    prisma.chart_of_accounts.findFirst.mockResolvedValueOnce({ id: 'existing' } as never);
+    prisma.chart_of_accounts.findFirst.mockResolvedValueOnce({
+      id: 'existing',
+    } as never);
 
     await expect(
       service.create({
@@ -95,7 +97,9 @@ describe('ChartOfAccountsService', () => {
   });
 
   it('should list only active company accounts ordered by level then code', async () => {
-    prisma.chart_of_accounts.findMany.mockResolvedValue([{ id: 'a1' }] as never);
+    prisma.chart_of_accounts.findMany.mockResolvedValue([
+      { id: 'a1' },
+    ] as never);
 
     const result = await service.findAll();
 
@@ -107,7 +111,9 @@ describe('ChartOfAccountsService', () => {
   });
 
   it('should update account and recompute level when account_code is provided', async () => {
-    prisma.chart_of_accounts.findFirst.mockResolvedValue({ id: 'acc-1' } as never);
+    prisma.chart_of_accounts.findFirst.mockResolvedValue({
+      id: 'acc-1',
+    } as never);
     prisma.chart_of_accounts.update.mockResolvedValue({ id: 'acc-1' } as never);
 
     await service.update('acc-1', {
@@ -126,7 +132,9 @@ describe('ChartOfAccountsService', () => {
   });
 
   it('should soft-delete account when remove is called', async () => {
-    prisma.chart_of_accounts.findFirst.mockResolvedValue({ id: 'acc-1' } as never);
+    prisma.chart_of_accounts.findFirst.mockResolvedValue({
+      id: 'acc-1',
+    } as never);
     prisma.chart_of_accounts.update.mockResolvedValue({ id: 'acc-1' } as never);
 
     await service.remove('acc-1');

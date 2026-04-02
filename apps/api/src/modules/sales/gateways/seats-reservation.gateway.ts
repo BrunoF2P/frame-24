@@ -13,7 +13,19 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { SessionSeatStatusRepository } from 'src/modules/operations/session_seat_status/repositories/session-seat-status.repository';
 import { SeatStatusRepository } from 'src/modules/operations/seat-status/repositories/seat-status.repository';
 import { OnModuleInit } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import jwksRsa from 'jwks-rsa';
+import jwt from 'jsonwebtoken';
+
+interface JwtHeaderWithKid {
+  kid?: string;
+  alg?: string;
+}
+
+interface JwtPayloadWithClaims {
+  sub?: string;
+  company_id?: string;
+  tenant_slug?: string;
+}
 
 interface SeatReservation {
   showtime_id: string;
@@ -28,6 +40,12 @@ interface SeatReservation {
 interface SocketAuthContext {
   userId: string;
   companyId: string;
+}
+
+interface SocketUserContext {
+  sub: string;
+  company_id: string;
+  tenant_slug?: string;
 }
 
 const isDev = process.env.NODE_ENV !== 'production';
@@ -74,18 +92,118 @@ export class SeatsReservationGateway
 
   // Reservas temporárias em memória (sincronizadas com o banco)
   private reservations = new Map<string, SeatReservation>();
+  private readonly jwksClient = this.createJwksClient();
 
   constructor(
     private readonly logger: LoggerService,
     private readonly prisma: PrismaService,
     private readonly sessionSeatStatusRepository: SessionSeatStatusRepository,
     private readonly seatStatusRepository: SeatStatusRepository,
-    private readonly jwtService: JwtService,
   ) {
     // Limpar reservas expiradas a cada minuto
     setInterval(() => {
-      this.cleanExpiredReservations();
+      void this.cleanExpiredReservations();
     }, 60000);
+  }
+
+  private createJwksClient() {
+    const issuer = process.env.OIDC_ISSUER || process.env.KEYCLOAK_ISSUER;
+    const jwksUri =
+      process.env.OIDC_JWKS_URI ||
+      (issuer ? new URL('./jwks/', issuer).toString() : undefined);
+
+    if (!jwksUri) return null;
+
+    return jwksRsa({
+      cache: true,
+      rateLimit: true,
+      jwksRequestsPerMinute: 10,
+      jwksUri,
+    });
+  }
+
+  private async getSigningKey(kid: string): Promise<string> {
+    if (!this.jwksClient) {
+      throw new Error('OIDC JWKS client is not configured');
+    }
+
+    const key = await this.jwksClient.getSigningKey(kid);
+    return key.getPublicKey();
+  }
+
+  private async buildSocketUserContext(
+    token: string,
+  ): Promise<SocketUserContext> {
+    const issuer = process.env.OIDC_ISSUER || process.env.KEYCLOAK_ISSUER;
+    const audience =
+      process.env.OIDC_API_AUDIENCE || process.env.KEYCLOAK_API_AUDIENCE;
+
+    if (!issuer || !audience) {
+      throw new Error('OIDC issuer/audience not configured');
+    }
+
+    const decoded = jwt.decode(token, {
+      complete: true,
+    }) as { header?: JwtHeaderWithKid } | null;
+
+    const kid = decoded?.header?.kid;
+
+    if (!kid) {
+      throw new Error('Missing kid in token header');
+    }
+
+    const publicKey = await this.getSigningKey(kid);
+
+    const payload = jwt.verify(token, publicKey, {
+      algorithms: ['RS256'],
+      issuer,
+      audience,
+    }) as JwtPayloadWithClaims;
+
+    const userId = payload.sub;
+
+    if (!userId) {
+      throw new Error('Invalid token payload: missing sub');
+    }
+
+    if (payload.company_id) {
+      return {
+        sub: userId,
+        company_id: payload.company_id,
+        tenant_slug: payload.tenant_slug,
+      };
+    }
+
+    const identity = await this.prisma.identities.findFirst({
+      where: {
+        external_id: userId,
+        active: true,
+      },
+      include: {
+        company_users: {
+          where: { active: true },
+          include: {
+            companies: true,
+          },
+          orderBy: {
+            created_at: 'asc',
+          },
+          take: 1,
+        },
+      },
+    });
+
+    const companyUser = identity?.company_users?.[0];
+
+    if (!companyUser) {
+      throw new Error('Identity not linked to an active company user');
+    }
+
+    return {
+      sub: userId,
+      company_id: companyUser.company_id,
+      tenant_slug: companyUser.companies?.tenant_slug,
+    };
   }
 
   async onModuleInit() {
@@ -150,26 +268,32 @@ export class SeatsReservationGateway
       );
     } catch (error) {
       this.logger.error(
-        `Failed to load active reservations: ${error}`,
+        `Failed to load active reservations: ${error instanceof Error ? error.message : String(error)}`,
         '',
         'SeatsReservationGateway',
       );
     }
   }
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket): Promise<void> {
     try {
       // Allow passing auth via token or headers
+      const headerAuthorization = client.handshake.headers['authorization'];
       const token =
-        client.handshake.auth?.token ||
-        client.handshake.headers['authorization']?.split(' ')[1];
+        (typeof client.handshake.auth?.token === 'string'
+          ? client.handshake.auth.token
+          : undefined) ||
+        (typeof headerAuthorization === 'string'
+          ? headerAuthorization.split(' ')[1]
+          : undefined);
 
       if (!token) {
         throw new Error('Unauthorized - Token not provided');
       }
 
-      const payload = this.jwtService.verify(token);
-      client.data.user = payload; // Attach user to socket connection
+      const payload = await this.buildSocketUserContext(token);
+      const socketData = client.data as { user?: SocketUserContext };
+      socketData.user = payload; // Attach user to socket connection
 
       this.logger.log(
         `WebSocket client connected: ${client.id} (User: ${payload.sub || 'guest'})`,
@@ -194,7 +318,8 @@ export class SeatsReservationGateway
   }
 
   private getSocketAuthContext(client: Socket): SocketAuthContext {
-    const user = client.data.user as
+    const socketData = client.data as { user?: SocketUserContext };
+    const user = socketData.user as
       | { sub?: string; company_id?: string }
       | undefined;
 
@@ -234,7 +359,7 @@ export class SeatsReservationGateway
     const { showtime_id } = payload;
     const auth = this.getSocketAuthContext(client);
 
-    client.join(`showtime:${showtime_id}`);
+    void client.join(`showtime:${showtime_id}`);
     this.logger.debug(
       `Client ${client.id} joined showtime ${showtime_id} (User: ${auth.userId})`,
       'SeatsReservationGateway',
@@ -427,7 +552,7 @@ export class SeatsReservationGateway
       );
     } catch (error) {
       this.logger.error(
-        `Error reserving seats: ${error}`,
+        `Error reserving seats: ${error instanceof Error ? error.message : String(error)}`,
         'SeatsReservationGateway',
       );
       client.emit('reservation-error', {
@@ -518,7 +643,7 @@ export class SeatsReservationGateway
       });
     } catch (error) {
       this.logger.error(
-        `Error confirming reservation: ${error}`,
+        `Error confirming reservation: ${error instanceof Error ? error.message : String(error)}`,
         '',
         'SeatsReservationGateway',
       );
@@ -657,7 +782,7 @@ export class SeatsReservationGateway
       );
     } catch (error) {
       this.logger.error(
-        `Error expiring reservation: ${error}`,
+        `Error expiring reservation: ${error instanceof Error ? error.message : String(error)}`,
         '',
         'SeatsReservationGateway',
       );
@@ -768,7 +893,6 @@ export class SeatsReservationGateway
         );
 
         for (const [showtimeId, seats] of Object.entries(byShowtime)) {
-          const seatIds = seats.map((s) => s.seat_id);
           // Podemos emitir múltiplos eventos ou um agrupado.
           // O front espera { seat_ids, reservation_uuid }.
           // Se mandarmos array de seat_ids e um uuid null ou genérico, o front entende?
@@ -808,7 +932,7 @@ export class SeatsReservationGateway
       );
     } catch (error) {
       this.logger.error(
-        `Error cleaning expired reservations: ${error}`,
+        `Error cleaning expired reservations: ${error instanceof Error ? error.message : String(error)}`,
         '',
         'SeatsReservationGateway',
       );

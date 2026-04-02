@@ -26,14 +26,12 @@ describe('TicketTypesController', () => {
     const listPayload = [{ id: 'type-1' }];
     const payload = { id: 'type-1' };
 
-    const service: Pick<
-      TicketTypesService,
-      'findAll' | 'findOne' | 'delete'
-    > = {
-      findAll: jest.fn().mockResolvedValue(listPayload as any),
-      findOne: jest.fn().mockResolvedValue(payload as any),
-      delete: jest.fn().mockResolvedValue(undefined),
-    };
+    const service: Pick<TicketTypesService, 'findAll' | 'findOne' | 'delete'> =
+      {
+        findAll: jest.fn().mockResolvedValue(listPayload as any),
+        findOne: jest.fn().mockResolvedValue(payload as any),
+        delete: jest.fn().mockResolvedValue(undefined),
+      };
 
     const controller = new TicketTypesController(service as TicketTypesService);
 

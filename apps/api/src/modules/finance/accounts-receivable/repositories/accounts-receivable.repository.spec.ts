@@ -28,7 +28,9 @@ describe('AccountsReceivableRepository', () => {
   });
 
   it('should create receivable computing remaining amount', async () => {
-    prisma.accounts_receivable.create.mockResolvedValue({ id: 'ar-1' } as never);
+    prisma.accounts_receivable.create.mockResolvedValue({
+      id: 'ar-1',
+    } as never);
 
     const dto = {
       cinema_complex_id: 'complex-1',
@@ -83,7 +85,9 @@ describe('AccountsReceivableRepository', () => {
   });
 
   it('should find one by id and company with transactions', async () => {
-    prisma.accounts_receivable.findFirst.mockResolvedValue({ id: 'ar-1' } as never);
+    prisma.accounts_receivable.findFirst.mockResolvedValue({
+      id: 'ar-1',
+    } as never);
 
     const result = await repository.findById('ar-1', 'company-1');
 
@@ -95,7 +99,9 @@ describe('AccountsReceivableRepository', () => {
   });
 
   it('should update receivable fields', async () => {
-    prisma.accounts_receivable.update.mockResolvedValue({ id: 'ar-1' } as never);
+    prisma.accounts_receivable.update.mockResolvedValue({
+      id: 'ar-1',
+    } as never);
 
     const result = await repository.update('ar-1', {
       description: 'updated',
@@ -113,7 +119,9 @@ describe('AccountsReceivableRepository', () => {
   });
 
   it('should update status and amounts', async () => {
-    prisma.accounts_receivable.update.mockResolvedValue({ id: 'ar-1' } as never);
+    prisma.accounts_receivable.update.mockResolvedValue({
+      id: 'ar-1',
+    } as never);
 
     const result = await repository.updateStatus('ar-1', 'partial', 20, 80);
 

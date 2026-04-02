@@ -1,6 +1,5 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
-import { ClsService } from 'nestjs-cls';
 import type { SessionLanguageResponse } from '../../shared/dto/session-language-response.dto';
 import { SessionLanguagesRepository } from '../repositories/session-languages.repository';
 

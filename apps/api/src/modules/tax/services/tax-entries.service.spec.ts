@@ -10,7 +10,9 @@ import { TaxCalculationService } from './tax-calculation.service';
 import { TaxEntriesService } from './tax-entries.service';
 
 jest.mock('@nestjs-cls/transactional', () => ({
-  Transactional: () => (_target: unknown, _key: string, descriptor: PropertyDescriptor) => descriptor,
+  Transactional:
+    () => (_target: unknown, _key: string, descriptor: PropertyDescriptor) =>
+      descriptor,
 }));
 
 describe('TaxEntriesService', () => {
@@ -83,7 +85,9 @@ describe('TaxEntriesService', () => {
   it('should throw in findOne when entry does not exist', async () => {
     taxEntriesRepository.findById.mockResolvedValue(null);
 
-    await expect(service.findOne('entry-404')).rejects.toThrow(NotFoundException);
+    await expect(service.findOne('entry-404')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('should block create when source already has tax entry', async () => {
@@ -91,7 +95,9 @@ describe('TaxEntriesService', () => {
       id: 'complex-1',
       company_id: 'company-1',
     } as never);
-    taxEntriesRepository.findBySource.mockResolvedValue({ id: 'existing' } as never);
+    taxEntriesRepository.findBySource.mockResolvedValue({
+      id: 'existing',
+    } as never);
 
     await expect(
       service.create({
@@ -153,7 +159,9 @@ describe('TaxEntriesService', () => {
       { id: 'bank-1', active: true },
     ] as never);
     rabbitmq.publish.mockResolvedValue(undefined as never);
-    cashFlowEntriesService.createForCompany.mockResolvedValue({ id: 'cf-1' } as never);
+    cashFlowEntriesService.createForCompany.mockResolvedValue({
+      id: 'cf-1',
+    } as never);
 
     const result = await service.create({
       cinema_complex_id: 'complex-1',

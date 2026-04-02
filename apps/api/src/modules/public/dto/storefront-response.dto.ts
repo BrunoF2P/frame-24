@@ -104,7 +104,11 @@ export class StorefrontProductDto {
   @ApiProperty({ example: 'Combo Pipoca' })
   name!: string;
 
-  @ApiProperty({ required: false, nullable: true, example: 'Pipoca + Refrigerante' })
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    example: 'Pipoca + Refrigerante',
+  })
   description!: string | null;
 
   @ApiProperty({
@@ -125,7 +129,11 @@ export class StorefrontTicketTypeDto {
   @ApiProperty({ example: 'Inteira' })
   name!: string;
 
-  @ApiProperty({ required: false, nullable: true, example: 'Ingresso sem desconto' })
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    example: 'Ingresso sem desconto',
+  })
   description!: string | null;
 
   @ApiProperty({ example: 1 })
@@ -139,7 +147,11 @@ export class StorefrontPaymentMethodDto {
   @ApiProperty({ example: 'PIX' })
   name!: string;
 
-  @ApiProperty({ required: false, nullable: true, example: 'Pagamento instantaneo' })
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    example: 'Pagamento instantaneo',
+  })
   description!: string | null;
 }
 

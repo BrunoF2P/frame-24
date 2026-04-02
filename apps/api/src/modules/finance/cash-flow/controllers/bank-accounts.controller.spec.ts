@@ -21,8 +21,14 @@ describe('BankAccountsController', () => {
   it('should delegate create/findOne/getBalance/update/delete', async () => {
     service.create.mockResolvedValue({ id: 'bank-1' } as never);
     service.findOne.mockResolvedValue({ id: 'bank-1' } as never);
-    service.getBalance.mockResolvedValue({ bank_account_id: 'bank-1', current_balance: 100 } as never);
-    service.update.mockResolvedValue({ id: 'bank-1', bank_name: 'Banco X' } as never);
+    service.getBalance.mockResolvedValue({
+      bank_account_id: 'bank-1',
+      current_balance: 100,
+    } as never);
+    service.update.mockResolvedValue({
+      id: 'bank-1',
+      bank_name: 'Banco X',
+    } as never);
     service.delete.mockResolvedValue({ count: 1 } as never);
 
     await controller.create({ bank_name: 'Banco X' } as any);

@@ -1,7 +1,6 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
 import { Prisma } from '@repo/db';
-import { ClsService } from 'nestjs-cls';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AgingReportQueryDto } from '../dto/aging-report-query.dto';
 

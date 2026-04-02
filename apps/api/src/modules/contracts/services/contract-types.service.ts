@@ -1,10 +1,5 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { TenantContextService } from 'src/common/services/tenant-context.service';
-import { ClsService } from 'nestjs-cls';
 import { ContractTypesRepository } from '../repositories/contract-types.repository';
 import { CreateContractTypeDto } from '../dto/create-contract-type.dto';
 import { UpdateContractTypeDto } from '../dto/update-contract-type.dto';
