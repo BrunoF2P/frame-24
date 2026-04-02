@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["**/.env*"],
+  "globalDependencies": ["**/.env*", ".editorconfig", ".prettierrc.json", "tsconfig.base.json"],
   "globalEnv": [
     "NODE_ENV",
     "PORT",
@@ -14,7 +14,10 @@
     "MINIO_*",
     "STORAGE_PUBLIC_URL",
     "RESEND_API_KEY",
-    "EMAIL_FROM"
+    "EMAIL_FROM",
+    "AUTH_KEYCLOAK_ISSUER",
+    "AUTH_KEYCLOAK_ID",
+    "AUTH_KEYCLOAK_SECRET"
   ],
   "tasks": {
     "dev": {
@@ -48,6 +51,7 @@
       "dependsOn": ["^check-types"]
     },
     "test": {
+      "dependsOn": ["^build"],
       "outputs": ["coverage/**"],
       "cache": false
     }

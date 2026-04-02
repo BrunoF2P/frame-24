@@ -4,6 +4,8 @@ import turboPlugin from "eslint-plugin-turbo";
 import tseslint from "typescript-eslint";
 import onlyWarn from "eslint-plugin-only-warn";
 
+const isStrictLintMode = process.env.FRAME24_STRICT_LINT === "1";
+
 /**
  * A shared ESLint configuration for the repository.
  *
@@ -22,9 +24,13 @@ export const config = [
     },
   },
   {
-    plugins: {
-      onlyWarn,
-    },
+    ...(isStrictLintMode
+      ? {}
+      : {
+          plugins: {
+            onlyWarn,
+          },
+        }),
   },
   {
     ignores: ["dist/**"],

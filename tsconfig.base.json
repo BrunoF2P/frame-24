@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": "./packages/db",
     "paths": {
       "@repo/*": ["packages/*/src"]
     }

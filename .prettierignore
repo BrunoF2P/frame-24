@@ -1,0 +1,11 @@
+node_modules
+.pnpm-store
+.turbo
+.next
+out
+build
+dist
+coverage
+apps/api/coverage
+**/*.min.js
+pnpm-lock.yaml

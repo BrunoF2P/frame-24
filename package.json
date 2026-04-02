@@ -2,24 +2,29 @@
   "name": "frame-24",
   "private": true,
   "scripts": {
+    "auth:bootstrap": "node ./scripts/bootstrap-authentik.mjs",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "dev:api": "turbo run dev --filter=api",
     "dev:web": "turbo run dev --filter=web",
     "dev:admin": "turbo run dev --filter=admin",
     "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "lint:strict": "pnpm --filter web run lint:strict && pnpm --filter admin run lint:strict",
+    "lint:strict:web": "pnpm --filter web run lint:strict",
+    "lint:strict:admin": "pnpm --filter admin run lint:strict",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}\"",
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
-    "@nestjs/cli": "^11.0.16",
+    "@nestjs/cli": "^11.0.17",
     "@types/express": "^5.0.6",
     "@types/node": "^25.5.0",
     "prettier": "^3.8.1",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "turbo": "^2.8.17",
-    "typescript": "^5.9.3"
+    "turbo": "^2.9.3",
+    "typescript": "^6.0.2"
   },
   "packageManager": "pnpm@10.20.0",
   "pnpm": {
@@ -31,6 +36,5 @@
   },
   "engines": {
     "node": ">=18"
-  },
-  "dependencies": {}
+  }
 }
