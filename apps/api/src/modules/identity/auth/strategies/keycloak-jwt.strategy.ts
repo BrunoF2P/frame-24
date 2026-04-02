@@ -1,7 +1,8 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import * as jwksRsa from 'jwks-rsa';
+import jwt from 'jsonwebtoken';
+import jwksRsa from 'jwks-rsa';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { LoggerService } from 'src/common/services/logger.service';
 import type { RequestUser, CustomerUser } from '../types/auth-user.types';
@@ -13,6 +14,12 @@ interface KeycloakJwtPayload {
   preferred_username?: string;
   company_id?: string;
   tenant_slug?: string;
+  iss?: string;
+  aud?: string | string[];
+}
+
+interface DecodedJwtHeader {
+  kid?: string;
 }
 
 function isKeycloakEnabled(): boolean {
@@ -24,28 +31,69 @@ function isKeycloakEnabled(): boolean {
   );
 }
 
-function getOidcIssuer(): string | undefined {
-  return process.env.OIDC_ISSUER || process.env.KEYCLOAK_ISSUER;
+function getAllowedOidcIssuers(): string[] {
+  const configured = (
+    process.env.OIDC_ALLOWED_ISSUERS ||
+    process.env.KEYCLOAK_ALLOWED_ISSUERS ||
+    [
+      process.env.OIDC_ISSUER,
+      process.env.KEYCLOAK_ISSUER,
+      process.env.AUTHENTIK_URL
+        ? `${process.env.AUTHENTIK_URL.replace(/\/$/, '')}/application/o/frame24-admin/`
+        : undefined,
+      process.env.AUTHENTIK_URL
+        ? `${process.env.AUTHENTIK_URL.replace(/\/$/, '')}/application/o/frame24-web/`
+        : undefined,
+      process.env.AUTHENTIK_URL
+        ? `${process.env.AUTHENTIK_URL.replace(/\/$/, '')}/application/o/frame24-landing/`
+        : undefined,
+      'http://localhost:9080/application/o/frame24-admin/',
+      'http://localhost:9080/application/o/frame24-web/',
+      'http://localhost:9080/application/o/frame24-landing/',
+      'http://localhost:9080/application/o/frame24-app/',
+    ]
+      .filter(Boolean)
+      .join(',')
+  )
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return [...new Set(configured)];
 }
 
-function getOidcAudience(): string | undefined {
-  return process.env.OIDC_API_AUDIENCE || process.env.KEYCLOAK_API_AUDIENCE;
+function getAllowedOidcAudiences(): string[] {
+  const configured = (
+    process.env.OIDC_ALLOWED_AUDIENCES ||
+    process.env.KEYCLOAK_ALLOWED_AUDIENCES ||
+    [
+      process.env.OIDC_API_AUDIENCE,
+      process.env.KEYCLOAK_API_AUDIENCE,
+      'frame24-admin',
+      'frame24-web',
+      'frame24-landing',
+      'frame24-app',
+    ]
+      .filter(Boolean)
+      .join(',')
+  )
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return [...new Set(configured)];
 }
 
 function getOidcJwksUri(issuer?: string): string | undefined {
-  return (
-    process.env.OIDC_JWKS_URI ||
-    (issuer ? new URL('./jwks/', issuer).toString() : undefined)
-  );
+  return issuer ? new URL('./jwks/', issuer).toString() : undefined;
 }
 
 function buildStrategyOptions(): StrategyOptionsWithoutRequest {
   const enabled = isKeycloakEnabled();
-  const issuer = getOidcIssuer();
-  const audience = getOidcAudience();
-  const jwksUri = getOidcJwksUri(issuer);
+  const issuers = getAllowedOidcIssuers();
+  const audiences = getAllowedOidcAudiences();
 
-  if (!enabled || !issuer || !audience || !jwksUri) {
+  if (!enabled || issuers.length === 0 || audiences.length === 0) {
     // Keep strategy registered without breaking startup in legacy mode.
     return {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -57,14 +105,50 @@ function buildStrategyOptions(): StrategyOptionsWithoutRequest {
   return {
     jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
     ignoreExpiration: false,
-    issuer,
-    audience,
     algorithms: ['RS256'],
-    secretOrKeyProvider: jwksRsa.passportJwtSecret({
-      cache: true,
-      rateLimit: true,
-      jwksRequestsPerMinute: 10,
-      jwksUri,
+    secretOrKeyProvider: ((
+      req: unknown,
+      rawJwtToken: string,
+      done: (err: unknown, secret?: string | Buffer) => void,
+    ) => {
+      try {
+        const decoded = jwt.decode(rawJwtToken, {
+          complete: true,
+        }) as { header?: DecodedJwtHeader; payload?: KeycloakJwtPayload } | null;
+
+        const issuer = decoded?.payload?.iss;
+        const kid = decoded?.header?.kid;
+
+        if (!issuer || !issuers.includes(issuer)) {
+          done(new UnauthorizedException('OIDC issuer not allowed'));
+          return;
+        }
+
+        if (!kid) {
+          done(new UnauthorizedException('OIDC token missing kid'));
+          return;
+        }
+
+        const jwksUri = getOidcJwksUri(issuer);
+        if (!jwksUri) {
+          done(new UnauthorizedException('OIDC JWKS URI not available'));
+          return;
+        }
+
+        const client = jwksRsa({
+          cache: true,
+          rateLimit: true,
+          jwksRequestsPerMinute: 10,
+          jwksUri,
+        });
+
+        client
+          .getSigningKey(kid)
+          .then((key: { getPublicKey(): string }) => done(null, key.getPublicKey()))
+          .catch((error: unknown) => done(error));
+      } catch (error) {
+        done(error);
+      }
     }) as unknown as (
       req: unknown,
       rawJwtToken: string,
@@ -94,6 +178,22 @@ export class KeycloakJwtStrategy extends PassportStrategy(
 
     if (!payload.sub) {
       throw new UnauthorizedException('Invalid OIDC token payload');
+    }
+
+    const allowedIssuers = getAllowedOidcIssuers();
+    const allowedAudiences = getAllowedOidcAudiences();
+    const tokenAudiences = Array.isArray(payload.aud)
+      ? payload.aud
+      : payload.aud
+        ? [payload.aud]
+        : [];
+
+    if (!payload.iss || !allowedIssuers.includes(payload.iss)) {
+      throw new UnauthorizedException('OIDC issuer not allowed');
+    }
+
+    if (!tokenAudiences.some((aud) => allowedAudiences.includes(aud))) {
+      throw new UnauthorizedException('OIDC audience not allowed');
     }
 
     const identity = await this.prisma.identities.findFirst({

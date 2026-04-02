@@ -18,5 +18,8 @@ declare module "next-auth/jwt" {
   interface JWT {
     accessToken?: string;
     idToken?: string;
+    sessionId?: string;
+    oidcSubject?: string;
+    oidcExpiresAt?: number;
   }
 }

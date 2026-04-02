@@ -2,6 +2,11 @@ import NextAuth, {
   type NextAuthConfig,
   type NextAuthResult,
 } from "next-auth";
+import {
+  extractSessionMetadata,
+  isOidcSessionActive,
+  registerOidcSession,
+} from "@/services/internal-oidc-session";
 
 const oidcProvider = {
   id: "authentik",
@@ -31,6 +36,41 @@ const authConfig = {
       if (account) {
         token.accessToken = account.access_token;
         token.idToken = account.id_token;
+        const metadata = extractSessionMetadata(account.id_token);
+        token.sessionId =
+          metadata.sid ??
+          (typeof token.sub === "string" ? `sub:${token.sub}:admin` : undefined);
+        token.oidcSubject =
+          metadata.sub ?? (typeof token.sub === "string" ? token.sub : undefined);
+        token.oidcExpiresAt = metadata.exp;
+
+        if (
+          typeof token.oidcSubject === "string" &&
+          typeof token.sessionId === "string"
+        ) {
+          await registerOidcSession({
+            subject: token.oidcSubject,
+            sessionId: token.sessionId,
+            context: "EMPLOYEE",
+            expiresAt:
+              typeof token.oidcExpiresAt === "number"
+                ? token.oidcExpiresAt
+                : undefined,
+          });
+        }
+      }
+
+      if (token.sessionId || token.oidcSubject) {
+        const active = await isOidcSessionActive({
+          subject:
+            typeof token.oidcSubject === "string" ? token.oidcSubject : undefined,
+          sessionId:
+            typeof token.sessionId === "string" ? token.sessionId : undefined,
+        });
+
+        if (!active) {
+          return null;
+        }
       }
       return token;
     },

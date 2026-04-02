@@ -4,6 +4,32 @@ import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import { Loader2 } from "lucide-react";
 
+function clearAuthJsCookies() {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const cookieNames = [
+    "authjs.session-token",
+    "__Secure-authjs.session-token",
+    "authjs.callback-url",
+    "__Secure-authjs.callback-url",
+    "authjs.csrf-token",
+    "__Host-authjs.csrf-token",
+    "authjs.pkce.code_verifier",
+    "__Secure-authjs.pkce.code_verifier",
+    "authjs.state",
+    "__Secure-authjs.state",
+    "authjs.nonce",
+    "__Secure-authjs.nonce",
+  ];
+
+  for (const name of cookieNames) {
+    document.cookie = `${name}=; Max-Age=0; path=/; SameSite=Lax`;
+    document.cookie = `${name}=; Max-Age=0; path=/; domain=${window.location.hostname}; SameSite=Lax`;
+  }
+}
+
 export default function LoginPage() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [showFallback, setShowFallback] = useState(false);
@@ -12,6 +38,8 @@ export default function LoginPage() {
     const currentUrl = new URL(window.location.href);
     const authError = currentUrl.searchParams.get("error");
     const callbackUrl = currentUrl.searchParams.get("callbackUrl") ?? "/";
+
+    clearAuthJsCookies();
 
     if (authError) {
       setLoginError(
@@ -41,6 +69,7 @@ export default function LoginPage() {
     const currentUrl = new URL(window.location.href);
     const callbackUrl = currentUrl.searchParams.get("callbackUrl") ?? "/";
 
+    clearAuthJsCookies();
     setLoginError(null);
     setShowFallback(false);
     void signIn("authentik", { callbackUrl }).catch(() => {

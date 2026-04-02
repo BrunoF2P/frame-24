@@ -16,6 +16,9 @@ import { SnowflakeService } from 'src/common/services/snowflake.service';
 import { LoggerService } from 'src/common/services/logger.service';
 import { KeycloakProvisioningService } from 'src/common/services/keycloak-provisioning.service';
 
+const AUTHENTIK_CUSTOMER_GROUP =
+  process.env.AUTHENTIK_CUSTOMER_GROUP ?? 'Frame24 Customers';
+
 @Injectable()
 export class CustomerAuthService {
   constructor(
@@ -59,6 +62,7 @@ export class CustomerAuthService {
         fullName: dto.full_name,
         password: dto.password,
         realmRoles: ['FRAME24_CUSTOMER'],
+        groups: [AUTHENTIK_CUSTOMER_GROUP],
       });
 
       const identity = await this.prisma.identities.create({

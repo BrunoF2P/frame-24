@@ -11,6 +11,9 @@ import {
 } from '../dto/public-register.dto';
 import { EmployeeIdGeneratorService } from './employee-id-generator';
 
+const AUTHENTIK_ADMIN_GROUP =
+  process.env.AUTHENTIK_ADMIN_GROUP ?? 'Frame24 Admins';
+
 @Injectable()
 export class PublicRegistrationService {
   constructor(
@@ -43,6 +46,7 @@ export class PublicRegistrationService {
         email: normalizedEmail,
         fullName: dto.full_name,
         password: dto.password,
+        groups: [AUTHENTIK_ADMIN_GROUP],
       });
 
       return await this.createLocalRegistration(

@@ -15,7 +15,9 @@ import { EmployeeIdGeneratorService } from './services/employee-id-generator';
 
 import { KeycloakJwtStrategy } from './strategies/keycloak-jwt.strategy';
 import { PublicAuthController } from './controllers/public-auth.controller';
+import { InternalOidcSessionController } from './controllers/internal-oidc-session.controller';
 import { PublicRegistrationService } from './services/public-registration.service';
+import { OidcSessionService } from './services/oidc-session.service';
 import { MasterDataSetupService } from 'src/modules/setup/services/master-data-setup.service';
 
 @Module({
@@ -26,7 +28,7 @@ import { MasterDataSetupService } from 'src/modules/setup/services/master-data-s
     forwardRef(() => CompanyModule),
     TaxModule,
   ],
-  controllers: [PublicAuthController],
+  controllers: [PublicAuthController, InternalOidcSessionController],
   providers: [
     IdentityRepository,
     PersonRepository,
@@ -36,6 +38,7 @@ import { MasterDataSetupService } from 'src/modules/setup/services/master-data-s
     EmployeeIdGeneratorService,
     KeycloakJwtStrategy,
     PublicRegistrationService,
+    OidcSessionService,
     MasterDataSetupService,
   ],
   exports: [

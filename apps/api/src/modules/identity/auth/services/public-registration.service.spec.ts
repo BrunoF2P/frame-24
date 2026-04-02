@@ -119,6 +119,7 @@ describe('PublicRegistrationService', () => {
       email: 'maria@x.com',
       fullName: 'Maria Souza',
       password: 'StrongPass123',
+      groups: ['Frame24 Admins'],
     });
     expect(masterDataSetupService.setupCompanyMasterData).toHaveBeenCalledWith(
       'company-1',

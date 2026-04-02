@@ -12,6 +12,7 @@ interface CreateKeycloakUserInput {
   realmRoles?: string[];
   temporaryPassword?: boolean;
   requiredActions?: string[];
+  groups?: string[];
 }
 
 @Injectable()
@@ -69,9 +70,54 @@ export class KeycloakProvisioningService {
     };
   }
 
+  private async ensureGroupIds(groupNames: string[]): Promise<string[]> {
+    if (groupNames.length === 0) {
+      return [];
+    }
+
+    const baseUrl = this.resolveBaseUrl();
+    const headers = this.getAdminHeaders();
+    const groupIds: string[] = [];
+
+    for (const groupName of groupNames) {
+      const existingResponse = await axios.get<{
+        results?: Array<{ pk?: string; name?: string }>;
+      }>(`${baseUrl}/api/v3/core/groups/`, {
+        headers,
+        params: { name: groupName },
+      });
+
+      const existing = existingResponse.data.results?.find(
+        (group) => group.name === groupName,
+      );
+
+      if (existing?.pk) {
+        groupIds.push(String(existing.pk));
+        continue;
+      }
+
+      const createdResponse = await axios.post<{ pk?: string }>(
+        `${baseUrl}/api/v3/core/groups/`,
+        { name: groupName },
+        { headers },
+      );
+
+      if (!createdResponse.data.pk) {
+        throw new BadGatewayException(
+          `Nao foi possivel criar o grupo ${groupName} no Authentik.`,
+        );
+      }
+
+      groupIds.push(String(createdResponse.data.pk));
+    }
+
+    return groupIds;
+  }
+
   async createUser(input: CreateKeycloakUserInput): Promise<string> {
     const baseUrl = this.resolveBaseUrl();
     const config = this.getProvisioningConfig();
+    const groups = await this.ensureGroupIds(input.groups ?? []);
 
     const createResponse = await axios.post<{
       pk?: number | string;
@@ -88,6 +134,7 @@ export class KeycloakProvisioningService {
         email: input.email,
         name: input.fullName,
         is_active: true,
+        ...(groups.length > 0 ? { groups } : {}),
         ...(config.defaultPath ? { path: config.defaultPath } : {}),
       },
       {

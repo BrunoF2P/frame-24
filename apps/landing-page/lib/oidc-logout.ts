@@ -2,6 +2,11 @@ const OIDC_ISSUER =
   process.env.NEXT_PUBLIC_AUTH_OIDC_ISSUER ??
   process.env.AUTH_OIDC_ISSUER ??
   "http://localhost:9080/application/o/frame24-app/";
+const OIDC_CLIENT_ID =
+  process.env.AUTH_OIDC_ID ??
+  process.env.NEXT_PUBLIC_AUTH_OIDC_ID ??
+  process.env.AUTH_KEYCLOAK_ID ??
+  "frame24-app";
 
 function normalizeIssuer(issuer: string) {
   return issuer.endsWith("/") ? issuer : `${issuer}/`;
@@ -16,6 +21,10 @@ export function buildOidcLogoutUrl(params?: {
 
   if (params?.idToken) {
     endSessionEndpoint.searchParams.set("id_token_hint", params.idToken);
+  }
+
+  if (OIDC_CLIENT_ID) {
+    endSessionEndpoint.searchParams.set("client_id", OIDC_CLIENT_ID);
   }
 
   if (params?.postLogoutRedirectUrl) {

@@ -25,6 +25,8 @@ interface JwtPayloadWithClaims {
   sub?: string;
   company_id?: string;
   tenant_slug?: string;
+  iss?: string;
+  aud?: string | string[];
 }
 
 interface SeatReservation {
@@ -80,6 +82,59 @@ const websocketCorsConfig = {
   credentials: true,
 };
 
+function getAllowedOidcIssuers(): string[] {
+  const configured = (
+    process.env.OIDC_ALLOWED_ISSUERS ||
+    process.env.KEYCLOAK_ALLOWED_ISSUERS ||
+    [
+      process.env.OIDC_ISSUER,
+      process.env.KEYCLOAK_ISSUER,
+      process.env.AUTHENTIK_URL
+        ? `${process.env.AUTHENTIK_URL.replace(/\/$/, '')}/application/o/frame24-admin/`
+        : undefined,
+      process.env.AUTHENTIK_URL
+        ? `${process.env.AUTHENTIK_URL.replace(/\/$/, '')}/application/o/frame24-web/`
+        : undefined,
+      process.env.AUTHENTIK_URL
+        ? `${process.env.AUTHENTIK_URL.replace(/\/$/, '')}/application/o/frame24-landing/`
+        : undefined,
+      'http://localhost:9080/application/o/frame24-admin/',
+      'http://localhost:9080/application/o/frame24-web/',
+      'http://localhost:9080/application/o/frame24-landing/',
+      'http://localhost:9080/application/o/frame24-app/',
+    ]
+      .filter(Boolean)
+      .join(',')
+  )
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return [...new Set(configured)];
+}
+
+function getAllowedOidcAudiences(): string[] {
+  const configured = (
+    process.env.OIDC_ALLOWED_AUDIENCES ||
+    process.env.KEYCLOAK_ALLOWED_AUDIENCES ||
+    [
+      process.env.OIDC_API_AUDIENCE,
+      process.env.KEYCLOAK_API_AUDIENCE,
+      'frame24-admin',
+      'frame24-web',
+      'frame24-landing',
+      'frame24-app',
+    ]
+      .filter(Boolean)
+      .join(',')
+  )
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return [...new Set(configured)];
+}
+
 @WebSocketGateway({
   cors: websocketCorsConfig,
   namespace: '/seats',
@@ -92,7 +147,6 @@ export class SeatsReservationGateway
 
   // Reservas temporárias em memória (sincronizadas com o banco)
   private reservations = new Map<string, SeatReservation>();
-  private readonly jwksClient = this.createJwksClient();
 
   constructor(
     private readonly logger: LoggerService,
@@ -106,58 +160,46 @@ export class SeatsReservationGateway
     }, 60000);
   }
 
-  private createJwksClient() {
-    const issuer = process.env.OIDC_ISSUER || process.env.KEYCLOAK_ISSUER;
-    const jwksUri =
-      process.env.OIDC_JWKS_URI ||
-      (issuer ? new URL('./jwks/', issuer).toString() : undefined);
-
-    if (!jwksUri) return null;
-
-    return jwksRsa({
+  private async getSigningKey(issuer: string, kid: string): Promise<string> {
+    const jwksUri = new URL('./jwks/', issuer).toString();
+    const client = jwksRsa({
       cache: true,
       rateLimit: true,
       jwksRequestsPerMinute: 10,
       jwksUri,
     });
-  }
 
-  private async getSigningKey(kid: string): Promise<string> {
-    if (!this.jwksClient) {
-      throw new Error('OIDC JWKS client is not configured');
-    }
-
-    const key = await this.jwksClient.getSigningKey(kid);
+    const key = await client.getSigningKey(kid);
     return key.getPublicKey();
   }
 
   private async buildSocketUserContext(
     token: string,
   ): Promise<SocketUserContext> {
-    const issuer = process.env.OIDC_ISSUER || process.env.KEYCLOAK_ISSUER;
-    const audience =
-      process.env.OIDC_API_AUDIENCE || process.env.KEYCLOAK_API_AUDIENCE;
-
-    if (!issuer || !audience) {
-      throw new Error('OIDC issuer/audience not configured');
-    }
+    const allowedIssuers = getAllowedOidcIssuers();
+    const allowedAudiences = getAllowedOidcAudiences();
 
     const decoded = jwt.decode(token, {
       complete: true,
-    }) as { header?: JwtHeaderWithKid } | null;
+    }) as { header?: JwtHeaderWithKid; payload?: JwtPayloadWithClaims } | null;
 
     const kid = decoded?.header?.kid;
+    const issuer = decoded?.payload?.iss;
 
-    if (!kid) {
+    if (!kid || !issuer) {
       throw new Error('Missing kid in token header');
     }
 
-    const publicKey = await this.getSigningKey(kid);
+    if (!allowedIssuers.includes(issuer)) {
+      throw new Error('OIDC issuer not allowed');
+    }
+
+    const publicKey = await this.getSigningKey(issuer, kid);
 
     const payload = jwt.verify(token, publicKey, {
       algorithms: ['RS256'],
       issuer,
-      audience,
+      audience: allowedAudiences as [string, ...string[]],
     }) as JwtPayloadWithClaims;
 
     const userId = payload.sub;
