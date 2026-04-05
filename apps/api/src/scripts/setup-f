@@ -1,0 +1,145 @@
+// apps/api/src/scripts/setup-full.ts
+
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from '../app.module';
+import { PrismaService } from '../prisma/prisma.service';
+import { PrismaClient } from '@prisma/client';
+import { LoggerService } from '../common/services/logger.service';
+
+// ==========================================================
+// 1. IMPORTAÇÕES DE SCRIPTS DE SEEDING
+// ==========================================================
+import { createAdminCompanyAndUser } from './create-admin'; //
+import { seedStatuses } from './seed-statuses';             // Seeds de Status (Vendas, Finanças, Operações)
+import { seedPaymentsAndSales } from './seed-payments';       // Seeds de Métodos de Pagamento e Tipos de Venda
+import { seedIdentityPermissions } from './seed-permissions'; // Seeds de Permissões (Identity)
+import { seedLanguages } from './seed-languages';             // Seeds de Idiomas de Sessão
+import { seedSeatStatus } from './seed-seat-status';          // Seeds de Status de Assentos (Disponível, Vendido, etc.)
+import { seedCourtesy } from './seed-courtesy';               // Seeds de Parâmetros de Cortesia
+import { seedCatalogMasterData } from './seed-catalog';       // Seeds de Dados Mestres de Catálogo (Idades, Tipos de Mídia/Elenco)
+
+// Seus scripts de dados de exemplo que dependem dos seeds mestres:
+import { seedRoomComplexesAndSeats } from './seed-room';    // Cria Complexo, Salas e Assentos (depende de tipos de projeção/assento)
+import { seedSampleProducts } from './seed-products';         // Cria Categorias e Produtos (depende de tipos de categoria)
+import { seedSampleMovies } from './seed-movies';             // Cria Filmes (depende de idades, categorias de filme)
+
+// ==========================================================
+// 2. VARIÁVEIS DE CONFIGURAÇÃO INICIAL
+// ==========================================================
+const COMPANY_SLUG = 'frame24-cinemas';
+const ADMIN_EMAIL = 'admin@frame24.com';
+const ADMIN_PASSWORD = 'password123';
+const COMPANY_NAME = 'Frame24 Cinemas S.A.';
+const COMPANY_CNPJ = '00.000.000/0001-00';
+const CINEMA_COMPLEX_NAME = 'Cinema Central';
+const CINEMA_COMPLEX_CODE = 'CENTRAL';
+
+
+async function setupFull() {
+  const logger = new LoggerService('SetupFullScript');
+  logger.log('Iniciando o Setup Completo da Aplicação...');
+
+  const app = await NestFactory.createApplicationContext(AppModule);
+  const prisma: PrismaClient = app.get(PrismaService);
+
+  try {
+    // ===============================================
+    // FASE 1: CRIAÇÃO DA EMPRESA E USUÁRIO ADMIN
+    // ===============================================
+    logger.log('1/4. Criando Empresa Inicial e Usuário Administrador...');
+
+    const { companyId, adminRoleId, adminIdentityId } = await createAdminCompanyAndUser(prisma, {
+        companyName: COMPANY_NAME,
+        companyCnpj: COMPANY_CNPJ,
+        tenantSlug: COMPANY_SLUG,
+        adminEmail: ADMIN_EMAIL,
+        adminPassword: ADMIN_PASSWORD,
+    });
+
+    logger.log(`Empresa criada: ${COMPANY_NAME} (ID: ${companyId})`);
+
+    // ===============================================
+    // FASE 2: SEED DE DADOS MESTRES CORE (LOOKUP TABLES)
+    // ===============================================
+
+    logger.log('2/4. Preenchendo Tabelas de Dados Mestres...');
+
+    // 2.1 - Status (Venda, Sessão, Pagamento, etc.)
+    await seedStatuses(prisma, companyId);
+    
+    // 2.2 - Tipos de Pagamento e Venda
+    await seedPaymentsAndSales(prisma, companyId);
+
+    // 2.3 - Dados Operacionais (Idiomas e Status/Tipos de Assento)
+    await seedLanguages(prisma, companyId);
+    await seedSeatStatus(prisma, companyId);
+    
+    // 2.4 - Parâmetros Específicos
+    await seedCourtesy(prisma, companyId);
+    // OBS: seeds para 'tax_data' (revenue_types, federal_tax_rates) 
+    // e 'finance_data' (account_natures, journal_entry_types) 
+    // devem ser adicionados aqui se os scripts existirem.
+
+    // 2.5 - Dados Mestres do Catálogo (Idades, Tipos de Mídia/Elenco)
+    await seedCatalogMasterData(prisma, companyId);
+
+    // ===============================================
+    // FASE 3: CRIAÇÃO DE ENTIDADES OPERACIONAIS DE EXEMPLO
+    // ===============================================
+    logger.log('3/4. Criando Complexos, Salas, Produtos e Filmes de Exemplo...');
+
+    // 3.1 - Complexo, Salas e Assentos (Depende de Projection Types, Audio Types, Seat Types que devem ser seeded no 2.3)
+    const cinemaComplex = await seedRoomComplexesAndSeats(prisma, companyId, { 
+        name: CINEMA_COMPLEX_NAME, 
+        code: CINEMA_COMPLEX_CODE,
+        // Usar complex_id para ligar a filmes, estoque etc.
+    });
+    
+    // 3.2 - Produtos e Combos (Depende de product_categories)
+    await seedSampleProducts(prisma, companyId, cinemaComplex.id);
+    
+    // 3.3 - Filmes (Depende de age_ratings, movie_categories)
+    // Nota: O seed de filmes normalmente também cria a Distribuidora (supplier) 
+    // se não existir.
+    await seedSampleMovies(prisma, companyId);
+
+
+    // ===============================================
+    // FASE 4: PERMISSÕES E ROLES PADRÃO
+    // ===============================================
+    logger.log('4/4. Criando e Atribuindo Permissões ao Administrador...');
+
+    // 4.1 - Cria o pool de permissões padrão
+    const permissions = await seedIdentityPermissions(prisma, companyId);
+
+    // 4.2 - Vincula todas as permissões ao Role de Admin (já criado na Fase 1)
+    const permissionIds = permissions.map(p => p.id);
+    await prisma.role_permissions.createMany({
+        data: permissionIds.map(permission_id => ({
+            id: prisma.snowflake.generate().toString(),
+            role_id: adminRoleId,
+            permission_id: permission_id,
+        })),
+        skipDuplicates: true,
+    });
+
+    logger.log('Setup Completo Finalizado com Sucesso!');
+    logger.log(`
+      ======================================================
+      DADOS DE ACESSO ADMINISTRATIVO:
+      Empresa: ${COMPANY_NAME}
+      Tenant Slug: ${COMPANY_SLUG} (Usado na URL do Frontend)
+      Email: ${ADMIN_EMAIL}
+      Senha: ${ADMIN_PASSWORD}
+      ======================================================
+    `);
+
+  } catch (error) {
+    logger.error('Erro durante o Setup Completo.', error.stack);
+    process.exit(1);
+  } finally {
+    await app.close();
+  }
+}
+
+setupFull();

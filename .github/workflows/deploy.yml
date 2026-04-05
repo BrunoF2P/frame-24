@@ -1,0 +1,49 @@
+name: Deploy Frame 24 to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚀 Conectar na VPS e Compilar
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            
+            # Trava de segurança de RAM
+            export NODE_OPTIONS="--max-old-space-size=1024"
+            
+            cd ~/frame-24
+            
+            git pull origin main
+            pnpm install
+            
+            # Compila o monorepo
+            pnpm build
+            
+            # Atualiza e reinicia os serviços no PM2 usando o Ecosystem
+            pm2 start ecosystem.config.js
+            pm2 save
+
+      - name: ✅ Notificar Sucesso no Discord
+        if: success()
+        run: |
+          curl -X POST "${{ secrets.N8N_WEBHOOK_URL }}" \
+          -H "Content-Type: application/json" \
+          -d '{"status":"success", "message":"Nova versão do Frame 24 compilada e online!"}'
+
+      - name: ❌ Notificar Falha no Discord
+        if: failure()
+        run: |
+          curl -X POST "${{ secrets.N8N_WEBHOOK_URL }}" \
+          -H "Content-Type: application/json" \
+          -d '{"status":"error", "message":"O deploy falhou. O build quebrou ou a VPS não conectou."}'
