@@ -162,4 +162,66 @@ export class EmailService {
       throw error;
     }
   }
+
+  async sendEmailChangeConfirmationEmail(params: {
+    to: string;
+    customerName: string;
+    requestId: string;
+    token: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    const confirmUrl = `${this.frontendUrl}/perfil/conta/email?request_id=${params.requestId}&token=${params.token}`;
+    const title = `Confirme seu novo e-mail, ${params.customerName}!`;
+    const preheader = 'Valide seu novo endereço de e-mail para concluir a alteração.';
+    const content = `
+      <p>Recebemos uma solicitação para alterar o e-mail da sua conta no ${this.brandName}.</p>
+      <p>Para confirmar a troca, clique no botão abaixo:</p>
+      <p style="text-align: center; margin: 30px 0;">
+        <a href="${confirmUrl}" class="button" style="background-color: ${this.brandColor};">Confirmar novo e-mail</a>
+      </p>
+      <p>Se o botão não funcionar, copie e cole o link abaixo no navegador:</p>
+      <p><a href="${confirmUrl}" class="link">${confirmUrl}</a></p>
+      <p style="color: #888; font-size: 14px; margin-top: 30px;">Este link expira em ${params.expiresAt.toLocaleString('pt-BR')}.</p>
+    `;
+
+    await this.resend.emails.send({
+      from: this.fromEmail,
+      to: params.to,
+      subject: `Confirmação de novo e-mail - ${this.brandName}`,
+      html: this.createStyledEmail(title, preheader, content),
+    });
+  }
+
+  async sendCustomerTicketEmail(params: {
+    to: string;
+    customerName: string;
+    movieTitle: string;
+    cinemaName: string;
+    showtimeLabel: string;
+    ticketNumber: string;
+    ticketUrl: string;
+  }): Promise<void> {
+    const title = `Seu ingresso: ${params.movieTitle}`;
+    const preheader = 'Reenvio do seu ingresso digital.';
+    const content = `
+      <p>Olá, ${params.customerName}.</p>
+      <p>Segue o reenvio das informações do seu ingresso:</p>
+      <ul>
+        <li><strong>Filme:</strong> ${params.movieTitle}</li>
+        <li><strong>Cinema:</strong> ${params.cinemaName}</li>
+        <li><strong>Sessão:</strong> ${params.showtimeLabel}</li>
+        <li><strong>Número do ingresso:</strong> ${params.ticketNumber}</li>
+      </ul>
+      <p style="text-align: center; margin: 30px 0;">
+        <a href="${params.ticketUrl}" class="button" style="background-color: ${this.brandColor};">Abrir ingresso digital</a>
+      </p>
+    `;
+
+    await this.resend.emails.send({
+      from: this.fromEmail,
+      to: params.to,
+      subject: `Reenvio do ingresso - ${params.movieTitle}`,
+      html: this.createStyledEmail(title, preheader, content),
+    });
+  }
 }

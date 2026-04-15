@@ -72,8 +72,8 @@ export default function TicketSelectionPage({
           });
           setSelectedTickets(initialSelection);
         }
-      } catch (error) {
-        console.error("Erro ao buscar tipos de ingresso:", error);
+      } catch {
+        setTicketTypes([]);
       } finally {
         setLoading(false);
       }

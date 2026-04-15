@@ -1,167 +1,129 @@
 "use client";
 
-import { useCompany } from "@/hooks/use-company";
-import { useComplexes } from "@/hooks/use-complexes";
-import { useFilters } from "@/store/use-filters";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { motion, useReducedMotion } from "framer-motion";
+import { AuthModal } from "@/components/layout/auth-modal";
+import { CitySelector } from "@/components/layout/city-selector";
+import { GlobalSearchCombobox } from "@/components/layout/global-search-combobox";
+import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { copy, formatCityNowShowingLabel } from "@/lib/copy/catalog";
+import { cities } from "@/lib/storefront/data";
+import { useCityStore } from "@/stores/use-city-store";
 import { useAuth } from "@/contexts/auth-context";
-import { AuthActions } from "@/components/layout/auth-actions";
-import { useEffect } from "react";
 
-interface Company {
-  id: string;
-  corporate_name: string;
-  trade_name?: string | null;
-  tenant_slug: string;
+interface AppHeaderProps {
+  citySlug?: string;
+  tenantSlug?: string;
 }
 
-interface Complex {
-  id: string;
-  name: string;
-  city?: string | null;
-  state?: string | null;
-}
-
-export function AppHeader({ tenantSlug }: { tenantSlug: string }) {
+export const AppHeader = ({ citySlug = "salvador", tenantSlug }: AppHeaderProps) => {
   const pathname = usePathname();
-  const isAuthRoute = pathname?.includes("/auth/") ?? false;
-  const router = useRouter();
-  const { data: company } = useCompany(tenantSlug, { enabled: !isAuthRoute });
-  const { data: complexes } = useComplexes(tenantSlug, {
-    enabled: !isAuthRoute,
-  });
-  const { selectedComplexId, setComplex, selectedCity, setCity, setTenantSlug } =
-    useFilters();
-
-  const complexesList = (complexes as unknown as Complex[]) || [];
-  const companyData = (company as Company | undefined) ?? undefined;
-
-  // Extrair cidades únicas
-  const cities = Array.from(
-    new Set(complexesList.map((c) => c.city).filter(Boolean)),
-  );
-
-  // Filtrar complexos por cidade
-  const filteredComplexes = selectedCity
-    ? complexesList.filter((c) => c.city === selectedCity)
-    : complexesList;
-
-  const { user, isAuthenticated, isLoading } = useAuth();
-
-  useEffect(() => {
-    setTenantSlug(tenantSlug);
-  }, [setTenantSlug, tenantSlug]);
-
-  if (isAuthRoute) {
-    return (
-      <header className="sticky top-0 z-50 bg-zinc-900/95 backdrop-blur-sm border-b border-zinc-800">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <button
-              onClick={() => router.push(`/${tenantSlug}`)}
-              className="text-2xl font-bold text-white hover:text-red-400 transition-colors"
-            >
-              Frame<span className="text-red-500">24</span>
-            </button>
-            <AuthActions tenantSlug={tenantSlug} />
-          </div>
-        </div>
-      </header>
-    );
-  }
+  const reduceMotion = useReducedMotion();
+  const { hasSession } = useAuth();
+  const storedCity = useCityStore((state) => state.activeCitySlug);
+  const fallbackCity = cities[0]!;
+  const routeCity = pathname?.startsWith("/cidade/")
+    ? pathname.split("/").filter(Boolean)[1]
+    : tenantSlug ?? citySlug ?? storedCity;
+  const activeCity = cities.find((city) => city.slug === routeCity) ?? fallbackCity;
 
   return (
-    <header className="sticky top-0 z-50 bg-zinc-900/95 backdrop-blur-sm border-b border-zinc-800">
-      <div className="max-w-7xl mx-auto px-4 py-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          {/* Logo */}
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push(`/${tenantSlug}`)}
-              className="text-2xl font-bold text-white hover:text-red-400 transition-colors"
+    <header className="sticky top-0 z-40 border-b border-border/60 bg-background-elevated/95 backdrop-blur-xl">
+      <div className="page-shell py-3">
+        <div className="flex min-h-10 items-center justify-between gap-3">
+          <nav aria-label="Navegação primária" className="flex min-w-0 items-center gap-3">
+            <Link
+              aria-label={copy("brandName")}
+              className="shrink-0 text-2xl font-bold tracking-[-0.04em]"
+              href="/"
             >
-              Frame<span className="text-red-500">24</span>
-            </button>
-            <div className="h-8 w-px bg-zinc-700" />
-            <div className="text-sm">
-              <div className="text-zinc-400">Rede:</div>
-              <div className="text-white font-medium">
-                {companyData?.trade_name || companyData?.corporate_name}
-              </div>
-            </div>
-          </div>
-
-          {/* Filtros e Auth */}
-          <div className="flex items-center gap-3 flex-1 justify-end">
-            {/* Seletor de Cidade */}
-            {cities.length > 1 && (
-              <select
-                value={selectedCity || ""}
-                onChange={(e) => {
-                  setCity(e.target.value || null);
-                  setComplex(null); // Reset complex when city changes
-                }}
-                className="bg-zinc-800 text-white px-4 py-2 rounded-lg border border-zinc-700 hover:border-red-500/50 transition-colors focus:outline-none focus:border-red-500 cursor-pointer hidden md:block"
+              <motion.span
+                animate={
+                  reduceMotion
+                    ? { opacity: 1 }
+                    : { opacity: [0, 1], y: [6, 0] }
+                }
+                className="relative inline-flex items-center"
+                initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                transition={{ duration: 0.45, ease: "easeOut" }}
               >
-                <option value="">Todas as cidades</option>
-                {cities.map((city) => (
-                  <option key={city} value={city!}>
-                    {city}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {/* Seletor de Complexo */}
-            {filteredComplexes.length > 0 && (
-              <select
-                value={selectedComplexId || ""}
-                onChange={(e) => setComplex(e.target.value || null)}
-                className="bg-zinc-800 text-white px-4 py-2 rounded-lg border border-zinc-700 hover:border-red-500/50 transition-colors focus:outline-none focus:border-red-500 cursor-pointer min-w-[200px] hidden md:block"
-              >
-                <option value="">Todos os cinemas</option>
-                {filteredComplexes.map((complex) => (
-                  <option key={complex.id} value={complex.id}>
-                    {complex.name}
-                    {complex.city && ` - ${complex.city}`}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            <div className="h-8 w-px bg-zinc-700 hidden md:block" />
-
-            {isLoading ? (
-              <div className="flex items-center gap-4">
-                <div className="hidden sm:block text-right">
-                  <div className="h-4 w-32 animate-pulse rounded bg-zinc-800/80" />
-                  <div className="mt-2 h-3 w-24 animate-pulse rounded bg-zinc-800/70" />
-                </div>
-                <AuthActions tenantSlug={tenantSlug} />
-              </div>
-            ) : isAuthenticated ? (
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => router.push(`/${tenantSlug}/profile`)}
-                  className="text-right hidden sm:block hover:opacity-80 transition-opacity"
+                <span className="text-foreground">Frame</span>
+                <motion.span
+                  animate={reduceMotion ? { opacity: 1, scaleX: 1 } : { opacity: [0.65, 1], scaleX: [0.85, 1] }}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -bottom-1 left-0 h-[2px] w-full origin-left rounded-full bg-gradient-to-r from-accent-red-500/0 via-accent-red-500 to-accent-red-500/0"
+                  initial={reduceMotion ? false : { opacity: 0, scaleX: 0.7 }}
+                  transition={{ duration: 0.55, ease: "easeOut" }}
+                />
+                <motion.span
+                  animate={reduceMotion ? { opacity: 1 } : { opacity: [0.9, 1, 0.9] }}
+                  aria-hidden="true"
+                  className="text-accent-red-500"
+                  transition={
+                    reduceMotion
+                      ? undefined
+                      : { duration: 3.6, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }
+                  }
                 >
-                  <div className="text-sm font-medium text-white">
-                    {user?.name}
-                  </div>
-                  <div className="text-xs text-zinc-400">
-                    {user?.loyalty_level} • {user?.accumulated_points} pts
-                  </div>
-                </button>
-                <AuthActions tenantSlug={tenantSlug} />
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <AuthActions tenantSlug={tenantSlug} />
-              </div>
-            )}
-          </div>
+                  24
+                </motion.span>
+              </motion.span>
+            </Link>
+            <div className="hidden md:block">
+              <CitySelector activeCity={activeCity} cities={cities} />
+            </div>
+          </nav>
+          <nav aria-label="Ações da conta e busca" className="hidden items-center gap-2 md:flex md:flex-1 md:justify-end">
+            <GlobalSearchCombobox
+              currentCityLabel={activeCity.name}
+              currentCitySlug={activeCity.slug}
+              initialItems={[
+                {
+                  id: activeCity.id,
+                  type: "city",
+                  title: activeCity.name,
+                  subtitle: formatCityNowShowingLabel(activeCity.state),
+                  href: `/cidade/${activeCity.slug}`,
+                },
+              ]}
+            />
+            {hasSession ? (
+              <Button asChild className="hidden xl:inline-flex" size="md" variant="ghost">
+                <Link href="/perfil/ingressos">
+                  <Icon name="ticket" size="sm" />
+                  <span className="whitespace-nowrap">{copy("headerMyTickets")}</span>
+                </Link>
+              </Button>
+            ) : null}
+            <ThemeToggle />
+            <AuthModal />
+          </nav>
+          <nav aria-label="Ações rápidas no mobile" className="flex items-center gap-2 md:hidden">
+            <GlobalSearchCombobox
+              mobileIconOnly
+              currentCityLabel={activeCity.name}
+              currentCitySlug={activeCity.slug}
+              initialItems={[
+                {
+                  id: activeCity.id,
+                  type: "city",
+                  title: activeCity.name,
+                  subtitle: formatCityNowShowingLabel(activeCity.state),
+                  href: `/cidade/${activeCity.slug}`,
+                },
+              ]}
+            />
+            <ThemeToggle compact />
+            <AuthModal mobileIconOnly />
+          </nav>
+        </div>
+        <div className="mt-2 md:hidden">
+          <CitySelector activeCity={activeCity} cities={cities} mobileFullWidth />
         </div>
       </div>
     </header>
   );
-}
+};

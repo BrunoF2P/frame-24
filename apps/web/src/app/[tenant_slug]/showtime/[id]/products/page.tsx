@@ -131,8 +131,8 @@ export default function ProductSelectionPage({
 
           setTicketsTotalValue(total);
         }
-      } catch (error) {
-        console.error("Erro ao carregar dados:", error);
+      } catch {
+        setProducts([]);
       } finally {
         setLoading(false);
       }

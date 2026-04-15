@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 import { Prisma } from '@repo/db';
+import { randomUUID } from 'crypto';
 import { ClsService } from 'nestjs-cls';
 import { SalesService } from 'src/modules/sales/services/sales.service';
 import {
@@ -18,6 +19,8 @@ import { SaleResponseDto } from 'src/modules/sales/dto/sale-response.dto';
 import { CreateSaleDto } from 'src/modules/sales/dto/create-sale.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { LoggerService } from 'src/common/services/logger.service';
+import { EmailService } from 'src/modules/email/services/email.service';
+import { CreateCustomerRefundRequestDto } from '../dto/customer-refund-request.dto';
 
 type CustomerSaleWithRelations = Prisma.salesGetPayload<{
   include: {
@@ -96,6 +99,47 @@ type CustomerTicketResponse = {
   created_at?: string;
 };
 
+type CustomerOrderItem = {
+  id: string;
+  item_type: 'ticket' | 'concession';
+  reference_id: string;
+  label: string;
+  quantity: number;
+  unit_amount: string;
+  total_amount: string;
+  metadata?: Record<string, unknown>;
+  refund_eligibility: {
+    eligible: boolean;
+    reason: string | null;
+  };
+};
+
+type CustomerOrderResponse = {
+  id: string;
+  sale_number: string;
+  sale_date: string;
+  status: string | null;
+  payment_method: string | null;
+  total_amount: string;
+  discount_amount: string;
+  net_amount: string;
+  cinema_complex_id: string;
+  order_items: CustomerOrderItem[];
+  showtime: {
+    id: string;
+    start_time: string;
+    cinema: string;
+    room: string | null;
+  } | null;
+  movie: {
+    id: string;
+    title: string;
+    poster_url: string | null;
+    age_rating: string | null;
+  } | null;
+  can_request_refund: boolean;
+};
+
 @Injectable()
 export class CustomerPurchasesService {
   constructor(
@@ -103,6 +147,7 @@ export class CustomerPurchasesService {
     private readonly salesRepository: SalesRepository,
     private readonly companyCustomersRepository: CompanyCustomersRepository,
     private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
     private readonly logger: LoggerService,
     private readonly cls: ClsService,
   ) {}
@@ -516,6 +561,386 @@ export class CustomerPurchasesService {
     return { purchases, tickets };
   }
 
+  async findOrders(): Promise<CustomerOrderResponse[]> {
+    const context = this.getCustomerContext();
+    const sales = await this.prisma.sales.findMany({
+      where: {
+        customer_id: context.customerId,
+      },
+      include: {
+        tickets: {
+          include: {
+            ticket_types: true,
+          },
+        },
+        concession_sales: {
+          include: {
+            concession_sale_items: true,
+          },
+        },
+        sale_types: true,
+        payment_methods: true,
+        sale_status: true,
+      },
+      orderBy: {
+        sale_date: 'desc',
+      },
+    });
+
+    return this.mapSalesToOrders(sales);
+  }
+
+  async findOrderById(id: string): Promise<CustomerOrderResponse> {
+    const context = this.getCustomerContext();
+    const sale = await this.prisma.sales.findFirst({
+      where: {
+        id,
+        customer_id: context.customerId,
+      },
+      include: {
+        tickets: {
+          include: {
+            ticket_types: true,
+          },
+        },
+        concession_sales: {
+          include: {
+            concession_sale_items: true,
+          },
+        },
+        sale_types: true,
+        payment_methods: true,
+        sale_status: true,
+      },
+    });
+
+    if (!sale) {
+      throw new NotFoundException('Pedido não encontrado.');
+    }
+
+    const [mapped] = await this.mapSalesToOrders([sale]);
+    if (!mapped) {
+      throw new NotFoundException('Pedido não encontrado.');
+    }
+
+    return mapped;
+  }
+
+  async createRefundRequest(
+    orderId: string,
+    dto: CreateCustomerRefundRequestDto,
+  ) {
+    const context = this.getCustomerContext();
+    const sale = await this.prisma.sales.findFirst({
+      where: {
+        id: orderId,
+        customer_id: context.customerId,
+      },
+      include: {
+        tickets: true,
+        concession_sales: {
+          include: {
+            concession_sale_items: true,
+          },
+        },
+      },
+    });
+
+    if (!sale) {
+      throw new NotFoundException('Pedido não encontrado.');
+    }
+
+    const showtimeId = sale.tickets[0]?.showtime_id;
+    const showtime = showtimeId
+      ? await this.prisma.showtime_schedule.findFirst({
+          where: { id: showtimeId },
+        })
+      : null;
+
+    const validationErrors: string[] = [];
+    const normalizedItems = dto.items.map((item) => {
+      if (item.item_type === 'ticket') {
+        const ticket = sale.tickets.find((ticketItem) => ticketItem.id === item.item_id);
+        if (!ticket) {
+          validationErrors.push(`Ingresso ${item.item_id} não pertence ao pedido.`);
+          return null;
+        }
+
+        const eligibility = this.resolveTicketRefundEligibility(
+          ticket.used ?? false,
+          showtime?.start_time ?? null,
+        );
+
+        if (!eligibility.eligible) {
+          validationErrors.push(
+            `Ingresso ${ticket.ticket_number}: ${eligibility.reason ?? 'não elegível'}.`,
+          );
+        }
+
+        return {
+          item_type: 'ticket' as const,
+          item_id: ticket.id,
+          quantity: 1,
+          requested_quantity: 1,
+          eligibility,
+        };
+      }
+
+      const concessionItems = sale.concession_sales.flatMap(
+        (concessionSale) => concessionSale.concession_sale_items,
+      );
+      const concession = concessionItems.find(
+        (concessionItem) => concessionItem.id === item.item_id,
+      );
+
+      if (!concession) {
+        validationErrors.push(`Item de bomboniere ${item.item_id} não pertence ao pedido.`);
+        return null;
+      }
+
+      const requestedQuantity = item.quantity ?? 1;
+      if (requestedQuantity > concession.quantity) {
+        validationErrors.push(
+          `Quantidade solicitada para ${item.item_id} excede a quantidade do pedido.`,
+        );
+      }
+
+      const eligibility = this.resolveConcessionRefundEligibility(
+        showtime?.start_time ?? null,
+      );
+      if (!eligibility.eligible) {
+        validationErrors.push(
+          `Item de bomboniere ${item.item_id}: ${eligibility.reason ?? 'não elegível'}.`,
+        );
+      }
+
+      return {
+        item_type: 'concession' as const,
+        item_id: concession.id,
+        quantity: concession.quantity,
+        requested_quantity: requestedQuantity,
+        eligibility,
+      };
+    });
+
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(validationErrors.join(' '));
+    }
+
+    const requestId = randomUUID();
+    const payload = {
+      status: 'requested',
+      order_id: orderId,
+      reason: dto.reason ?? null,
+      items: normalizedItems.filter(Boolean),
+      requested_at: new Date().toISOString(),
+    };
+
+    await this.prisma.audit_logs.create({
+      data: {
+        company_id: context.companyId,
+        event_type: 'customer.refund.requested',
+        resource_type: 'CUSTOMER_REFUND_REQUEST',
+        resource_id: requestId,
+        action: 'REFUND_REQUESTED',
+        user_id: context.customerId,
+        old_values: {
+          order_id: orderId,
+        },
+        new_values: payload,
+      },
+    });
+
+    return {
+      request_id: requestId,
+      ...payload,
+    };
+  }
+
+  async listRefundRequests() {
+    const context = this.getCustomerContext();
+    const requests = await this.prisma.audit_logs.findMany({
+      where: {
+        resource_type: 'CUSTOMER_REFUND_REQUEST',
+        action: 'REFUND_REQUESTED',
+        user_id: context.customerId,
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
+
+    return requests.map((item) => ({
+      request_id: item.resource_id,
+      ...(item.new_values as Record<string, unknown>),
+      created_at: item.created_at.toISOString(),
+    }));
+  }
+
+  async getRefundRequestById(requestId: string) {
+    const context = this.getCustomerContext();
+    const request = await this.prisma.audit_logs.findFirst({
+      where: {
+        resource_type: 'CUSTOMER_REFUND_REQUEST',
+        action: 'REFUND_REQUESTED',
+        user_id: context.customerId,
+        resource_id: requestId,
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Solicitação de reembolso não encontrada.');
+    }
+
+    return {
+      request_id: request.resource_id,
+      ...(request.new_values as Record<string, unknown>),
+      created_at: request.created_at.toISOString(),
+    };
+  }
+
+  async getTicketPdf(ticketId: string): Promise<Buffer> {
+    const context = this.getCustomerContext();
+    const ticket = await this.prisma.tickets.findFirst({
+      where: {
+        id: ticketId,
+      },
+      include: {
+        sales: {
+          select: {
+            id: true,
+            sale_number: true,
+            sale_date: true,
+            cinema_complex_id: true,
+            customer_id: true,
+          },
+        },
+      },
+    });
+
+    if (!ticket || !ticket.sales) {
+      throw new NotFoundException('Ingresso não encontrado.');
+    }
+
+    if (ticket.sales.customer_id !== context.customerId) {
+      throw new ForbiddenException(
+        'Você não tem permissão para acessar este ingresso.',
+      );
+    }
+
+    const showtime = ticket.showtime_id
+      ? await this.prisma.showtime_schedule.findFirst({
+          where: {
+            id: ticket.showtime_id,
+          },
+          include: {
+            cinema_complexes: true,
+          },
+        })
+      : null;
+
+    const movie = showtime?.movie_id
+      ? await this.prisma.movies.findFirst({
+          where: {
+            id: showtime.movie_id,
+          },
+        })
+      : null;
+
+    const pdfTitle = movie?.brazil_title || movie?.original_title || 'Ingresso';
+    const showtimeLabel = showtime?.start_time
+      ? new Date(showtime.start_time).toLocaleString('pt-BR')
+      : 'Horário indisponível';
+    const cinemaLabel = showtime?.cinema_complexes?.name ?? 'Cinema';
+
+    return this.generateSimpleTicketPdf({
+      title: pdfTitle,
+      cinemaLabel,
+      showtimeLabel,
+      seat: ticket.seat || 'Sem assento',
+      ticketNumber: ticket.ticket_number,
+      orderNumber: ticket.sales.sale_number,
+    });
+  }
+
+  async resendTicketByEmail(ticketId: string) {
+    const context = this.getCustomerContext();
+    const ticket = await this.prisma.tickets.findFirst({
+      where: {
+        id: ticketId,
+      },
+      include: {
+        sales: {
+          select: {
+            id: true,
+            sale_number: true,
+            cinema_complex_id: true,
+            customer_id: true,
+          },
+        },
+      },
+    });
+
+    if (!ticket || !ticket.sales) {
+      throw new NotFoundException('Ingresso não encontrado.');
+    }
+
+    if (ticket.sales.customer_id !== context.customerId) {
+      throw new ForbiddenException(
+        'Você não tem permissão para reenviar este ingresso.',
+      );
+    }
+
+    const customer = await this.prisma.customers.findFirst({
+      where: {
+        id: context.customerId,
+      },
+    });
+
+    if (!customer?.email) {
+      throw new BadRequestException('Cliente sem e-mail cadastrado.');
+    }
+
+    const showtime = ticket.showtime_id
+      ? await this.prisma.showtime_schedule.findFirst({
+          where: {
+            id: ticket.showtime_id,
+          },
+          include: {
+            cinema_complexes: true,
+          },
+        })
+      : null;
+
+    const movie = showtime?.movie_id
+      ? await this.prisma.movies.findFirst({
+          where: { id: showtime.movie_id },
+        })
+      : null;
+
+    const movieTitle = movie?.brazil_title || movie?.original_title || 'Ingresso';
+    const showtimeLabel = showtime?.start_time
+      ? new Date(showtime.start_time).toLocaleString('pt-BR')
+      : 'Horário indisponível';
+    const cinemaName = showtime?.cinema_complexes?.name || 'Cinema';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+    await this.emailService.sendCustomerTicketEmail({
+      to: customer.email,
+      customerName: customer.full_name,
+      movieTitle,
+      cinemaName,
+      showtimeLabel,
+      ticketNumber: ticket.ticket_number,
+      ticketUrl: `${frontendUrl}/perfil/ingressos/${ticket.id}`,
+    });
+
+    return { success: true };
+  }
+
   private async accumulateLoyaltyPoints(
     sale: SaleResponseDto,
     context: { companyId: string; customerId: string },
@@ -592,6 +1017,304 @@ export class CustomerPurchasesService {
         CustomerPurchasesService.name,
       );
     }
+  }
+
+  private async mapSalesToOrders(
+    sales: CustomerSaleWithRelations[],
+  ): Promise<CustomerOrderResponse[]> {
+    const showtimeIds = [
+      ...new Set(
+        sales.flatMap((sale) =>
+          sale.tickets
+            .map((ticket) => ticket.showtime_id)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ),
+    ];
+
+    const showtimes = await this.prisma.showtime_schedule.findMany({
+      where: {
+        id: {
+          in: showtimeIds,
+        },
+      },
+      include: {
+        cinema_complexes: true,
+        rooms: true,
+      },
+    });
+    const showtimeMap = new Map(showtimes.map((showtime) => [showtime.id, showtime]));
+
+    const movieIds = [
+      ...new Set(
+        showtimes
+          .map((showtime) => showtime.movie_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const movies = await this.prisma.movies.findMany({
+      where: {
+        id: {
+          in: movieIds,
+        },
+      },
+      include: {
+        age_rating: true,
+        movie_media: {
+          where: {
+            active: true,
+            media_types: {
+              name: 'Poster',
+            },
+          },
+          include: {
+            media_types: true,
+          },
+          take: 1,
+        },
+      },
+    });
+    const movieMap = new Map(
+      movies.map((movie) => [
+        movie.id,
+        {
+          id: movie.id,
+          title: movie.brazil_title || movie.original_title || '',
+          poster_url: movie.movie_media[0]?.media_url || null,
+          age_rating: movie.age_rating?.code || null,
+        },
+      ]),
+    );
+
+    const concessionItems = sales.flatMap((sale) =>
+      sale.concession_sales.flatMap((concessionSale) =>
+        concessionSale.concession_sale_items.map((item) => ({
+          item_id: item.item_id,
+          item_type: item.item_type,
+        })),
+      ),
+    );
+
+    const productIds = concessionItems
+      .filter((item) => item.item_type === 'PRODUCT')
+      .map((item) => item.item_id);
+    const comboIds = concessionItems
+      .filter((item) => item.item_type === 'COMBO')
+      .map((item) => item.item_id);
+
+    const [products, combos] = await Promise.all([
+      productIds.length
+        ? this.prisma.products.findMany({
+            where: {
+              id: {
+                in: productIds,
+              },
+            },
+          })
+        : Promise.resolve([]),
+      comboIds.length
+        ? this.prisma.combos.findMany({
+            where: {
+              id: {
+                in: comboIds,
+              },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const productMap = new Map(products.map((item) => [item.id, item.name]));
+    const comboMap = new Map(combos.map((item) => [item.id, item.name]));
+
+    return sales.map((sale) => {
+      const firstTicket = sale.tickets[0];
+      const showtime = firstTicket?.showtime_id
+        ? showtimeMap.get(firstTicket.showtime_id)
+        : null;
+      const movie = showtime?.movie_id ? movieMap.get(showtime.movie_id) : null;
+
+      const ticketItems: CustomerOrderItem[] = sale.tickets.map((ticket) => {
+        const eligibility = this.resolveTicketRefundEligibility(
+          ticket.used ?? false,
+          showtime?.start_time ?? null,
+        );
+
+        return {
+          id: `ticket-item-${ticket.id}`,
+          item_type: 'ticket',
+          reference_id: ticket.id,
+          label: ticket.ticket_types?.name || 'Ingresso',
+          quantity: 1,
+          unit_amount: ticket.total_amount.toString(),
+          total_amount: ticket.total_amount.toString(),
+          metadata: {
+            seat: ticket.seat,
+            ticket_number: ticket.ticket_number,
+            used: ticket.used || false,
+          },
+          refund_eligibility: eligibility,
+        };
+      });
+
+      const concessionLineItems = sale.concession_sales.flatMap((concessionSale) =>
+        concessionSale.concession_sale_items.map((item) => {
+          const eligibility = this.resolveConcessionRefundEligibility(
+            showtime?.start_time ?? null,
+          );
+          const itemLabel =
+            item.item_type === 'PRODUCT'
+              ? productMap.get(item.item_id) || 'Produto'
+              : comboMap.get(item.item_id) || 'Combo';
+
+          return {
+            id: `concession-item-${item.id}`,
+            item_type: 'concession' as const,
+            reference_id: item.id,
+            label: itemLabel,
+            quantity: item.quantity,
+            unit_amount: item.unit_price.toString(),
+            total_amount: item.total_price.toString(),
+            metadata: {
+              concession_item_type: item.item_type,
+              source_item_id: item.item_id,
+            },
+            refund_eligibility: eligibility,
+          };
+        }),
+      );
+
+      const items = [...ticketItems, ...concessionLineItems];
+      const canRequestRefund = items.some((item) => item.refund_eligibility.eligible);
+
+      return {
+        id: sale.id,
+        sale_number: sale.sale_number,
+        sale_date: sale.sale_date.toISOString(),
+        status: sale.sale_status?.name || null,
+        payment_method: sale.payment_methods?.name || null,
+        total_amount: sale.total_amount.toString(),
+        discount_amount: (sale.discount_amount || 0).toString(),
+        net_amount: sale.net_amount.toString(),
+        cinema_complex_id: sale.cinema_complex_id,
+        order_items: items,
+        showtime: showtime
+          ? {
+              id: showtime.id,
+              start_time: showtime.start_time.toISOString(),
+              cinema: showtime.cinema_complexes?.name || '',
+              room: showtime.rooms?.name || null,
+            }
+          : null,
+        movie: movie || null,
+        can_request_refund: canRequestRefund,
+      };
+    });
+  }
+
+  private resolveTicketRefundEligibility(
+    used: boolean,
+    startTime: Date | null,
+  ): { eligible: boolean; reason: string | null } {
+    if (used) {
+      return { eligible: false, reason: 'Ingresso já utilizado.' };
+    }
+
+    if (!startTime) {
+      return {
+        eligible: false,
+        reason: 'Sessão sem horário válido para análise de reembolso.',
+      };
+    }
+
+    const deadline = new Date(startTime.getTime() - 2 * 60 * 60 * 1000);
+    if (Date.now() > deadline.getTime()) {
+      return {
+        eligible: false,
+        reason: 'Prazo de solicitação encerrado (até 2h antes da sessão).',
+      };
+    }
+
+    return { eligible: true, reason: null };
+  }
+
+  private resolveConcessionRefundEligibility(
+    startTime: Date | null,
+  ): { eligible: boolean; reason: string | null } {
+    if (!startTime) {
+      return {
+        eligible: false,
+        reason: 'Sem sessão vinculada para validar bomboniere.',
+      };
+    }
+
+    const deadline = new Date(startTime.getTime() - 2 * 60 * 60 * 1000);
+    if (Date.now() > deadline.getTime()) {
+      return {
+        eligible: false,
+        reason: 'Prazo de solicitação encerrado (até 2h antes da sessão).',
+      };
+    }
+
+    return { eligible: true, reason: null };
+  }
+
+  private generateSimpleTicketPdf(params: {
+    title: string;
+    cinemaLabel: string;
+    showtimeLabel: string;
+    seat: string;
+    ticketNumber: string;
+    orderNumber: string;
+  }): Buffer {
+    const lines = [
+      'Frame-24 - Ingresso Digital',
+      `Filme: ${params.title}`,
+      `Cinema: ${params.cinemaLabel}`,
+      `Sessao: ${params.showtimeLabel}`,
+      `Assento: ${params.seat}`,
+      `Ingresso: ${params.ticketNumber}`,
+      `Pedido: ${params.orderNumber}`,
+    ];
+    const escapedLines = lines.map((line) =>
+      line.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)'),
+    );
+    const textStream = [
+      'BT',
+      '/F1 14 Tf',
+      '50 780 Td',
+      ...escapedLines.flatMap((line, index) =>
+        index === 0 ? [`(${line}) Tj`] : ['0 -24 Td', `(${line}) Tj`],
+      ),
+      'ET',
+    ].join('\n');
+
+    const contentLength = Buffer.byteLength(textStream, 'utf8');
+    const objects = [
+      '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+      '2 0 obj\n<< /Type /Pages /Count 1 /Kids [3 0 R] >>\nendobj\n',
+      '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n',
+      '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+      `5 0 obj\n<< /Length ${contentLength} >>\nstream\n${textStream}\nendstream\nendobj\n`,
+    ];
+
+    let pdf = '%PDF-1.4\n';
+    const offsets = [0];
+
+    for (const object of objects) {
+      offsets.push(Buffer.byteLength(pdf, 'utf8'));
+      pdf += object;
+    }
+
+    const xrefPosition = Buffer.byteLength(pdf, 'utf8');
+    pdf += `xref\n0 ${objects.length + 1}\n`;
+    pdf += '0000000000 65535 f \n';
+    for (let index = 1; index <= objects.length; index += 1) {
+      const offset = String(offsets[index] || 0).padStart(10, '0');
+      pdf += `${offset} 00000 n \n`;
+    }
+    pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefPosition}\n%%EOF`;
+
+    return Buffer.from(pdf, 'utf8');
   }
 
   private mapToDto(sale: SaleWithFullRelations): SaleResponseDto {

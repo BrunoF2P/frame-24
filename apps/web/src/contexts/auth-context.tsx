@@ -43,10 +43,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
 
-  const tenantSlug = pathname
-    ?.split("/")
-    .filter(Boolean)[0]
-    ?.trim() || null;
+  const firstSegment = pathname?.split("/").filter(Boolean)[0]?.trim() || null;
+  const reservedSegments = new Set([
+    "cidade",
+    "perfil",
+    "busca",
+    "checkout",
+    "pedido",
+    "cinema",
+  ]);
+  const tenantSlug =
+    firstSegment && !reservedSegments.has(firstSegment) ? firstSegment : null;
 
   useEffect(() => {
     if (isPending) {
@@ -54,12 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (!session) {
-      setProfile(null);
-      setIsProfileLoading(false);
-      return;
-    }
-
-    if (!tenantSlug) {
       setProfile(null);
       setIsProfileLoading(false);
       return;
@@ -121,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // In customer-facing web app, authenticated means: valid session + active customer profile.
   const isAuthenticated = !!profile;
   const hasSession = !!session;
-  const isLoading = isPending || (!!session && !!tenantSlug && isProfileLoading);
+  const isLoading = isPending || (!!session && isProfileLoading);
 
   return (
     <AuthContext.Provider

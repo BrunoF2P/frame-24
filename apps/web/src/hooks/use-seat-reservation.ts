@@ -17,20 +17,11 @@ interface ReservationState {
   error: string | null;
 }
 
-interface JoinShowtimePayload {
-  showtime_id: string;
-}
-
 interface ReservationEventData {
   reservation_uuid: string;
   expires_at: string;
   seat_ids: string[];
   message?: string;
-}
-
-interface ReservationConfirmedEventData {
-  reservation_uuid: string;
-  sale_id: string;
 }
 
 interface SeatsReleasedEventData {
@@ -93,8 +84,7 @@ function getInitialReservation(showtimeId: string): ReservationState {
       isReserving: false,
       error: null,
     };
-  } catch (error) {
-    console.error("[Reservation] Error parsing saved reservation:", error);
+  } catch {
     localStorage.removeItem(savedReservationKey);
     return defaultState;
   }
@@ -133,7 +123,6 @@ export const useSeatReservation = ({
 
       // Se já está conectado, apenas entrar na sala
       if (seatsSocket.connected) {
-        console.log("[Socket] Already connected, joining showtime");
         setConnected(true);
         seatsSocket.emit("join-showtime", joinPayload);
       } else {
@@ -142,20 +131,16 @@ export const useSeatReservation = ({
       }
 
       const onConnect = () => {
-        console.log("[Socket] Connected");
         setConnected(true);
         // Entrar na sala da sessão
         seatsSocket.emit("join-showtime", joinPayload);
       };
 
       const onDisconnect = () => {
-        console.log("[Socket] Disconnected");
         setConnected(false);
       };
 
-      const onJoinedShowtime = (data: JoinShowtimePayload) => {
-        console.log("[Socket] Joined showtime:", data.showtime_id);
-      };
+      const onJoinedShowtime = () => {};
 
       seatsSocket.on("connect", onConnect);
       seatsSocket.on("disconnect", onDisconnect);
@@ -195,8 +180,6 @@ export const useSeatReservation = ({
 
         if (secondsRemaining <= 0) {
           // Reserva expirou - notificar o backend para liberar imediatamente
-          console.log("[Reservation] Timer expired, releasing seats...");
-
           // Emitir evento para o backend liberar os assentos
           if (socket && reservation.reservationUuid) {
             socket.emit("release-seats", {
@@ -218,7 +201,6 @@ export const useSeatReservation = ({
           // Limpar do localStorage
           const savedReservationKey = `seat-reservation-${showtimeId}`;
           localStorage.removeItem(savedReservationKey);
-          console.log("[Reservation] Expired and cleared from localStorage");
         } else {
           setReservation((prev) => ({
             ...prev,
@@ -250,7 +232,6 @@ export const useSeatReservation = ({
 
     // Sucesso na reserva
     const onReservationSuccess = (data: ReservationEventData) => {
-      console.log("[Socket] Reservation success:", data);
       const reservationData = {
         reservationUuid: data.reservation_uuid,
         expiresAt: new Date(data.expires_at),
@@ -272,12 +253,10 @@ export const useSeatReservation = ({
           reservedSeatIds: data.seat_ids,
         }),
       );
-      console.log("[Reservation] Saved to localStorage");
     };
 
     // Erro na reserva
     const onReservationError = (data: ErrorEventData) => {
-      console.error("[Socket] Reservation error:", data.message);
       setReservation((prev) => ({
         ...prev,
         isReserving: false,
@@ -286,8 +265,7 @@ export const useSeatReservation = ({
     };
 
     // Confirmação da venda
-    const onReservationConfirmed = (data: ReservationConfirmedEventData) => {
-      console.log("[Socket] Reservation confirmed:", data);
+    const onReservationConfirmed = () => {
       setReservation({
         reservationUuid: null,
         expiresAt: null,
@@ -300,7 +278,6 @@ export const useSeatReservation = ({
 
     // Erro na confirmação
     const onConfirmationError = (data: ErrorEventData) => {
-      console.error("[Socket] Confirmation error:", data.message);
       setReservation((prev) => ({
         ...prev,
         error: data.message,
@@ -309,7 +286,6 @@ export const useSeatReservation = ({
 
     // Reserva restaurada (pelo backend via user_id)
     const onReservationRestored = (data: ReservationEventData) => {
-      console.log("[Socket] Reservation restored from backend:", data);
       const reservationData = {
         reservationUuid: data.reservation_uuid,
         expiresAt: new Date(data.expires_at),
@@ -335,7 +311,6 @@ export const useSeatReservation = ({
 
     // Assentos liberados (manual ou expiração)
     const onSeatsReleased = (data: SeatsReleasedEventData) => {
-      console.log("[Socket] Seats released:", data);
       // Só limpar se for a nossa reserva
       if (reservation.reservationUuid === data.reservation_uuid) {
         setReservation({
@@ -350,9 +325,6 @@ export const useSeatReservation = ({
         // Limpar do localStorage
         const savedReservationKey = `seat-reservation-${showtimeId}`;
         localStorage.removeItem(savedReservationKey);
-        console.log(
-          "[Reservation] Cleared from localStorage due to release event",
-        );
       }
     };
 
@@ -421,7 +393,6 @@ export const useSeatReservation = ({
     // Limpar do localStorage
     const savedReservationKey = `seat-reservation-${showtimeId}`;
     localStorage.removeItem(savedReservationKey);
-    console.log("[Reservation] Cleared from localStorage");
   }, [socket, connected, reservation.reservationUuid, companyId, showtimeId]);
 
   // Confirmar reserva (após pagamento)

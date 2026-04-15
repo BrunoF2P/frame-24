@@ -123,8 +123,10 @@ export default function CheckoutPage({
         if (Array.isArray(paymentsRes.data) && paymentsRes.data.length > 0) {
           setSelectedPaymentMethod((paymentsRes.data[0] as PaymentMethod).id);
         }
-      } catch (error) {
-        console.error("Erro ao carregar dados do checkout", error);
+      } catch {
+        setTicketTypes([]);
+        setProducts([]);
+        setPaymentMethods([]);
       } finally {
         setLoading(false);
       }
@@ -213,7 +215,6 @@ export default function CheckoutPage({
         router.push(`/${tenant_slug}/confirmation/${response.data.id}`);
       }
     } catch (error: unknown) {
-      console.error("Erro no checkout:", error);
       const message =
         error &&
         typeof error === "object" &&

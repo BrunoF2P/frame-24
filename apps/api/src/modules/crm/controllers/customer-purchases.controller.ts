@@ -5,6 +5,7 @@ import {
   Delete,
   Param,
   Body,
+  Res,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -21,6 +22,8 @@ import { CustomerGuard } from 'src/common/guards/customer.guard';
 import { CustomerPurchasesService } from '../services/customer-purchases.service';
 import { CreatePurchaseDto } from '../dto/create-purchase.dto';
 import { SaleResponseDto } from 'src/modules/sales/dto/sale-response.dto';
+import { CreateCustomerRefundRequestDto } from '../dto/customer-refund-request.dto';
+import type { Response } from 'express';
 
 @ApiTags('Customer')
 @ApiBearerAuth()
@@ -64,6 +67,60 @@ export class CustomerPurchasesController {
   })
   async findAll(): Promise<SaleResponseDto[]> {
     return this.customerPurchasesService.findAll();
+  }
+
+  @Get('orders')
+  @ApiOperation({
+    summary: 'Listar pedidos do cliente',
+    description:
+      'Retorna pedidos com itens (ingressos e bomboniere) e metadados de elegibilidade de reembolso.',
+  })
+  async findOrders() {
+    return this.customerPurchasesService.findOrders();
+  }
+
+  @Get('orders/:id')
+  @ApiOperation({
+    summary: 'Detalhar pedido',
+    description: 'Retorna o detalhe completo de um pedido do cliente.',
+  })
+  async findOrderById(
+    @Param('id', ParseEntityIdPipe) id: string,
+  ) {
+    return this.customerPurchasesService.findOrderById(id);
+  }
+
+  @Post('orders/:id/refund-requests')
+  @ApiOperation({
+    summary: 'Solicitar reembolso por item',
+    description:
+      'Cria solicitação de reembolso por item do pedido (modo v1: solicitação para análise).',
+  })
+  async createRefundRequest(
+    @Param('id', ParseEntityIdPipe) id: string,
+    @Body() dto: CreateCustomerRefundRequestDto,
+  ) {
+    return this.customerPurchasesService.createRefundRequest(id, dto);
+  }
+
+  @Get('refund-requests')
+  @ApiOperation({
+    summary: 'Listar solicitações de reembolso',
+    description: 'Retorna as solicitações de reembolso já abertas pelo cliente.',
+  })
+  async listRefundRequests() {
+    return this.customerPurchasesService.listRefundRequests();
+  }
+
+  @Get('refund-requests/:id')
+  @ApiOperation({
+    summary: 'Detalhar solicitação de reembolso',
+    description: 'Retorna uma solicitação de reembolso específica.',
+  })
+  async getRefundRequestById(
+    @Param('id') id: string,
+  ) {
+    return this.customerPurchasesService.getRefundRequestById(id);
   }
 
   @Get('purchases/:id')
@@ -130,6 +187,36 @@ export class CustomerPurchasesController {
   })
   async getTicketQrCode(@Param('id', ParseEntityIdPipe) id: string) {
     return this.customerPurchasesService.getTicketQrCode(id);
+  }
+
+  @Get('tickets/:id/pdf')
+  @ApiOperation({
+    summary: 'Baixar ingresso em PDF',
+    description: 'Gera e retorna o PDF oficial do ingresso.',
+  })
+  async getTicketPdf(
+    @Param('id', ParseEntityIdPipe) id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<Buffer> {
+    const pdf = await this.customerPurchasesService.getTicketPdf(id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="ingresso-${id}.pdf"`,
+    );
+    return pdf;
+  }
+
+  @Post('tickets/:id/resend-email')
+  @ApiOperation({
+    summary: 'Reenviar ingresso por e-mail',
+    description:
+      'Reenvia para o e-mail cadastrado do cliente as informações do ingresso.',
+  })
+  async resendTicketByEmail(
+    @Param('id', ParseEntityIdPipe) id: string,
+  ) {
+    return this.customerPurchasesService.resendTicketByEmail(id);
   }
 
   @Get('history')

@@ -10,6 +10,13 @@ export const UpdateCustomerProfileSchema = z.object({
     .optional(),
   phone: z.string().optional(),
   birth_date: z.string().optional().nullable(),
+  zip_code: z.string().max(10).optional().nullable(),
+  address: z.string().max(300).optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  state: z.string().length(2).optional().nullable(),
+  accepts_email: z.boolean().optional(),
+  accepts_sms: z.boolean().optional(),
+  accepts_marketing: z.boolean().optional(),
 });
 
 export class UpdateCustomerProfileDto extends createZodDto(
@@ -32,4 +39,46 @@ export class UpdateCustomerProfileDto extends createZodDto(
     example: '1990-01-01',
   })
   birth_date?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'CEP fiscal',
+    example: '40000-000',
+  })
+  zip_code?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Endereço fiscal',
+    example: 'Av. Sete de Setembro, 1000',
+  })
+  address?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Cidade fiscal',
+    example: 'Salvador',
+  })
+  city?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'UF fiscal',
+    example: 'BA',
+  })
+  state?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Aceite de comunicação por e-mail',
+    example: true,
+  })
+  accepts_email?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Aceite de comunicação por SMS',
+    example: false,
+  })
+  accepts_sms?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Aceite de comunicação de marketing',
+    example: true,
+  })
+  accepts_marketing?: boolean;
 }

@@ -40,6 +40,34 @@ Monorepo full-stack com TypeScript para operação de redes de cinema, com arqui
 
 O Frame-24 é um sistema para gestão integrada de operações de cinema, incluindo catálogo, sessões, vendas, fiscal, CRM e processos administrativos.
 
+### Experiência pública Frame-24
+
+O `apps/web` agora implementa a experiência pública city-first do Frame-24: um hub nacional de compra de ingressos orientado por cidade, com visual editorial-premium, fluxo P0 de compra em quatro etapas e base pronta para P1.
+
+Principais decisões dessa implementação:
+
+- Navegação canônica por cidade: `/cidade/[citySlug]` é a espinha dorsal da experiência pública.
+- Design system próprio em Tailwind v4 com tokens via `@theme`, dark/light mode e tipografia `Cormorant Garamond + Manrope`.
+- Componentes cinema-native para hero, cards, picker de sessão, seat map, countdown e ticket digital.
+- Páginas P0 implementadas: home, hub por cidade, listagem, filme, sessão/assentos, checkout e confirmação.
+- Páginas P1 implementadas como base navegável: busca unificada, perfil, histórico e página do cinema.
+- Performance orientada a Core Web Vitals com `next/font`, `next/image`, streaming/layout server-first e client islands apenas onde há interação forte.
+- Server Action no checkout com validação via Zod e persistência do pedido em cookie para a confirmação.
+
+Rotas principais da nova vitrine:
+
+- `/`
+- `/cidade/[citySlug]`
+- `/cidade/[citySlug]/filmes`
+- `/cidade/[citySlug]/filme/[movieSlug]`
+- `/cidade/[citySlug]/sessao/[showtimeId]`
+- `/checkout/[checkoutId]`
+- `/pedido/[orderId]`
+- `/busca`
+- `/perfil`
+- `/perfil/historico`
+- `/cinema/[cinemaSlug]`
+
 ### Principais capacidades
 
 - Gestão de complexos, salas e assentos.

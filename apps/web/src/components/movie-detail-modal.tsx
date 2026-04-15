@@ -1,9 +1,12 @@
 "use client";
 
-import { X, Calendar, Clock, MapPin, Film, Info } from "lucide-react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { AgeRatingBadge } from "@/components/cinema/age-rating-badge";
+import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
+import { IconButton } from "@/components/ui/icon-button";
 
 interface MovieCategory {
   name: string;
@@ -89,14 +92,17 @@ export function MovieDetailModal({
       />
 
       {/* Modal Content */}
-      <div className="relative w-full max-w-4xl bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh] border border-zinc-800 animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[var(--radius-lg)] border border-zinc-800 bg-zinc-900 shadow-2xl animate-in fade-in zoom-in-95 duration-200 md:flex-row">
         {/* Close Button */}
-        <button
+        <IconButton
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+          className="absolute right-4 top-4 z-10 rounded-full border-black/30 bg-black/50 text-white hover:bg-black/70"
+          aria-label="Fechar detalhes do filme"
+          variant="secondary"
+          size="sm"
         >
-          <X className="w-6 h-6" />
-        </button>
+          <Icon name="x" size="md" />
+        </IconButton>
 
         {/* Movie Poster Side */}
         <div className="w-full md:w-2/5 relative h-64 md:h-auto bg-zinc-950">
@@ -110,7 +116,7 @@ export function MovieDetailModal({
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-zinc-600">
-              <Film className="w-16 h-16 opacity-20" />
+              <Icon name="film" size={64} className="opacity-20" />
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent md:bg-gradient-to-r" />
@@ -124,36 +130,13 @@ export function MovieDetailModal({
               <h2 className="text-3xl font-bold text-white leading-tight">
                 {movie.brazil_title || movie.original_title}
               </h2>
-              {movie.age_rating && (
-                <div
-                  className={`
-                                    px-3 py-1 rounded-md font-bold text-sm whitespace-nowrap
-                                    ${
-                                      movie.age_rating.code === "L"
-                                        ? "bg-green-500 text-white"
-                                        : movie.age_rating.code === "10"
-                                          ? "bg-blue-500 text-white"
-                                          : movie.age_rating.code === "12"
-                                            ? "bg-yellow-500 text-black"
-                                            : movie.age_rating.code === "14"
-                                              ? "bg-orange-500 text-white"
-                                              : movie.age_rating.code === "16"
-                                                ? "bg-red-500 text-white"
-                                                : "bg-black text-white border border-zinc-700"
-                                    }
-                                `}
-                >
-                  {movie.age_rating.code === "L"
-                    ? "LIVRE"
-                    : `${movie.age_rating.code} ANOS`}
-                </div>
-              )}
+              {movie.age_rating ? <AgeRatingBadge value={movie.age_rating.code} /> : null}
             </div>
 
             <div className="flex flex-wrap gap-2 text-sm text-zinc-400 mb-4">
               {movie.duration_minutes && (
                 <span className="flex items-center gap-1">
-                  <Clock className="w-4 h-4" /> {movie.duration_minutes} min
+                  <Icon name="clock" size="xs" /> {movie.duration_minutes} min
                 </span>
               )}
               {movie.categories && movie.categories.length > 0 && (
@@ -182,7 +165,7 @@ export function MovieDetailModal({
                   {movie.movie_cast.map((cast) => (
                     <div
                       key={cast.id}
-                      className="flex items-center gap-3 bg-zinc-950/50 p-2 rounded-lg border border-zinc-800/50 min-w-[200px]"
+                      className="flex min-w-[200px] items-center gap-3 rounded-[var(--radius-sm)] border border-zinc-800/50 bg-zinc-950/50 p-2"
                     >
                       <div className="w-10 h-10 bg-zinc-800 rounded-full overflow-hidden flex-shrink-0">
                         {cast.photo_url ? (
@@ -219,53 +202,49 @@ export function MovieDetailModal({
           {/* Showtimes */}
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-red-500" />
+              <Icon name="calendar" size="md" className="text-red-500" />
               Sessões Disponíveis
             </h3>
 
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-red-500"></div>
+                <Icon name="loader" size="lg" className="animate-spin text-red-500" />
               </div>
             ) : showtimes.length === 0 ? (
-              <div className="text-center py-8 bg-zinc-950/50 rounded-xl border border-zinc-800/50">
-                <Info className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+              <div className="rounded-[var(--radius-md)] border border-zinc-800/50 bg-zinc-950/50 py-8 text-center">
+                <Icon name="info" size="lg" className="mx-auto mb-2 text-zinc-600" />
                 <p className="text-zinc-400">
                   Nenhuma sessão disponível para a data selecionada.
                 </p>
               </div>
             ) : (
-              Object.entries(showtimesByCinema).map(
-                ([cinemaName, sessions]) => (
-                  <div key={cinemaName} className="space-y-3">
+              Object.entries(showtimesByCinema).map(([cinemaName, sessions]) => (
+                  <article key={cinemaName} className="space-y-3">
                     <div className="flex items-center gap-2 text-zinc-400 text-sm font-medium">
-                      <MapPin className="w-4 h-4" />
+                      <Icon name="mapPin" size="xs" />
                       {cinemaName}
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                       {sessions.map((session) => (
-                        <button
-                          key={session.id}
-                          onClick={() =>
-                            router.push(`/${tenantSlug}/showtime/${session.id}`)
-                          }
-                          className="group flex flex-col items-center p-3 bg-zinc-950 hover:bg-red-500/10 border border-zinc-800 hover:border-red-500/50 rounded-xl transition-all duration-200"
-                        >
-                          <span className="text-lg font-bold text-white group-hover:text-red-500 transition-colors">
-                            {format(new Date(session.start_time), "HH:mm")}
-                          </span>
-                          <div className="flex flex-col items-center text-[10px] text-zinc-500 uppercase font-medium mt-1 gap-0.5">
-                            <span>
-                              {session.projection_types?.name || "2D"}
+                        <li key={session.id}>
+                          <Button
+                            onClick={() => router.push(`/${tenantSlug}/showtime/${session.id}`)}
+                            variant="secondary"
+                            className="group h-auto w-full flex-col items-center gap-1 border-zinc-800 bg-zinc-950 py-3 text-white hover:border-red-500/50 hover:bg-red-500/10"
+                          >
+                            <span className="text-lg font-bold group-hover:text-red-500 transition-colors">
+                              {format(new Date(session.start_time), "HH:mm")}
                             </span>
-                            <span>{session.audio_types?.name || "LEG"}</span>
-                          </div>
-                        </button>
+                            <span className="flex flex-col items-center text-[10px] font-medium uppercase text-zinc-500">
+                              <span>{session.projection_types?.name || "2D"}</span>
+                              <span>{session.audio_types?.name || "LEG"}</span>
+                            </span>
+                          </Button>
+                        </li>
                       ))}
-                    </div>
-                  </div>
-                ),
-              )
+                    </ul>
+                  </article>
+                ))
             )}
           </div>
         </div>

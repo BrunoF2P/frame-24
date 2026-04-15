@@ -94,7 +94,6 @@ export default function PurchaseHistoryPage({
         setSales((response.data ?? []) as SaleResponse[]);
         setError(null);
       } catch (error: unknown) {
-        console.error('Erro ao carregar histórico:', error);
         const errorMessage = extractErrorMessage(
           error,
           'Erro ao carregar histórico de compras. Tente novamente.',
