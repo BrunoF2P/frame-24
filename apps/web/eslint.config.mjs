@@ -4,6 +4,13 @@ import { nextJsConfig } from "@repo/eslint-config/next-js";
 export default defineConfig([
   ...nextJsConfig,
   {
-    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts"],
+    ignores: [
+      ".next/**",
+      "out/**",
+      "build/**",
+      "next-env.d.ts",
+      "playwright-report/**",
+      "test-results/**",
+    ],
   },
 ]);

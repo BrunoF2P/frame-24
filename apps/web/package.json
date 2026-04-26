@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "lint:strict": "pnpm run copy:check && FRAME24_STRICT_LINT=1 eslint --max-warnings=0",
-    "copy:check": "node scripts/check-copy-terms.mjs"
+    "copy:check": "node scripts/check-copy-terms.mjs",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:headed": "playwright test --headed"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -33,6 +36,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@tailwindcss/postcss": "^4.2.2",
