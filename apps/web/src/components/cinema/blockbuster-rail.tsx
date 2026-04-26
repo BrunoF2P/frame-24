@@ -7,15 +7,17 @@ import { Icon } from "@/components/ui/icon";
 export const BlockbusterRail = ({
   citySlug,
   movies,
+  tenantSlug,
 }: {
   citySlug: string;
   movies: MovieSummary[];
+  tenantSlug?: string;
 }) => (
   <ul className="grid gap-4 lg:grid-cols-3" aria-label="Blockbusters em alta">
     {movies.map((movie) => (
       <li key={movie.id}>
         <article className="group overflow-hidden rounded-[var(--radius-lg)] border border-border/70 bg-black text-white shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
-          <Link className="block" href={`/cidade/${citySlug}/filme/${movie.slug}`}>
+          <Link className="block" href={`${tenantSlug ? `/${tenantSlug}` : ""}/cidade/${citySlug}/filme/${movie.slug}`}>
             <figure className="relative aspect-[16/9]">
               <Image
                 src={movie.backdropUrl}

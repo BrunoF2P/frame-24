@@ -59,6 +59,7 @@ export interface CustomerOrder {
     start_time: string;
     cinema: string;
     room: string | null;
+    timezone?: string | null;
   } | null;
   movie: {
     id: string;
@@ -100,6 +101,19 @@ export interface TicketDetails {
     sale_date: string;
     cinema_complex_id: string;
   };
+  showtime?: {
+    id: string;
+    start_time: string;
+    cinema: string | null;
+    room: string | null;
+    timezone?: string | null;
+  } | null;
+  movie?: {
+    id: string;
+    title: string;
+    poster_url: string | null;
+    age_rating: string | null;
+  } | null;
 }
 
 export interface ActiveSessionDevice {

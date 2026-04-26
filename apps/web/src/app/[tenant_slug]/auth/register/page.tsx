@@ -161,6 +161,7 @@ export default function RegisterPage({
           birth_date: formData.birthdate || undefined,
           password: formData.password,
           company_id: companyId,
+          tenant_slug,
           accepts_marketing: true,
           accepts_email: true,
           accepts_sms: true,

@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { withTenantPath } from "@/lib/tenant-routing";
 
 export function AuthActions({
   tenantSlug,
@@ -20,9 +21,10 @@ export function AuthActions({
       return;
     }
 
-    const isOnLogin = pathname?.includes(`/${tenantSlug}/auth/login`) ?? false;
-    const isOnRegister =
-      pathname?.includes(`/${tenantSlug}/auth/register`) ?? false;
+    const loginPath = withTenantPath(pathname, "/auth/login");
+    const registerPath = withTenantPath(pathname, "/auth/register");
+    const isOnLogin = pathname?.includes(loginPath) ?? false;
+    const isOnRegister = pathname?.includes(registerPath) ?? false;
 
     if (isOnLogin || isOnRegister) {
       return;
@@ -31,10 +33,13 @@ export function AuthActions({
     const returnUrl =
       typeof window !== "undefined"
         ? window.location.pathname + window.location.search
-        : `/${tenantSlug}`;
+        : withTenantPath(pathname, "/");
 
     router.replace(
-      `/${tenantSlug}/auth/register?intent=activate&returnUrl=${encodeURIComponent(returnUrl)}`,
+      withTenantPath(
+        pathname,
+        `/auth/register?intent=activate&returnUrl=${encodeURIComponent(returnUrl)}`,
+      ),
     );
   }, [
     hasSession,
@@ -67,10 +72,10 @@ export function AuthActions({
   return (
     <>
       <Button asChild variant="quiet" size="sm">
-        <Link href={`/${tenantSlug}/auth/login`}>Entrar</Link>
+        <Link href={withTenantPath(pathname, "/auth/login")}>Entrar</Link>
       </Button>
       <Button asChild size="sm">
-        <Link href={`/${tenantSlug}/auth/register`}>Cadastrar</Link>
+        <Link href={withTenantPath(pathname, "/auth/register")}>Cadastrar</Link>
       </Button>
     </>
   );

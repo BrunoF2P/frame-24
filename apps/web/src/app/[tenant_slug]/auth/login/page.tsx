@@ -6,6 +6,7 @@ import Link from "next/link";
 import { extractErrorMessage } from "@/lib/error-utils";
 import { authClient } from "@/lib/auth-client";
 import { resolveCustomerProfile } from "@/lib/api-client";
+import { toTenantAuthEmail } from "@/lib/tenant-auth-email";
 
 export default function LoginPage({
   params,
@@ -15,7 +16,7 @@ export default function LoginPage({
   const { tenant_slug } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnUrl = searchParams.get("returnUrl") || `/${tenant_slug}`;
+  const returnUrl = searchParams.get("returnUrl") || `/${tenant_slug}/perfil`;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,7 +30,7 @@ export default function LoginPage({
 
     try {
       const result = await authClient.signIn.email({
-        email: email.trim().toLowerCase(),
+        email: toTenantAuthEmail(tenant_slug, email),
         password,
       });
 
@@ -78,10 +79,14 @@ export default function LoginPage({
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">
+              <label
+                htmlFor="tenant-login-email"
+                className="block text-sm font-medium text-zinc-300 mb-2"
+              >
                 Email
               </label>
               <input
+                id="tenant-login-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -92,10 +97,14 @@ export default function LoginPage({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">
+              <label
+                htmlFor="tenant-login-password"
+                className="block text-sm font-medium text-zinc-300 mb-2"
+              >
                 Senha
               </label>
               <input
+                id="tenant-login-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

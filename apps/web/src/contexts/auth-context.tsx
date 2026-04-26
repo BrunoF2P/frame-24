@@ -4,6 +4,10 @@ import { createContext, useContext, ReactNode, useEffect, useState } from "react
 import { resolveCustomerProfile } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import { usePathname } from "next/navigation";
+import {
+  getTenantSlugFromHost,
+  getTenantSlugFromPathname,
+} from "@/lib/tenant-routing";
 
 interface User {
   id: string;
@@ -43,17 +47,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
 
-  const firstSegment = pathname?.split("/").filter(Boolean)[0]?.trim() || null;
-  const reservedSegments = new Set([
-    "cidade",
-    "perfil",
-    "busca",
-    "checkout",
-    "pedido",
-    "cinema",
-  ]);
   const tenantSlug =
-    firstSegment && !reservedSegments.has(firstSegment) ? firstSegment : null;
+    (typeof window !== "undefined" ? getTenantSlugFromHost(window.location.host) : null) ??
+    getTenantSlugFromPathname(pathname);
 
   useEffect(() => {
     if (isPending) {

@@ -15,10 +15,14 @@ export const CitySelector = ({
   activeCity,
   cities,
   mobileFullWidth = false,
+  tenantSlug,
+  useTenantPath = false,
 }: {
   activeCity: City;
   cities: City[];
   mobileFullWidth?: boolean;
+  tenantSlug?: string;
+  useTenantPath?: boolean;
 }) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -32,14 +36,19 @@ export const CitySelector = ({
     const segments = currentPath.split("/").filter(Boolean);
 
     return (citySlug: string) => {
+      if (useTenantPath && tenantSlug && segments[0] === tenantSlug && segments[1] === "cidade") {
+        const nextSegments = [tenantSlug, "cidade", citySlug, ...segments.slice(3)];
+        return `/${nextSegments.join("/")}`;
+      }
+
       if (segments[0] === "cidade" && segments[1]) {
         const nextSegments = [segments[0], citySlug, ...segments.slice(2)];
         return `/${nextSegments.join("/")}`;
       }
 
-      return `/cidade/${citySlug}`;
+      return useTenantPath && tenantSlug ? `/${tenantSlug}/cidade/${citySlug}` : `/cidade/${citySlug}`;
     };
-  }, [pathname]);
+  }, [pathname, tenantSlug, useTenantPath]);
 
   const handleSelect = (city: City) => {
     setActiveCity(city.slug);

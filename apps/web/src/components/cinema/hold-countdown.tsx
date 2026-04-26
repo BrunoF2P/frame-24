@@ -33,7 +33,7 @@ export const HoldCountdown = ({ expiresAt }: { expiresAt: number | null }) => {
   return (
     <div className="inline-flex items-center gap-2 rounded-full border border-accent-red-500/20 bg-accent-red-500/8 px-4 py-2 text-sm text-accent-red-300">
       <Icon name="timer" size="sm" />
-      Hold ativo: {label}
+      Reserva temporária: {label}
     </div>
   );
 };

@@ -4,6 +4,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { searchStorefront } from "@/lib/storefront/service";
+import { getTenantSearch } from "@/lib/storefront/api";
 import type { SearchItem } from "@/types/storefront";
 import { cn } from "@/lib/utils";
 import type { IconName } from "@/lib/icon-registry";
@@ -43,9 +44,13 @@ const groupedItems = (items: SearchItem[]) =>
 const SearchResults = ({
   items,
   onSelect,
+  tenantSlug,
+  useTenantPath = false,
 }: {
   items: SearchItem[];
   onSelect?: () => void;
+  tenantSlug?: string;
+  useTenantPath?: boolean;
 }) => {
   const groups = groupedItems(items);
 
@@ -66,11 +71,15 @@ const SearchResults = ({
             <ul className="space-y-2">
               {list.map((item) => {
                 const iconName = typeIcon[item.type] as IconName;
+                const href =
+                  useTenantPath && tenantSlug && item.href.startsWith("/") && !item.href.startsWith(`/${tenantSlug}/`)
+                    ? `/${tenantSlug}${item.href}`
+                    : item.href;
 
                 return (
                   <li key={`${item.type}-${item.id}`}>
                     <Link
-                      href={item.href}
+                      href={href}
                       onClick={onSelect}
                       className="flex items-center gap-3 rounded-[var(--radius-md)] border border-border bg-surface px-4 py-3 hover:border-accent-red-500/40 hover:bg-background-strong"
                     >
@@ -99,11 +108,15 @@ export const GlobalSearchCombobox = ({
   currentCityLabel,
   currentCitySlug,
   mobileIconOnly = false,
+  tenantSlug,
+  useTenantPath = false,
 }: {
   initialItems: SearchItem[];
   currentCityLabel: string;
   currentCitySlug: string;
   mobileIconOnly?: boolean;
+  tenantSlug?: string;
+  useTenantPath?: boolean;
 }) => {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<SearchItem[]>(initialItems);
@@ -115,7 +128,9 @@ export const GlobalSearchCombobox = ({
     let cancelled = false;
 
     const run = async () => {
-      const results = await searchStorefront(deferredQuery, currentCitySlug);
+      const results = tenantSlug
+        ? await getTenantSearch(tenantSlug, deferredQuery, currentCitySlug)
+        : await searchStorefront(deferredQuery, currentCitySlug);
       if (!cancelled) {
         setItems(results);
       }
@@ -126,7 +141,7 @@ export const GlobalSearchCombobox = ({
     return () => {
       cancelled = true;
     };
-  }, [currentCitySlug, deferredQuery]);
+  }, [currentCitySlug, deferredQuery, tenantSlug]);
 
   const quickTerms = useMemo(
     () =>
@@ -198,10 +213,10 @@ export const GlobalSearchCombobox = ({
                       </ChipToggle>
                     ))}
                   </div>
-                  <SearchResults items={items} onSelect={() => setOpen(false)} />
+                  <SearchResults items={items} onSelect={() => setOpen(false)} tenantSlug={tenantSlug} useTenantPath={useTenantPath} />
                 </div>
               ) : (
-                <SearchResults items={items} onSelect={() => setOpen(false)} />
+                <SearchResults items={items} onSelect={() => setOpen(false)} tenantSlug={tenantSlug} useTenantPath={useTenantPath} />
               )}
               <Button
                 onClick={() => setOpen(false)}
@@ -265,7 +280,7 @@ export const GlobalSearchCombobox = ({
                     ))}
                   </div>
                 ) : null}
-                <SearchResults items={items} onSelect={() => setQuery("")} />
+                <SearchResults items={items} onSelect={() => setQuery("")} tenantSlug={tenantSlug} useTenantPath={useTenantPath} />
               </div>
             </div>
           </Dialog.Content>

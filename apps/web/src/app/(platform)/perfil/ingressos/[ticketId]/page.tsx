@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { use } from "react";
+import { usePathname } from "next/navigation";
 import { ProfileAuthState } from "@/components/profile/profile-auth-state";
 import { ProfileShell } from "@/components/profile/profile-shell";
 import { TicketActionPanel } from "@/components/profile/ticket-action-panel";
@@ -9,6 +10,7 @@ import { useCustomerProfileQuery, useCustomerTicketQuery } from "@/hooks/use-cus
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { copy } from "@/lib/copy/catalog";
+import { withTenantPath } from "@/lib/tenant-routing";
 
 export default function ProfileTicketPage({
   params,
@@ -16,6 +18,7 @@ export default function ProfileTicketPage({
   params: Promise<{ ticketId: string }>;
 }) {
   const { ticketId } = use(params);
+  const pathname = usePathname();
   const profileQuery = useCustomerProfileQuery();
   const ticketQuery = useCustomerTicketQuery(ticketId);
 
@@ -41,7 +44,7 @@ export default function ProfileTicketPage({
         <Card className="space-y-3">
           <p className="text-sm text-foreground-muted">{copy("profileTicketNotFound")}</p>
           <Button asChild size="sm" variant="secondary">
-            <Link href="/perfil/pedidos">{copy("profileTicketBackToOrders")}</Link>
+            <Link href={withTenantPath(pathname, "/perfil/pedidos")}>{copy("profileTicketBackToOrders")}</Link>
           </Button>
         </Card>
       </ProfileShell>
@@ -52,7 +55,7 @@ export default function ProfileTicketPage({
     <ProfileShell title={copy("profileTicketTitle")} description={copy("profileTicketDescription")}>
       <div className="space-y-4">
         <Button asChild size="sm" variant="quiet">
-          <Link href={`/perfil/pedidos/${ticketQuery.data.sale.id}`}>{copy("profileTicketBackToOrder")}</Link>
+          <Link href={withTenantPath(pathname, `/perfil/pedidos/${ticketQuery.data.sale.id}`)}>{copy("profileTicketBackToOrder")}</Link>
         </Button>
         <TicketActionPanel ticket={ticketQuery.data} />
       </div>

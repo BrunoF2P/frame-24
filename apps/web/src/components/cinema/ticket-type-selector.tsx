@@ -21,7 +21,11 @@ const iconByTicketType: Partial<Record<TicketType["code"], "ticket" | "user" | "
   acompanhante_pcd: "user",
 };
 
-export const TicketTypeSelector = ({ ticketTypes }: { ticketTypes: TicketType[] }) => {
+export const TicketTypeSelector = ({
+  ticketTypes,
+}: {
+  ticketTypes: Array<TicketType & { id?: string; priceModifier?: number }>;
+}) => {
   const { ticketQuantities, setTicketQuantity, courtesyCode, setCourtesyCode, fiscalCpf, setFiscalCpf } =
     useBookingStore();
 
@@ -36,12 +40,12 @@ export const TicketTypeSelector = ({ ticketTypes }: { ticketTypes: TicketType[] 
       </div>
 
       <div className="space-y-3">
-        {ticketTypes.map((ticketType) => {
+        {ticketTypes.map((ticketType, index) => {
           const quantity = ticketQuantities[ticketType.code] ?? 0;
 
           return (
             <article
-              key={ticketType.code}
+              key={[ticketType.id, ticketType.code, ticketType.label, index].filter(Boolean).join(":")}
               className="flex items-center justify-between gap-4 rounded-[var(--radius-md)] border border-border p-4"
             >
               <div className="min-w-0">

@@ -10,25 +10,45 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { copy, formatCityNowShowingLabel } from "@/lib/copy/catalog";
-import { cities } from "@/lib/storefront/data";
 import { useCityStore } from "@/stores/use-city-store";
 import { useAuth } from "@/contexts/auth-context";
+import type { City } from "@/types/storefront";
 
 interface AppHeaderProps {
   citySlug?: string;
   tenantSlug?: string;
+  useTenantPath?: boolean;
+  cities?: City[];
 }
 
-export const AppHeader = ({ citySlug = "salvador", tenantSlug }: AppHeaderProps) => {
+export const AppHeader = ({
+  citySlug,
+  tenantSlug,
+  useTenantPath = false,
+  cities = [],
+}: AppHeaderProps) => {
   const pathname = usePathname();
   const reduceMotion = useReducedMotion();
   const { hasSession } = useAuth();
   const storedCity = useCityStore((state) => state.activeCitySlug);
-  const fallbackCity = cities[0]!;
+  const fallbackCity =
+    cities[0] ??
+    ({
+      id: "fallback",
+      slug: citySlug ?? storedCity ?? "cidade",
+      name: "Cidade",
+      state: "",
+      heroLabel: "Cidade",
+      intro: "",
+      timezone: "America/Bahia",
+    } satisfies City);
   const routeCity = pathname?.startsWith("/cidade/")
     ? pathname.split("/").filter(Boolean)[1]
-    : tenantSlug ?? citySlug ?? storedCity;
+    : pathname?.split("/").filter(Boolean)[1] === "cidade"
+      ? pathname.split("/").filter(Boolean)[2]
+      : citySlug ?? storedCity;
   const activeCity = cities.find((city) => city.slug === routeCity) ?? fallbackCity;
+  const tenantPrefix = tenantSlug && useTenantPath ? `/${tenantSlug}` : "";
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background-elevated/95 backdrop-blur-xl">
@@ -38,7 +58,7 @@ export const AppHeader = ({ citySlug = "salvador", tenantSlug }: AppHeaderProps)
             <Link
               aria-label={copy("brandName")}
               className="shrink-0 text-2xl font-bold tracking-[-0.04em]"
-              href="/"
+              href={tenantPrefix || "/"}
             >
               <motion.span
                 animate={
@@ -73,7 +93,7 @@ export const AppHeader = ({ citySlug = "salvador", tenantSlug }: AppHeaderProps)
               </motion.span>
             </Link>
             <div className="hidden md:block">
-              <CitySelector activeCity={activeCity} cities={cities} />
+              <CitySelector activeCity={activeCity} cities={cities} tenantSlug={tenantSlug} useTenantPath={useTenantPath} />
             </div>
           </nav>
           <nav aria-label="Ações da conta e busca" className="hidden items-center gap-2 md:flex md:flex-1 md:justify-end">
@@ -86,13 +106,15 @@ export const AppHeader = ({ citySlug = "salvador", tenantSlug }: AppHeaderProps)
                   type: "city",
                   title: activeCity.name,
                   subtitle: formatCityNowShowingLabel(activeCity.state),
-                  href: `/cidade/${activeCity.slug}`,
+                  href: `${tenantPrefix}/cidade/${activeCity.slug}`,
                 },
               ]}
+              tenantSlug={tenantSlug}
+              useTenantPath={useTenantPath}
             />
             {hasSession ? (
               <Button asChild className="hidden xl:inline-flex" size="md" variant="ghost">
-                <Link href="/perfil/ingressos">
+                <Link href={`${tenantPrefix}/perfil/ingressos`}>
                   <Icon name="ticket" size="sm" />
                   <span className="whitespace-nowrap">{copy("headerMyTickets")}</span>
                 </Link>
@@ -112,16 +134,18 @@ export const AppHeader = ({ citySlug = "salvador", tenantSlug }: AppHeaderProps)
                   type: "city",
                   title: activeCity.name,
                   subtitle: formatCityNowShowingLabel(activeCity.state),
-                  href: `/cidade/${activeCity.slug}`,
+                  href: `${tenantPrefix}/cidade/${activeCity.slug}`,
                 },
               ]}
+              tenantSlug={tenantSlug}
+              useTenantPath={useTenantPath}
             />
             <ThemeToggle compact />
             <AuthModal mobileIconOnly />
           </nav>
         </div>
         <div className="mt-2 md:hidden">
-          <CitySelector activeCity={activeCity} cities={cities} mobileFullWidth />
+          <CitySelector activeCity={activeCity} cities={cities} mobileFullWidth tenantSlug={tenantSlug} useTenantPath={useTenantPath} />
         </div>
       </div>
     </header>

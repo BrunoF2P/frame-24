@@ -1,11 +1,18 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
+import {
+  getTenantSlugFromHost,
+  getTenantSlugFromPathname,
+  withTenantPath,
+} from "@/lib/tenant-routing";
+import { toTenantAuthEmail } from "@/lib/tenant-auth-email";
 import { Button } from "@/components/ui/button";
 import { ChipToggle } from "@/components/ui/chip-toggle";
 import { DialogShell, DialogShellHeader } from "@/components/ui/dialog-shell";
@@ -18,7 +25,8 @@ type AuthView = "login" | "register";
 
 export const AuthModal = ({ mobileIconOnly = false }: { mobileIconOnly?: boolean }) => {
   const router = useRouter();
-  const { hasSession } = useAuth();
+  const pathname = usePathname();
+  const { hasSession, user } = useAuth();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<AuthView>("login");
   const [loading, setLoading] = useState(false);
@@ -29,6 +37,45 @@ export const AuthModal = ({ mobileIconOnly = false }: { mobileIconOnly?: boolean
     email: "",
     password: "",
   });
+  const tenantSlug =
+    (typeof window !== "undefined" ? getTenantSlugFromHost(window.location.host) : null) ??
+    getTenantSlugFromPathname(pathname);
+  const displayName = user?.name
+    ?.split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" ");
+  const points =
+    typeof user?.accumulated_points === "number"
+      ? `${user.accumulated_points} pts`
+      : null;
+
+  if (hasSession) {
+    return (
+      <Button
+        asChild
+        aria-label="Abrir perfil"
+        variant="secondary"
+        size="sm"
+        className={cn(
+          "min-w-10 justify-center gap-2 px-3",
+          mobileIconOnly && "w-10 px-0 md:w-auto md:px-3",
+        )}
+      >
+        <Link href={withTenantPath(pathname, "/perfil")}>
+          <Icon name="user" size="sm" />
+          <span className={cn("hidden max-w-40 truncate md:inline", mobileIconOnly && "sr-only md:not-sr-only")}>
+            {displayName || "Perfil"}
+          </span>
+          {points ? (
+            <span className="hidden rounded-full border border-border/80 px-2 py-0.5 text-xs text-foreground-muted xl:inline">
+              {points}
+            </span>
+          ) : null}
+        </Link>
+      </Button>
+    );
+  }
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -37,7 +84,9 @@ export const AuthModal = ({ mobileIconOnly = false }: { mobileIconOnly?: boolean
 
     try {
       const result = await authClient.signIn.email({
-        email: loginForm.email.trim().toLowerCase(),
+        email: tenantSlug
+          ? toTenantAuthEmail(tenantSlug, loginForm.email)
+          : loginForm.email.trim().toLowerCase(),
         password: loginForm.password,
       });
 
@@ -47,7 +96,7 @@ export const AuthModal = ({ mobileIconOnly = false }: { mobileIconOnly?: boolean
       }
 
       setOpen(false);
-      router.push("/perfil");
+      router.push(withTenantPath(pathname, "/perfil"));
     } catch {
       setError(copy("authErrorSignInRetry"));
     } finally {
@@ -61,19 +110,8 @@ export const AuthModal = ({ mobileIconOnly = false }: { mobileIconOnly?: boolean
     setError("");
 
     try {
-      const result = await authClient.signUp.email({
-        name: registerForm.name.trim(),
-        email: registerForm.email.trim().toLowerCase(),
-        password: registerForm.password,
-      });
-
-      if (result.error) {
-        setError(result.error.message || copy("authErrorSignUp"));
-        return;
-      }
-
       setOpen(false);
-      router.push("/perfil");
+      router.push(withTenantPath(pathname, "/auth/register"));
     } catch {
       setError(copy("authErrorSignUpRetry"));
     } finally {
@@ -86,7 +124,7 @@ export const AuthModal = ({ mobileIconOnly = false }: { mobileIconOnly?: boolean
       <Dialog.Trigger asChild>
         <Button
           type="button"
-          aria-label={hasSession ? copy("headerAccount") : copy("headerEnter")}
+          aria-label={copy("headerEnter")}
           variant="secondary"
           size="sm"
           className={cn(
@@ -95,7 +133,7 @@ export const AuthModal = ({ mobileIconOnly = false }: { mobileIconOnly?: boolean
         >
           {mobileIconOnly ? <Icon name="user" size="sm" /> : null}
           <span className={cn(mobileIconOnly && "sr-only md:not-sr-only")}>
-            {hasSession ? copy("headerAccount") : copy("headerEnter")}
+            {copy("headerEnter")}
           </span>
         </Button>
       </Dialog.Trigger>

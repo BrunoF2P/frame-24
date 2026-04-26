@@ -5,6 +5,7 @@ import { differenceInSeconds } from "date-fns";
 interface UseSeatReservationParams {
   showtimeId: string;
   companyId: string;
+  tenantSlug?: string;
   user?: { id: string } | null;
 }
 
@@ -93,6 +94,7 @@ function getInitialReservation(showtimeId: string): ReservationState {
 export const useSeatReservation = ({
   showtimeId,
   companyId,
+  tenantSlug,
   user,
 }: UseSeatReservationParams) => {
   const [socket, setSocket] = useState<SeatsSocket | null>(null);
@@ -106,6 +108,10 @@ export const useSeatReservation = ({
 
   // Conectar ao socket ao montar
   useEffect(() => {
+    if (!user?.id || !companyId) {
+      return;
+    }
+
     let cancelled = false;
 
     const connectSocket = async () => {
@@ -119,6 +125,7 @@ export const useSeatReservation = ({
       const joinPayload = {
         showtime_id: showtimeId,
         user_id: user?.id,
+        tenant_slug: tenantSlug,
       };
 
       // Se já está conectado, apenas entrar na sala
@@ -164,7 +171,7 @@ export const useSeatReservation = ({
       cancelled = true;
       cleanup?.();
     };
-  }, [showtimeId, user?.id]);
+  }, [companyId, showtimeId, tenantSlug, user?.id]);
 
   const isInitialized = true;
 
@@ -185,6 +192,7 @@ export const useSeatReservation = ({
             socket.emit("release-seats", {
               reservation_uuid: reservation.reservationUuid,
               company_id: companyId,
+              tenant_slug: tenantSlug,
             });
           }
 
@@ -223,6 +231,7 @@ export const useSeatReservation = ({
     reservation.reservationUuid,
     socket,
     companyId,
+    tenantSlug,
     showtimeId,
   ]);
 
@@ -367,9 +376,10 @@ export const useSeatReservation = ({
         seat_ids: seatIds,
         company_id: companyId,
         user_id: user?.id,
+        tenant_slug: tenantSlug,
       });
     },
-    [socket, connected, showtimeId, companyId, user?.id],
+    [socket, connected, showtimeId, companyId, tenantSlug, user?.id],
   );
 
   // Liberar assentos
@@ -379,6 +389,7 @@ export const useSeatReservation = ({
     socket.emit("release-seats", {
       reservation_uuid: reservation.reservationUuid,
       company_id: companyId,
+      tenant_slug: tenantSlug,
     });
 
     setReservation({
@@ -393,7 +404,7 @@ export const useSeatReservation = ({
     // Limpar do localStorage
     const savedReservationKey = `seat-reservation-${showtimeId}`;
     localStorage.removeItem(savedReservationKey);
-  }, [socket, connected, reservation.reservationUuid, companyId, showtimeId]);
+  }, [socket, connected, reservation.reservationUuid, companyId, tenantSlug, showtimeId]);
 
   // Confirmar reserva (após pagamento)
   const confirmReservation = useCallback(
@@ -403,9 +414,10 @@ export const useSeatReservation = ({
       socket.emit("confirm-reservation", {
         reservation_uuid: reservation.reservationUuid,
         sale_id: saleId,
+        tenant_slug: tenantSlug,
       });
     },
-    [socket, connected, reservation.reservationUuid],
+    [socket, connected, reservation.reservationUuid, tenantSlug],
   );
 
   // Cleanup ao desmontar - apenas liberar reserva

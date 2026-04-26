@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { AccountProfileForm } from "@/components/profile/account-profile-form";
 import { AddressForm } from "@/components/profile/address-form";
 import { EmailChangeFlowDialog } from "@/components/profile/email-change-flow-dialog";
@@ -10,8 +11,10 @@ import { useCustomerProfileQuery } from "@/hooks/use-customer-profile";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { copy } from "@/lib/copy/catalog";
+import { withTenantPath } from "@/lib/tenant-routing";
 
 export default function ProfileAccountPage() {
+  const pathname = usePathname();
   const profileQuery = useCustomerProfileQuery();
 
   if (profileQuery.isLoading) {
@@ -52,7 +55,7 @@ export default function ProfileAccountPage() {
           <div className="flex items-center gap-2">
             <EmailChangeFlowDialog currentEmail={profile.email} />
             <Button asChild size="sm" variant="quiet">
-              <Link href="/perfil/conta/email">{copy("profileAccountOpenEmailPage")}</Link>
+              <Link href={withTenantPath(pathname, "/perfil/conta/email")}>{copy("profileAccountOpenEmailPage")}</Link>
             </Button>
           </div>
         </Card>

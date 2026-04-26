@@ -11,14 +11,17 @@ type DateChip = {
 export const QuickFilterChips = ({
   citySlug,
   dateChips,
+  tenantSlug,
 }: {
   citySlug: string;
   dateChips?: DateChip[];
+  tenantSlug?: string;
 }) => {
+  const prefix = tenantSlug ? `/${tenantSlug}` : "";
   const sections = [
-    { label: "Em cartaz", href: `/cidade/${citySlug}#em-cartaz`, icon: "film" as const },
-    { label: "Pré-estreias", href: `/cidade/${citySlug}#pre-estreias`, icon: "calendar" as const },
-    { label: "Cinemas", href: `/cidade/${citySlug}#cinemas`, icon: "building" as const },
+    { label: "Em cartaz", href: `${prefix}/cidade/${citySlug}#em-cartaz`, icon: "film" as const },
+    { label: "Pré-estreias", href: `${prefix}/cidade/${citySlug}#pre-estreias`, icon: "calendar" as const },
+    { label: "Cinemas", href: `${prefix}/cidade/${citySlug}#cinemas`, icon: "building" as const },
   ];
 
   return (
@@ -27,7 +30,7 @@ export const QuickFilterChips = ({
         <ul className="flex flex-wrap gap-2" aria-label="Datas disponíveis para sessões">
           {dateChips.map((chip) => (
             <li key={chip.iso}>
-              <Link href={`/cidade/${citySlug}?date=${chip.iso}#sessoes-hoje`}>
+              <Link href={`${prefix}/cidade/${citySlug}?date=${chip.iso}#sessoes-hoje`}>
                 <Badge
                   className="inline-flex items-center gap-2 px-3 py-2 text-sm normal-case tracking-normal"
                   variant={chip.isActive ? "accent" : "neutral"}

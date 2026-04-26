@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { use } from "react";
+import { usePathname } from "next/navigation";
 import { OrderDetailsPanel } from "@/components/profile/order-details-panel";
 import { ProfileAuthState } from "@/components/profile/profile-auth-state";
 import { ProfileShell } from "@/components/profile/profile-shell";
@@ -13,6 +14,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { copy } from "@/lib/copy/catalog";
+import { withTenantPath } from "@/lib/tenant-routing";
 
 export default function ProfileOrderDetailsPage({
   params,
@@ -20,6 +22,7 @@ export default function ProfileOrderDetailsPage({
   params: Promise<{ orderId: string }>;
 }) {
   const { orderId } = use(params);
+  const pathname = usePathname();
   const profileQuery = useCustomerProfileQuery();
   const orderQuery = useCustomerOrderQuery(orderId);
   const refundQuery = useCustomerRefundRequestsQuery();
@@ -46,7 +49,7 @@ export default function ProfileOrderDetailsPage({
         <Card className="space-y-3">
           <p className="text-sm text-foreground-muted">{copy("profileOrderDetailsNotFound")}</p>
           <Button asChild size="sm" variant="secondary">
-            <Link href="/perfil/pedidos">{copy("profileOrderDetailsBackToOrders")}</Link>
+            <Link href={withTenantPath(pathname, "/perfil/pedidos")}>{copy("profileOrderDetailsBackToOrders")}</Link>
           </Button>
         </Card>
       </ProfileShell>
@@ -57,7 +60,7 @@ export default function ProfileOrderDetailsPage({
     <ProfileShell title={copy("profileOrderDetailsTitle")} description={copy("profileOrderDetailsDescription")}>
       <div className="space-y-4">
         <Button asChild size="sm" variant="quiet">
-          <Link href="/perfil/pedidos">{copy("profileOrderDetailsBackToOrders")}</Link>
+          <Link href={withTenantPath(pathname, "/perfil/pedidos")}>{copy("profileOrderDetailsBackToOrders")}</Link>
         </Button>
         <OrderDetailsPanel order={orderQuery.data} refundRequests={refundQuery.data ?? []} />
       </div>

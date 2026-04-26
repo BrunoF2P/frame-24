@@ -1,4 +1,8 @@
 import axios from 'axios';
+import {
+  getTenantSlugFromHost,
+  getTenantSlugFromPathname,
+} from '@/lib/tenant-routing';
 
 const apiInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
@@ -6,6 +10,26 @@ const apiInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+apiInstance.interceptors.request.use((config) => {
+  if (typeof window === 'undefined') {
+    return config;
+  }
+
+  const tenantSlug =
+    getTenantSlugFromHost(window.location.host) ??
+    getTenantSlugFromPathname(window.location.pathname);
+  if (!tenantSlug) {
+    return config;
+  }
+
+  config.headers = config.headers ?? {};
+  if (!('x-tenant-slug' in config.headers)) {
+    config.headers['x-tenant-slug'] = tenantSlug;
+  }
+
+  return config;
 });
 
 type ApiResponse<T = unknown> = { data: T };
@@ -63,12 +87,122 @@ export const publicApi = {
         complex_id: complexId,
       },
     }),
+
+  publicControllerGetStorefrontV1: ({
+    tenantSlug,
+    citySlug,
+    date,
+    includeShowtimes,
+  }: TenantParams & {
+    citySlug?: string;
+    date?: string;
+    includeShowtimes?: boolean;
+  }): Promise<ApiResponse<ApiObject>> =>
+    apiInstance.get(`/v1/public/companies/${tenantSlug}/storefront`, {
+      params: {
+        city_slug: citySlug,
+        date,
+        include_showtimes: includeShowtimes ? 'true' : undefined,
+      },
+    }),
+
+  publicControllerGetCitiesV1: ({
+    tenantSlug,
+  }: TenantParams): Promise<ApiResponse<ApiList>> =>
+    apiInstance.get(`/v1/public/companies/${tenantSlug}/cities`),
+
+  publicControllerGetCinemasByCityV1: ({
+    tenantSlug,
+    citySlug,
+  }: TenantParams & {
+    citySlug: string;
+  }): Promise<ApiResponse<ApiList>> =>
+    apiInstance.get(`/v1/public/companies/${tenantSlug}/cities/${citySlug}/cinemas`),
+
+  publicControllerGetMoviesByCityV1: ({
+    tenantSlug,
+    citySlug,
+    status,
+    date,
+  }: TenantParams & {
+    citySlug: string;
+    status?: string;
+    date?: string;
+  }): Promise<ApiResponse<ApiList>> =>
+    apiInstance.get(`/v1/public/companies/${tenantSlug}/cities/${citySlug}/movies`, {
+      params: { status, date },
+    }),
+
+  publicControllerGetMovieBySlugForCityV1: ({
+    tenantSlug,
+    citySlug,
+    movieSlug,
+  }: TenantParams & {
+    citySlug: string;
+    movieSlug: string;
+  }): Promise<ApiResponse<ApiObject>> =>
+    apiInstance.get(`/v1/public/companies/${tenantSlug}/cities/${citySlug}/movies/${movieSlug}`),
+
+  publicControllerGetShowtimesForMovieSlugV1: ({
+    tenantSlug,
+    citySlug,
+    movieSlug,
+    date,
+    format,
+    language,
+    cinemaId,
+  }: TenantParams & {
+    citySlug: string;
+    movieSlug: string;
+    date?: string;
+    format?: string;
+    language?: string;
+    cinemaId?: string;
+  }): Promise<ApiResponse<ApiList>> =>
+    apiInstance.get(
+      `/v1/public/companies/${tenantSlug}/cities/${citySlug}/movies/${movieSlug}/showtimes`,
+      {
+        params: {
+          date,
+          format,
+          language,
+          cinema_id: cinemaId,
+        },
+      },
+    ),
+
+  publicControllerSearchTenantStorefrontV1: ({
+    tenantSlug,
+    query,
+    citySlug,
+  }: TenantParams & {
+    query: string;
+    citySlug?: string;
+    }): Promise<ApiResponse<ApiList>> =>
+    apiInstance.get(`/v1/public/companies/${tenantSlug}/search`, {
+      params: { q: query, city_slug: citySlug },
+    }),
+
+  publicControllerGetTicketTypesV1: ({
+    tenantSlug,
+  }: TenantParams): Promise<ApiResponse<ApiList>> =>
+    apiInstance.get(`/v1/public/companies/${tenantSlug}/ticket-types`),
+
+  publicControllerGetPaymentMethodsV1: ({
+    tenantSlug,
+  }: TenantParams): Promise<ApiResponse<ApiList>> =>
+    apiInstance.get(`/v1/public/companies/${tenantSlug}/payment-methods`),
+
+  publicControllerGetSaleDetailsV1: ({
+    tenantSlug,
+    reference,
+  }: TenantParams & {
+    reference: string;
+  }): Promise<ApiResponse<ApiObject>> =>
+    apiInstance.get(`/v1/public/companies/${tenantSlug}/sales/${reference}`),
 };
 
 export const customerApi = {
-  customerPurchasesControllerFindAllV1: (): Promise<ApiResponse<ApiList>> =>
-    apiInstance.get('/v1/customer/purchases'),
-
   customerProfileGetV1: (): Promise<ApiResponse<ApiObject>> =>
     apiInstance.get('/v1/customer/profile'),
 
@@ -151,6 +285,56 @@ export const customerApi = {
     confirm_phrase: string;
   }): Promise<ApiResponse<ApiObject>> =>
     apiInstance.post('/v1/customer/privacy/delete-request', payload),
+
+  customerCheckoutCreateV1: (
+    tenantSlug: string,
+    payload: ApiObject,
+  ): Promise<ApiResponse<ApiObject>> =>
+    apiInstance.post('/v1/customer/checkout-sessions', payload, {
+      headers: { 'x-tenant-slug': tenantSlug },
+    }),
+
+  customerCheckoutFindOneV1: (
+    tenantSlug: string,
+    checkoutId: string,
+  ): Promise<ApiResponse<ApiObject>> =>
+    apiInstance.get(`/v1/customer/checkout-sessions/${checkoutId}`, {
+      headers: { 'x-tenant-slug': tenantSlug },
+    }),
+
+  customerCheckoutUpdateV1: (
+    tenantSlug: string,
+    checkoutId: string,
+    payload: ApiObject,
+  ): Promise<ApiResponse<ApiObject>> =>
+    apiInstance.patch(`/v1/customer/checkout-sessions/${checkoutId}`, payload, {
+      headers: { 'x-tenant-slug': tenantSlug },
+    }),
+
+  customerCheckoutCreatePaymentAttemptV1: (
+    tenantSlug: string,
+    checkoutId: string,
+    payload: ApiObject,
+    idempotencyKey?: string,
+  ): Promise<ApiResponse<ApiObject>> =>
+    apiInstance.post(
+      `/v1/customer/checkout-sessions/${checkoutId}/payment-attempts`,
+      payload,
+      {
+        headers: {
+          'x-tenant-slug': tenantSlug,
+          ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
+        },
+      },
+    ),
+
+  customerCheckoutPaymentStatusV1: (
+    tenantSlug: string,
+    checkoutId: string,
+  ): Promise<ApiResponse<ApiObject>> =>
+    apiInstance.get(`/v1/customer/checkout-sessions/${checkoutId}/payment-status`, {
+      headers: { 'x-tenant-slug': tenantSlug },
+    }),
 };
 
 export const customerAuthApi = {

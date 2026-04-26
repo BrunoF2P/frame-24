@@ -32,20 +32,23 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
-  "join-showtime": (data: { showtime_id: string; user_id?: string }) => void;
+  "join-showtime": (data: { showtime_id: string; user_id?: string; tenant_slug?: string }) => void;
   "reserve-seats": (data: {
     showtime_id: string;
     seat_ids: string[];
     company_id: string;
     user_id?: string;
+    tenant_slug?: string;
   }) => void;
   "release-seats": (data: {
     reservation_uuid: string;
     company_id: string;
+    tenant_slug?: string;
   }) => void;
   "confirm-reservation": (data: {
     reservation_uuid: string;
     sale_id: string;
+    tenant_slug?: string;
   }) => void;
 }
 

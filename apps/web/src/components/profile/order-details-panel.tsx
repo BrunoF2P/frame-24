@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { CustomerOrder, RefundRequest } from "@/types/customer-profile";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDateTimeInTimeZone } from "@/lib/utils";
+import { withTenantPath } from "@/lib/tenant-routing";
 import { RefundStatusBadge } from "@/components/profile/refund-status-badge";
 import { RefundRequestModal } from "@/components/profile/refund-request-modal";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +19,7 @@ export const OrderDetailsPanel = ({
   order: CustomerOrder;
   refundRequests: RefundRequest[];
 }) => {
+  const pathname = usePathname();
   const relatedRefunds = refundRequests.filter((request) => request.order_id === order.id);
 
   return (
@@ -28,8 +33,11 @@ export const OrderDetailsPanel = ({
             <p className="text-sm text-foreground-muted">
               {order.showtime?.cinema || "Cinema"} ·{" "}
               {order.showtime?.start_time
-                ? new Date(order.showtime.start_time).toLocaleString("pt-BR")
-                : new Date(order.sale_date).toLocaleString("pt-BR")}
+                ? formatDateTimeInTimeZone(
+                    order.showtime.start_time,
+                    order.showtime.timezone || undefined,
+                  )
+                : formatDateTimeInTimeZone(order.sale_date)}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -50,7 +58,7 @@ export const OrderDetailsPanel = ({
                   </p>
                   {item.item_type === "ticket" ? (
                     <Button asChild size="sm" variant="quiet">
-                      <Link href={`/perfil/ingressos/${item.reference_id}`}>{copy("profileOrderDetailsOpenTicket")}</Link>
+                      <Link href={withTenantPath(pathname, `/perfil/ingressos/${item.reference_id}`)}>{copy("profileOrderDetailsOpenTicket")}</Link>
                     </Button>
                   ) : null}
                   {!item.refund_eligibility.eligible && item.refund_eligibility.reason ? (
@@ -82,7 +90,7 @@ export const OrderDetailsPanel = ({
                 <div>
                   <p className="text-sm font-medium">#{request.request_id.slice(0, 8)}</p>
                   <p className="text-xs text-foreground-muted">
-                    {new Date(request.created_at).toLocaleString("pt-BR")}
+                    {formatDateTimeInTimeZone(request.created_at)}
                   </p>
                 </div>
                 <RefundStatusBadge status={request.status} />

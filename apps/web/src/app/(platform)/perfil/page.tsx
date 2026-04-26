@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ProfileAuthState } from "@/components/profile/profile-auth-state";
 import { ProfileShell } from "@/components/profile/profile-shell";
 import {
@@ -9,12 +10,14 @@ import {
   useCustomerSecuritySessionsQuery,
 } from "@/hooks/use-customer-profile";
 import { formatCurrency } from "@/lib/utils";
+import { withTenantPath } from "@/lib/tenant-routing";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { copy, formatProfileActiveSessionsLabel, formatProfileOverviewTitle } from "@/lib/copy/catalog";
 
 export default function ProfileOverviewPage() {
+  const pathname = usePathname();
   const profileQuery = useCustomerProfileQuery();
   const ordersQuery = useCustomerOrdersQuery();
   const sessionsQuery = useCustomerSecuritySessionsQuery();
@@ -84,13 +87,13 @@ export default function ProfileOverviewPage() {
           <h2 className="text-xl font-semibold">{copy("profileOverviewQuickActions")}</h2>
           <div className="flex flex-wrap gap-2">
             <Button asChild size="sm">
-              <Link href="/perfil/pedidos">{copy("profileOverviewActionOrders")}</Link>
+              <Link href={withTenantPath(pathname, "/perfil/pedidos")}>{copy("profileOverviewActionOrders")}</Link>
             </Button>
             <Button asChild size="sm" variant="secondary">
-              <Link href="/perfil/conta">{copy("profileOverviewActionEditAccount")}</Link>
+              <Link href={withTenantPath(pathname, "/perfil/conta")}>{copy("profileOverviewActionEditAccount")}</Link>
             </Button>
             <Button asChild size="sm" variant="secondary">
-              <Link href="/perfil/seguranca">{formatProfileActiveSessionsLabel(activeSessions.length)}</Link>
+              <Link href={withTenantPath(pathname, "/perfil/seguranca")}>{formatProfileActiveSessionsLabel(activeSessions.length)}</Link>
             </Button>
           </div>
         </Card>

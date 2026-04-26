@@ -13,9 +13,11 @@ const PAGE_SIZE = 4;
 export const MovieBrowser = ({
   citySlug,
   movies,
+  tenantSlug,
 }: {
   citySlug: string;
   movies: MovieSummary[];
+  tenantSlug?: string;
 }) => {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"todos" | MovieSummary["status"]>("todos");
@@ -114,7 +116,7 @@ export const MovieBrowser = ({
       <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5" aria-label="Resultados do catálogo de filmes">
         {visibleMovies.map((movie) => (
           <li key={movie.id} className="h-full">
-            <MovieCard citySlug={citySlug} movie={movie} />
+            <MovieCard citySlug={citySlug} movie={movie} tenantSlug={tenantSlug} />
           </li>
         ))}
       </ul>

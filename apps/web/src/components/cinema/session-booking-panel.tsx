@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -10,7 +12,6 @@ import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { HoldCountdown } from "@/components/cinema/hold-countdown";
 import { formatCurrency } from "@/lib/utils";
-import { validateSeatAndTicketSelection } from "@/lib/storefront/rule-engine";
 import { copy } from "@/lib/copy/catalog";
 
 export const SessionBookingPanel = ({
@@ -21,6 +22,7 @@ export const SessionBookingPanel = ({
   moviePosterUrl,
   cinemaName,
   cityState,
+  tenantSlug,
 }: {
   session: SessionGroup;
   citySlug: string;
@@ -29,6 +31,7 @@ export const SessionBookingPanel = ({
   moviePosterUrl: string;
   cinemaName: string;
   cityState: string;
+  tenantSlug?: string;
 }) => {
   const router = useRouter();
   const {
@@ -49,21 +52,36 @@ export const SessionBookingPanel = ({
     () => Object.values(ticketQuantities).reduce((sum, quantity) => sum + (quantity ?? 0), 0),
     [ticketQuantities],
   );
-  const validation = useMemo(
+  const selectedSeatLabels = useMemo(
     () =>
-      validateSeatAndTicketSelection(
-        citySlug,
-        session.cinemaId,
-        session.id,
-        {
-          tickets: ticketQuantities,
-          promoCode: courtesyCode,
-          fiscalCpf,
-        },
-        selectedSeatIds,
-      ),
-    [citySlug, courtesyCode, fiscalCpf, selectedSeatIds, session.cinemaId, session.id, ticketQuantities],
+      selectedSeatIds.map((seatId) => {
+        const seat = session.seats.find((item) => item.id === seatId);
+        return seat?.label || seatId;
+      }),
+    [selectedSeatIds, session.seats],
   );
+  const validation = useMemo(
+    () => {
+      const errors: string[] = [];
+      const totalTickets = Object.values(ticketQuantities).reduce(
+        (sum, quantity) => sum + (quantity ?? 0),
+        0,
+      );
+      if (totalTickets === 0) errors.push("Escolha ao menos um ingresso.");
+      if (selectedSeatIds.length !== totalTickets) {
+        errors.push("A quantidade de assentos deve bater com os ingressos.");
+      }
+      if (courtesyCode && courtesyCode.trim().length < 3) {
+        errors.push("Informe um código de cortesia válido.");
+      }
+      if (fiscalCpf && fiscalCpf.replace(/\D/g, "").length !== 11) {
+        errors.push("Informe um CPF válido.");
+      }
+      return { isValid: errors.length === 0, errors, warnings: [] as string[] };
+    },
+    [courtesyCode, fiscalCpf, selectedSeatIds.length, ticketQuantities],
+  );
+  const prefix = tenantSlug ? `/${tenantSlug}` : "";
 
   return (
     <Card className="space-y-5 self-start lg:sticky lg:top-24">
@@ -93,8 +111,24 @@ export const SessionBookingPanel = ({
       </div>
       <div className="rounded-[var(--radius-md)] border border-border p-4">
         <p className="text-sm text-foreground-muted">Assentos selecionados</p>
-        <p className="mt-2 text-lg font-semibold">
-          {selectedSeatIds.length ? selectedSeatIds.join(", ") : copy("movieDetailChooseOnMap")}
+        {selectedSeatLabels.length ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {selectedSeatLabels.map((seatLabel) => (
+              <span
+                key={seatLabel}
+                className="inline-flex min-w-12 items-center justify-center rounded-full border border-accent-red-500/20 bg-accent-red-500/8 px-3 py-1 text-sm font-semibold text-foreground"
+              >
+                {seatLabel}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-base font-medium text-foreground">{copy("movieDetailChooseOnMap")}</p>
+        )}
+        <p className="mt-3 text-xs text-foreground-muted">
+          {selectedSeatLabels.length
+            ? `${selectedSeatLabels.length} assento${selectedSeatLabels.length === 1 ? "" : "s"} reservado${selectedSeatLabels.length === 1 ? "" : "s"} para esta compra.`
+            : "Os assentos escolhidos no mapa aparecem aqui."}
         </p>
       </div>
       <div className="flex items-center justify-between text-sm">
@@ -126,7 +160,7 @@ export const SessionBookingPanel = ({
         disabled={!validation.isValid}
         onClick={() => {
           startHold(8);
-          router.push(`/checkout/${session.id}`);
+          router.push(`${prefix}/compra/${session.id}`);
         }}
         size="lg"
         type="button"
@@ -134,7 +168,7 @@ export const SessionBookingPanel = ({
         Continuar
       </Button>
       <Button asChild className="w-full" size="sm" variant="secondary">
-        <Link href={`/cidade/${citySlug}/filme/${movieSlug}`}>{copy("movieDetailSwitchSession")}</Link>
+        <Link href={`${prefix}/cidade/${citySlug}/filme/${movieSlug}`}>{copy("movieDetailSwitchSession")}</Link>
       </Button>
     </Card>
   );

@@ -64,7 +64,7 @@ export const SeatMap = ({
   }, [seats]);
 
   const maxSeatsInRow = useMemo(() => {
-    return Math.max(...rows.map(([_, rowSeats]) => rowSeats.length), 1);
+    return Math.max(...rows.map((row) => row[1].length), 1);
   }, [rows]);
 
   const availableKinds = useMemo(

@@ -14,6 +14,7 @@ import {
   getMoviesForCity,
   getSessionsForCity,
 } from "@/lib/storefront/service";
+import { resolvePublicTenantSlug } from "@/lib/resolve-public-tenant";
 
 const getTodayInBahiaIso = () =>
   new Intl.DateTimeFormat("en-CA", {
@@ -32,7 +33,8 @@ const addDaysToIso = (isoDate: string, days: number) => {
 
 export async function generateMetadata({ params }: { params: Promise<{ citySlug: string }> }) {
   const { citySlug } = await params;
-  const city = await getCityBySlug(citySlug);
+  const tenantSlug = await resolvePublicTenantSlug();
+  const city = tenantSlug ? await getCityBySlug(citySlug, tenantSlug) : null;
 
   if (!city) {
     return {};
@@ -53,13 +55,17 @@ export default async function CityPage({
 }) {
   const { citySlug } = await params;
   const { date } = await searchParams;
+  const tenantSlug = await resolvePublicTenantSlug();
+  if (!tenantSlug) {
+    notFound();
+  }
   const [city, movies, comingSoon, sessions, featuredMovie, cinemas] = await Promise.all([
-    getCityBySlug(citySlug),
-    getMoviesForCity(citySlug, "em-cartaz"),
-    getMoviesForCity(citySlug, "em-breve"),
-    getSessionsForCity(citySlug),
-    getFeaturedMovieForCity(citySlug),
-    getCinemasForCity(citySlug),
+    getCityBySlug(citySlug, tenantSlug),
+    getMoviesForCity(citySlug, "em-cartaz", tenantSlug),
+    getMoviesForCity(citySlug, "em-breve", tenantSlug),
+    getSessionsForCity(citySlug, undefined, tenantSlug),
+    getFeaturedMovieForCity(citySlug, tenantSlug),
+    getCinemasForCity(citySlug, tenantSlug),
   ]);
 
   if (!city || !featuredMovie) {
@@ -127,13 +133,14 @@ export default async function CityPage({
             Ainda não há sessões cadastradas para esta data.
           </p>
         ) : (
-          <ul className="space-y-4" aria-label={`Sessões para ${selectedDateLong}`}>
+          <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label={`Sessões para ${selectedDateLong}`}>
             {visibleSessions.slice(0, 8).map((session) => {
               const cinema = cinemas.find((item) => item.id === session.cinemaId);
-              if (!cinema) return null;
+              const movie = movies.find((item) => item.id === session.movieId);
+              if (!cinema || !movie) return null;
               return (
                 <li key={session.id}>
-                  <ShowtimeCardV2 cinema={cinema} citySlug={citySlug} session={session} />
+                  <ShowtimeCardV2 cinema={cinema} citySlug={citySlug} movie={movie} session={session} />
                 </li>
               );
             })}

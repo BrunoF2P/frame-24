@@ -4,18 +4,18 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { SessionGroup } from "@/types/storefront";
-import { validateSeatAndTicketSelection } from "@/lib/storefront/rule-engine";
 import { useBookingStore } from "@/stores/use-booking-store";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { formatCurrency } from "@/lib/utils";
 
 export const SeatSelectionMobileStatus = ({
-  citySlug,
   session,
+  tenantSlug,
 }: {
   citySlug: string;
   session: SessionGroup;
+  tenantSlug?: string;
 }) => {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
@@ -33,19 +33,21 @@ export const SeatSelectionMobileStatus = ({
   );
 
   const validation = useMemo(
-    () =>
-      validateSeatAndTicketSelection(
-        citySlug,
-        session.cinemaId,
-        session.id,
-        {
-          tickets: ticketQuantities,
-          promoCode: courtesyCode,
-          fiscalCpf,
-        },
-        selectedSeatIds,
-      ),
-    [citySlug, courtesyCode, fiscalCpf, selectedSeatIds, session.cinemaId, session.id, ticketQuantities],
+    () => {
+      const errors: string[] = [];
+      if (totalTickets === 0) errors.push("Escolha ao menos um ingresso.");
+      if (selectedSeatIds.length !== totalTickets) {
+        errors.push("Selecione um assento para cada ingresso.");
+      }
+      if (courtesyCode && courtesyCode.trim().length < 3) {
+        errors.push("Código de cortesia inválido.");
+      }
+      if (fiscalCpf && fiscalCpf.replace(/\D/g, "").length !== 11) {
+        errors.push("CPF inválido.");
+      }
+      return { isValid: errors.length === 0, errors, warnings: [] as string[] };
+    },
+    [courtesyCode, fiscalCpf, selectedSeatIds.length, totalTickets],
   );
 
   const subtotal = totalTickets * session.priceFrom;
@@ -101,7 +103,7 @@ export const SeatSelectionMobileStatus = ({
             type="button"
             onClick={() => {
               startHold(8);
-              router.push(`/checkout/${session.id}`);
+              router.push(`${tenantSlug ? `/${tenantSlug}` : ""}/compra/${session.id}`);
             }}
           >
             Continuar

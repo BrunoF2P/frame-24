@@ -1,6 +1,7 @@
 "use client";
 
 import type { ActiveSessionDevice } from "@/types/customer-profile";
+import { formatDateInTimeZone, formatDateTimeInTimeZone } from "@/lib/utils";
 import {
   useRevokeOtherSessionsMutation,
   useRevokeSessionMutation,
@@ -48,12 +49,12 @@ export const SessionDeviceList = ({
                 <p className="text-xs text-foreground-muted">
                   {session.ip_address || copy("profileSecuritySessionNoIp")} ·{" "}
                   {session.last_activity
-                    ? new Date(session.last_activity).toLocaleString("pt-BR")
+                    ? formatDateTimeInTimeZone(session.last_activity)
                     : copy("profileSecuritySessionNoActivity")}
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   {session.is_current ? <Badge variant="success">{copy("profileSecuritySessionCurrent")}</Badge> : null}
-                  <Badge variant="neutral">{copy("profileSecuritySessionExpiresPrefix")} {new Date(session.expires_at).toLocaleDateString("pt-BR")}</Badge>
+                  <Badge variant="neutral">{copy("profileSecuritySessionExpiresPrefix")} {formatDateInTimeZone(session.expires_at)}</Badge>
                 </div>
               </div>
               <Button

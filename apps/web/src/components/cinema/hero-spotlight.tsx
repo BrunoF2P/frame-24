@@ -8,7 +8,15 @@ import { FormatBadge } from "@/components/cinema/format-badge";
 import { TrailerDialogButton } from "@/components/cinema/trailer-dialog-button";
 import { copy } from "@/lib/copy/catalog";
 
-export const HeroSpotlight = ({ city, movie }: { city: City; movie: MovieSummary }) => (
+export const HeroSpotlight = ({
+  city,
+  movie,
+  tenantSlug,
+}: {
+  city: City;
+  movie: MovieSummary;
+  tenantSlug?: string;
+}) => (
   <section className="page-shell pt-6 sm:pt-8">
     <figure className="relative overflow-hidden rounded-[var(--radius-lg)] border border-border/70 bg-black text-white shadow-[0_24px_72px_rgba(0,0,0,0.28)]">
       <div className="absolute inset-0">
@@ -52,7 +60,7 @@ export const HeroSpotlight = ({ city, movie }: { city: City; movie: MovieSummary
           </div>
           <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto sm:flex-wrap">
             <Button asChild className="w-full sm:w-auto" size="lg">
-              <Link href={`/cidade/${city.slug}/filme/${movie.slug}`}>
+              <Link href={`${tenantSlug ? `/${tenantSlug}` : ""}/cidade/${city.slug}/filme/${movie.slug}`}>
                 <Icon name="ticket" size="md" />
                 {copy("heroPrimaryCta")}
               </Link>

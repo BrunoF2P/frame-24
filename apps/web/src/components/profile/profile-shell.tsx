@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { withTenantPath } from "@/lib/tenant-routing";
 import { Icon } from "@/components/ui/icon";
 import { copy } from "@/lib/copy/catalog";
 
@@ -38,13 +39,14 @@ export const ProfileShell = ({
         <aside className="rounded-[var(--radius-lg)] border border-border bg-surface p-2.5">
           <nav aria-label="Navegação de perfil" className="space-y-1">
             {profileNavItems.map((item) => {
+              const href = withTenantPath(pathname, item.href);
               const isActive =
-                pathname === item.href || (item.href !== "/perfil" && pathname?.startsWith(item.href));
+                pathname === href || (href !== withTenantPath(pathname, "/perfil") && pathname?.startsWith(href));
 
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={href}
                   className={cn(
                     "flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-2.5 text-sm font-medium text-foreground-muted",
                     isActive && "bg-background text-foreground",

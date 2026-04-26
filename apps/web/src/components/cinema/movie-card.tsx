@@ -28,13 +28,17 @@ const getReleaseLabel = (movie: MovieSummary) => {
 export const MovieCard = ({
   movie,
   citySlug,
+  tenantSlug,
 }: {
   movie: MovieSummary;
   citySlug: string;
+  tenantSlug?: string;
 }) => {
   const releaseLabel = getReleaseLabel(movie);
   const isComingSoon = movie.status === "em-breve";
   const genres = movie.genres.slice(0, 2);
+
+  const prefix = tenantSlug ? `/${tenantSlug}` : "";
 
   return (
     <Card className={`group relative h-full overflow-hidden p-0 ${isComingSoon ? "border-accent-red-400/45 shadow-[0_14px_34px_rgba(122,20,24,0.28)]" : ""}`}>
@@ -50,7 +54,7 @@ export const MovieCard = ({
         </>
       ) : null}
       <article className="h-full">
-        <Link className="flex h-full flex-col" href={`/cidade/${citySlug}/filme/${movie.slug}`}>
+        <Link className="flex h-full flex-col" href={`${prefix}/cidade/${citySlug}/filme/${movie.slug}`}>
           <figure className="relative aspect-[4/5] overflow-hidden bg-background-strong">
             <Image
               src={movie.posterUrl}

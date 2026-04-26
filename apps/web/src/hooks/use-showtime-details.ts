@@ -24,6 +24,7 @@ export interface ShowtimeDetails {
   cinema?: {
     id: string;
     name: string;
+    timezone?: string | null;
   };
   room?: {
     name: string;

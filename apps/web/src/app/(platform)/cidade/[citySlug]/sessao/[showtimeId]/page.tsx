@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { OccupancyIndicator } from "@/components/cinema/occupancy-indicator";
 import { SeatMap } from "@/components/cinema/seat-map";
@@ -9,11 +8,12 @@ import { Icon } from "@/components/ui/icon";
 import {
   getCityBySlug,
   getMovieById,
-  getSessionById,
+  getSessionByReference,
   getCinemasForCity,
   getTicketTypesForSession,
 } from "@/lib/storefront/service";
 import { SessionBookingPanel } from "@/components/cinema/session-booking-panel";
+import { resolvePublicTenantSlug } from "@/lib/resolve-public-tenant";
 
 export default async function ShowtimePage({
   params,
@@ -21,23 +21,29 @@ export default async function ShowtimePage({
   params: Promise<{ citySlug: string; showtimeId: string }>;
 }) {
   const { citySlug, showtimeId } = await params;
-  const session = await getSessionById(showtimeId);
+  const tenantSlug = await resolvePublicTenantSlug();
+  const session = tenantSlug ? await getSessionByReference(showtimeId, citySlug, tenantSlug) : null;
 
   if (!session || session.citySlug !== citySlug) {
     notFound();
   }
 
   const [movie, cityCinemas, city] = await Promise.all([
-    getMovieById(session.movieId),
-    getCinemasForCity(citySlug),
-    getCityBySlug(citySlug),
+    getMovieById(session.movieId, tenantSlug ?? undefined),
+    getCinemasForCity(citySlug, tenantSlug ?? undefined),
+    getCityBySlug(citySlug, tenantSlug ?? undefined),
   ]);
   const cinema = cityCinemas.find((item) => item.id === session.cinemaId) ?? null;
 
   if (!movie || !cinema || !city) {
     notFound();
   }
-  const ticketTypes = await getTicketTypesForSession(citySlug, session.cinemaId, session.id);
+  const ticketTypes = await getTicketTypesForSession(
+    citySlug,
+    session.cinemaId,
+    session.id,
+    tenantSlug ?? undefined,
+  );
 
   return (
     <main className="page-shell min-w-0 space-y-6 overflow-x-clip pb-36 pt-8 landscape:pb-24 lg:pb-10">
@@ -72,6 +78,7 @@ export default async function ShowtimePage({
           movieTitle={movie.title}
           moviePosterUrl={movie.posterUrl}
           session={session}
+          tenantSlug={tenantSlug ?? undefined}
         />
       </div>
     </main>

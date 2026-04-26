@@ -1,117 +1,281 @@
+import { getTenantSlugFromPathname } from "@/lib/tenant-routing";
+import { buildShowtimeSlug, isShowtimeUuid } from "@/lib/showtime-routing";
 import {
-  cinemas,
-  cities,
-  concessions,
-  loyaltyState,
-  movies,
-  purchaseHistory,
-  sessions,
-} from "@/lib/storefront/data";
-import {
-  getRoomLayoutForSession as getRoomLayoutForSessionModel,
-  getTicketTypesForSession as getTicketTypesForSessionModel,
-  validateSeatAndTicketSelection as validateSeatAndTicketSelectionModel,
-} from "@/lib/storefront/rule-engine";
-import { slugify, unique } from "@/lib/utils";
+  getTenantCinemas,
+  getTenantCity,
+  getTenantCities,
+  getTenantMovie,
+  getTenantMovies,
+  getTenantPaymentMethods,
+  getTenantProducts,
+  getTenantSaleByReference,
+  getTenantSearch,
+  getTenantShowtimeSeats,
+  getTenantShowtimes,
+  getTenantTicketTypes,
+  toMovie,
+} from "@/lib/storefront/api";
+import { publicApi } from "@/lib/api-client";
+import { unique } from "@/lib/utils";
 import type {
   CheckoutSummary,
   Cinema,
   City,
   ConcessionProduct,
+  LoyaltyState,
   MovieSessionStats,
   MovieSummary,
   RuleValidationResult,
   SearchItem,
+  SeatKind,
   SessionGroup,
   TicketSelectionState,
+  TicketType,
 } from "@/types/storefront";
 
-const pick = <T,>(value: T | undefined, fallback: T) => value ?? fallback;
-const withRoomLayout = (session: SessionGroup): SessionGroup => ({
-  ...session,
-  roomLayout: session.roomLayout ?? getRoomLayoutForSessionModel(session.id),
-});
+const fallbackLoyaltyState: LoyaltyState = {
+  tier: "Club",
+  points: 0,
+  perks: [],
+};
 
-export const getCities = async (): Promise<City[]> => cities;
+const resolveTenant = (tenantSlug?: string) => {
+  if (tenantSlug) {
+    return tenantSlug;
+  }
 
-export const getDefaultCity = async () => cities[0];
+  if (typeof window !== "undefined") {
+    return getTenantSlugFromPathname(window.location.pathname);
+  }
 
-export const getCityBySlug = async (slug: string) =>
-  cities.find((city) => city.slug === slug) ?? null;
+  return null;
+};
 
-export const getMoviesForCity = async (citySlug: string, status?: MovieSummary["status"]) =>
-  movies.filter(
-    (movie) =>
-      movie.citySlugs.includes(citySlug) && (status ? movie.status === status : true),
-  );
+const requireTenant = (tenantSlug?: string) => {
+  const resolved = resolveTenant(tenantSlug);
+  if (!resolved) {
+    throw new Error("Tenant não resolvido para a vitrine pública.");
+  }
+  return resolved;
+};
 
-export const getFeaturedMovieForCity = async (citySlug: string) =>
-  (await getMoviesForCity(citySlug, "em-cartaz")).sort(
+const toTicketTypeMap = (
+  items: Array<TicketType & { id?: string; priceModifier?: number }>,
+) =>
+  items.map((item) => ({
+    ...item,
+    seatConstraints: {
+      allowedSeatKinds:
+        item.code === "meia_pcd"
+          ? (["wheelchair"] satisfies SeatKind[])
+          : item.code === "acompanhante_pcd"
+            ? (["companion"] satisfies SeatKind[])
+            : undefined,
+      blockedSeatKinds:
+        item.code === "inteira"
+          ? (["wheelchair", "companion"] satisfies SeatKind[])
+          : undefined,
+    },
+  }));
+
+export const getCities = async (tenantSlug?: string): Promise<City[]> =>
+  getTenantCities(requireTenant(tenantSlug));
+
+export const getDefaultCity = async (tenantSlug?: string) =>
+  (await getCities(tenantSlug))[0] ?? null;
+
+export const getCityBySlug = async (slug: string, tenantSlug?: string) =>
+  getTenantCity(requireTenant(tenantSlug), slug);
+
+export const getMoviesForCity = async (
+  citySlug: string,
+  status?: MovieSummary["status"],
+  tenantSlug?: string,
+) => getTenantMovies(requireTenant(tenantSlug), citySlug, status);
+
+export const getFeaturedMovieForCity = async (citySlug: string, tenantSlug?: string) =>
+  (await getMoviesForCity(citySlug, "em-cartaz", tenantSlug)).sort(
     (left, right) => right.recommendationScore - left.recommendationScore,
   )[0] ?? null;
 
-export const getMovieBySlug = async (citySlug: string, movieSlug: string) =>
-  movies.find((movie) => movie.slug === movieSlug && movie.citySlugs.includes(citySlug)) ?? null;
+export const getMovieBySlug = async (
+  citySlug: string,
+  movieSlug: string,
+  tenantSlug?: string,
+) => getTenantMovie(requireTenant(tenantSlug), citySlug, movieSlug);
 
-export const getMovieById = async (movieId: string) =>
-  movies.find((movie) => movie.id === movieId) ?? null;
+export const getMovieById = async (movieId: string, tenantSlug?: string) => {
+  const resolvedTenant = requireTenant(tenantSlug);
+  const response = await publicApi.publicControllerGetMoviesV1({
+    tenantSlug: resolvedTenant,
+  });
+  const movie = (Array.isArray(response.data) ? response.data : []).find((item) => {
+    return item && typeof item === "object" && "id" in item && item.id === movieId;
+  });
 
-export const getCinemasForCity = async (citySlug: string) =>
-  cinemas.filter((cinema) => cinema.citySlug === citySlug);
-
-export const getCinemaBySlug = async (cinemaSlug: string) =>
-  cinemas.find((cinema) => cinema.slug === cinemaSlug) ?? null;
-
-export const getSessionById = async (sessionId: string) =>
-  {
-    const session = sessions.find((item) => item.id === sessionId);
-    return session ? withRoomLayout(session) : null;
-  };
-
-export const getSessionsForCity = async (citySlug: string, filters?: { movieId?: string; cinemaId?: string }) =>
-  sessions
-    .filter(
-      (session) =>
-        session.citySlug === citySlug &&
-        pick(session.movieId === filters?.movieId, true) &&
-        pick(session.cinemaId === filters?.cinemaId, true),
-    )
-    .map(withRoomLayout);
-
-export const getSessionsForMovie = async (citySlug: string, movieId: string) =>
-  getSessionsForCity(citySlug, { movieId });
-
-export const getCinemasForMovie = async (citySlug: string, movieId: string): Promise<Cinema[]> => {
-  const sessionCinemaIds = unique((await getSessionsForMovie(citySlug, movieId)).map((session) => session.cinemaId));
-  return cinemas.filter((cinema) => sessionCinemaIds.includes(cinema.id));
+  return movie ? toMovie(movie) : null;
 };
 
-export const getConcessions = async (): Promise<ConcessionProduct[]> => concessions;
+export const getCinemasForCity = async (citySlug: string, tenantSlug?: string) =>
+  getTenantCinemas(requireTenant(tenantSlug), citySlug);
+
+export const getCinemaBySlug = async (cinemaSlug: string, tenantSlug?: string) => {
+  const resolvedTenant = requireTenant(tenantSlug);
+  const cities = await getTenantCities(resolvedTenant);
+  for (const city of cities) {
+    const cinemas = await getTenantCinemas(resolvedTenant, city.slug);
+    const matched = cinemas.find((cinema) => cinema.slug === cinemaSlug);
+    if (matched) {
+      return matched;
+    }
+  }
+
+  return null;
+};
+
+export const getSessionById = async (sessionId: string, tenantSlug?: string) => {
+  const resolvedTenant = requireTenant(tenantSlug);
+  const seatMap = await getTenantShowtimeSeats(sessionId).catch(() => null);
+  if (!seatMap) {
+    return null;
+  }
+
+  const sessions = await getTenantShowtimes(resolvedTenant);
+  const session = sessions.find((item) => item.id === sessionId);
+
+  if (!session) {
+    return null;
+  }
+
+  return {
+    ...session,
+    seats: seatMap.seats,
+  } satisfies SessionGroup;
+};
+
+export const getSessionByReference = async (
+  reference: string,
+  citySlug: string,
+  tenantSlug?: string,
+) => {
+  if (isShowtimeUuid(reference)) {
+    return getSessionById(reference, tenantSlug);
+  }
+
+  const [sessions, movies, cinemas] = await Promise.all([
+    getSessionsForCity(citySlug, undefined, tenantSlug),
+    getMoviesForCity(citySlug, undefined, tenantSlug),
+    getCinemasForCity(citySlug, tenantSlug),
+  ]);
+
+  const matched = sessions.find((session) => {
+    const movie = movies.find((item) => item.id === session.movieId);
+    const cinema = cinemas.find((item) => item.id === session.cinemaId);
+    if (!movie || !cinema) {
+      return false;
+    }
+
+    return (
+      buildShowtimeSlug({
+        movieSlug: movie.slug,
+        cinemaSlug: cinema.slug,
+        date: session.date,
+        time: session.time,
+        room: session.room,
+      }) === reference
+    );
+  });
+
+  return matched ? getSessionById(matched.id, tenantSlug) : null;
+};
+
+export const getSessionsForCity = async (
+  citySlug: string,
+  filters?: { movieId?: string; cinemaId?: string },
+  tenantSlug?: string,
+) =>
+  (await getTenantShowtimes(requireTenant(tenantSlug), {
+    movieId: filters?.movieId,
+  })).filter(
+    (session) =>
+      session.citySlug === citySlug &&
+      (!filters?.movieId || session.movieId === filters.movieId) &&
+      (!filters?.cinemaId || session.cinemaId === filters.cinemaId),
+  );
+
+export const getSessionsForMovie = async (
+  citySlug: string,
+  movieId: string,
+  tenantSlug?: string,
+) => getSessionsForCity(citySlug, { movieId }, tenantSlug);
+
+export const getCinemasForMovie = async (
+  citySlug: string,
+  movieId: string,
+  tenantSlug?: string,
+): Promise<Cinema[]> => {
+  const cityCinemas = await getCinemasForCity(citySlug, tenantSlug);
+  const sessionCinemaIds = unique(
+    (await getSessionsForMovie(citySlug, movieId, tenantSlug)).map((session) => session.cinemaId),
+  );
+  return cityCinemas.filter((cinema) => sessionCinemaIds.includes(cinema.id));
+};
+
+export const getConcessions = async (
+  tenantSlug?: string,
+  complexId?: string,
+): Promise<ConcessionProduct[]> =>
+  getTenantProducts(requireTenant(tenantSlug), complexId);
 
 export const getTicketTypesForSession = async (
-  citySlug: string,
-  cinemaId: string,
-  sessionId: string,
-) => getTicketTypesForSessionModel(citySlug, cinemaId, sessionId);
+  _citySlug: string,
+  _cinemaId: string,
+  _sessionId: string,
+  tenantSlug?: string,
+) => toTicketTypeMap(await getTenantTicketTypes(requireTenant(tenantSlug)));
 
-export const getRoomLayoutForSession = async (sessionId: string) =>
-  getRoomLayoutForSessionModel(sessionId);
+export const getPaymentMethods = async (tenantSlug?: string) =>
+  getTenantPaymentMethods(requireTenant(tenantSlug));
+
+export const getRoomLayoutForSession = async () => null;
 
 export const validateSeatAndTicketSelection = async (
-  citySlug: string,
-  cinemaId: string,
-  sessionId: string,
+  _citySlug: string,
+  _cinemaId: string,
+  _sessionId: string,
   ticketSelection: TicketSelectionState,
   seats: string[],
-): Promise<RuleValidationResult> =>
-  validateSeatAndTicketSelectionModel(citySlug, cinemaId, sessionId, ticketSelection, seats);
+): Promise<RuleValidationResult> => {
+  const totalTickets = Object.values(ticketSelection.tickets).reduce(
+    (sum, quantity) => sum + (quantity ?? 0),
+    0,
+  );
+  const errors: string[] = [];
 
-export const getLoyaltyState = async () => loyaltyState;
+  if (totalTickets === 0) {
+    errors.push("Escolha ao menos um ingresso.");
+  }
+  if (seats.length !== totalTickets) {
+    errors.push("A quantidade de assentos deve bater com os ingressos.");
+  }
+  if (ticketSelection.fiscalCpf && ticketSelection.fiscalCpf.replace(/\D/g, "").length !== 11) {
+    errors.push("Informe um CPF válido.");
+  }
 
-export const getPurchaseHistory = async () => purchaseHistory;
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings: [],
+    recommendedActions: [],
+  };
+};
 
-export const getMovieSessionStatsForCity = async (citySlug: string) => {
-  const citySessions = await getSessionsForCity(citySlug);
+export const getLoyaltyState = async () => fallbackLoyaltyState;
+
+export const getPurchaseHistory = async () => [];
+
+export const getMovieSessionStatsForCity = async (citySlug: string, tenantSlug?: string) => {
+  const citySessions = await getSessionsForCity(citySlug, undefined, tenantSlug);
 
   const grouped = citySessions.reduce<Record<string, SessionGroup[]>>((acc, session) => {
     const sessionsByMovie = acc[session.movieId] ?? [];
@@ -134,22 +298,19 @@ export const getMovieSessionStatsForCity = async (citySlug: string) => {
       (session) => session.subtitle.toLowerCase() !== "sem legenda",
     );
 
-    const exhibitionLabel = hasDubbed && hasSubtitles
-      ? "Dublado e legendado"
-      : hasDubbed
-        ? "Dublado"
-        : hasSubtitles
-          ? "Legendado"
-          : movieSessions[0]?.language ?? "Consulte sessões";
-    const nextSessionLabel = nextSession
-      ? `${nextSession.date.split("-").reverse().join("/")} • ${nextSession.time}`
-      : undefined;
-
     acc[movieId] = {
       sessionCount: movieSessions.length,
       priceFrom: Math.min(...movieSessions.map((session) => session.priceFrom)),
-      nextSessionLabel,
-      exhibitionLabel,
+      nextSessionLabel: nextSession
+        ? `${nextSession.date.split("-").reverse().join("/")} • ${nextSession.time}`
+        : undefined,
+      exhibitionLabel: hasDubbed && hasSubtitles
+        ? "Dublado e legendado"
+        : hasDubbed
+          ? "Dublado"
+          : hasSubtitles
+            ? "Legendado"
+            : movieSessions[0]?.language ?? "Consulte sessões",
     };
 
     return acc;
@@ -175,79 +336,15 @@ export const buildCheckoutSummary = async (checkoutId: string): Promise<Checkout
 export const searchStorefront = async (
   query: string,
   citySlug?: string,
+  tenantSlug?: string,
 ): Promise<SearchItem[]> => {
-  const normalized = slugify(query);
-  const fallbackMovie = movies[0];
-  const fallbackCinema = cinemas[0];
-  const fallbackCity = cities[0];
-
-  if (!normalized && fallbackMovie && fallbackCinema && fallbackCity) {
-    return [
-      {
-        id: fallbackMovie.id,
-        type: "movie",
-        title: fallbackMovie.title,
-        subtitle: "Sessões de hoje e formatos premium",
-        href: `/cidade/${fallbackMovie.citySlugs[0]}/filme/${fallbackMovie.slug}`,
-      },
-      {
-        id: fallbackCinema.id,
-        type: "cinema",
-        title: fallbackCinema.name,
-        subtitle: `${fallbackCinema.network} • ${fallbackCinema.neighborhood}`,
-        href: `/cinema/${fallbackCinema.slug}`,
-      },
-      {
-        id: fallbackCity.id,
-        type: "city",
-        title: fallbackCity.name,
-        subtitle: `${fallbackCity.state} • Em cartaz agora`,
-        href: `/cidade/${fallbackCity.slug}`,
-      },
-    ];
-  }
-
-  if (!normalized) {
+  const resolvedTenant = resolveTenant(tenantSlug);
+  if (!resolvedTenant) {
     return [];
   }
 
-  const movieHits: SearchItem[] = movies
-    .filter(
-      (movie) =>
-        slugify(movie.title).includes(normalized) &&
-        (citySlug ? movie.citySlugs.includes(citySlug) : true),
-    )
-    .map((movie) => ({
-      id: movie.id,
-      type: "movie",
-      title: movie.title,
-      subtitle: movie.tagline,
-      href: `/cidade/${movie.citySlugs[0]}/filme/${movie.slug}`,
-    }));
-
-  const cinemaHits: SearchItem[] = cinemas
-    .filter(
-      (cinema) =>
-        slugify(cinema.name).includes(normalized) &&
-        (citySlug ? cinema.citySlug === citySlug : true),
-    )
-    .map((cinema) => ({
-      id: cinema.id,
-      type: "cinema",
-      title: cinema.name,
-      subtitle: `${cinema.network} • ${cinema.neighborhood}`,
-      href: `/cinema/${cinema.slug}`,
-    }));
-
-  const cityHits: SearchItem[] = cities
-    .filter((city) => slugify(city.name).includes(normalized))
-    .map((city) => ({
-      id: city.id,
-      type: "city",
-      title: city.name,
-      subtitle: `${city.state} • ${city.heroLabel}`,
-      href: `/cidade/${city.slug}`,
-    }));
-
-  return [...movieHits, ...cinemaHits, ...cityHits].slice(0, 8);
+  return getTenantSearch(resolvedTenant, query, citySlug);
 };
+
+export const getSaleDetails = async (reference: string, tenantSlug?: string) =>
+  getTenantSaleByReference(requireTenant(tenantSlug), reference);

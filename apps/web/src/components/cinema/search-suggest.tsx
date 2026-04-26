@@ -8,8 +8,10 @@ import { searchStorefront } from "@/lib/storefront/service";
 
 export const SearchSuggest = ({
   initialItems,
+  tenantSlug,
 }: {
   initialItems: SearchItem[];
+  tenantSlug?: string;
 }) => {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<SearchItem[]>(initialItems);
@@ -19,7 +21,7 @@ export const SearchSuggest = ({
     let cancelled = false;
 
     const run = async () => {
-      const results = await searchStorefront(deferredQuery);
+      const results = await searchStorefront(deferredQuery, undefined, tenantSlug);
       if (!cancelled) {
         setItems(results);
       }
@@ -30,7 +32,7 @@ export const SearchSuggest = ({
     return () => {
       cancelled = true;
     };
-  }, [deferredQuery]);
+  }, [deferredQuery, tenantSlug]);
 
   return (
     <div className="space-y-4">

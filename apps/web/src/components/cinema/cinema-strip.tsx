@@ -4,7 +4,13 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
 
-export const CinemaStrip = ({ cinemas }: { cinemas: Cinema[] }) => (
+export const CinemaStrip = ({
+  cinemas,
+  tenantSlug,
+}: {
+  cinemas: Cinema[];
+  tenantSlug?: string;
+}) => (
   <ul className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3" aria-label="Lista de cinemas disponíveis">
     {cinemas.map((cinema) => (
       <li key={cinema.id}>
@@ -26,7 +32,7 @@ export const CinemaStrip = ({ cinemas }: { cinemas: Cinema[] }) => (
               ))}
             </ul>
             <Link
-              href={`/cinema/${cinema.slug}`}
+              href={`${tenantSlug ? `/${tenantSlug}` : ""}/cinema/${cinema.slug}`}
               className="inline-flex items-center gap-2 text-sm font-semibold text-accent-red-500 hover:text-accent-red-600"
             >
               <Icon name="mapPin" size="xs" />

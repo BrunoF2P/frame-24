@@ -9,9 +9,11 @@ import { OccupancyIndicator } from "@/components/cinema/occupancy-indicator";
 import { TrailerDialogButton } from "@/components/cinema/trailer-dialog-button";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Button } from "@/components/ui/button";
+import { buildShowtimeHref } from "@/lib/showtime-routing";
 import { formatRuntime } from "@/lib/utils";
 import { getCinemasForCity, getCinemasForMovie, getCityBySlug, getMovieBySlug, getSessionsForCity, getSessionsForMovie } from "@/lib/storefront/service";
 import { copy } from "@/lib/copy/catalog";
+import { resolvePublicTenantSlug } from "@/lib/resolve-public-tenant";
 
 export async function generateMetadata({
   params,
@@ -19,7 +21,8 @@ export async function generateMetadata({
   params: Promise<{ citySlug: string; movieSlug: string }>;
 }) {
   const { citySlug, movieSlug } = await params;
-  const movie = await getMovieBySlug(citySlug, movieSlug);
+  const tenantSlug = await resolvePublicTenantSlug();
+  const movie = tenantSlug ? await getMovieBySlug(citySlug, movieSlug, tenantSlug) : null;
 
   if (!movie) {
     return {};
@@ -40,19 +43,26 @@ export default async function MovieDetailPage({
 }) {
   const { citySlug, movieSlug } = await params;
   const { date, lang, format: formatParam } = await searchParams;
-  const [city, movie] = await Promise.all([getCityBySlug(citySlug), getMovieBySlug(citySlug, movieSlug)]);
+  const tenantSlug = await resolvePublicTenantSlug();
+  const [city, movie] = await Promise.all([
+    tenantSlug ? getCityBySlug(citySlug, tenantSlug) : null,
+    tenantSlug ? getMovieBySlug(citySlug, movieSlug, tenantSlug) : null,
+  ]);
 
   if (!city || !movie) {
     notFound();
   }
 
   const [sessions, cinemas, cityCinemas, citySessions] = await Promise.all([
-    getSessionsForMovie(citySlug, movie.id),
-    getCinemasForMovie(citySlug, movie.id),
-    getCinemasForCity(citySlug),
-    getSessionsForCity(citySlug),
+    getSessionsForMovie(citySlug, movie.id, tenantSlug ?? undefined),
+    getCinemasForMovie(citySlug, movie.id, tenantSlug ?? undefined),
+    getCinemasForCity(citySlug, tenantSlug ?? undefined),
+    getSessionsForCity(citySlug, undefined, tenantSlug ?? undefined),
   ]);
   const primarySession = sessions[0] ?? null;
+  const primarySessionCinema = primarySession
+    ? cityCinemas.find((item) => item.id === primarySession.cinemaId) ?? null
+    : null;
   const occupancyLevel = sessions.some((session) => session.occupancy === "high")
     ? "high"
     : sessions.some((session) => session.occupancy === "medium")
@@ -170,7 +180,16 @@ export default async function MovieDetailPage({
                 <div className="flex flex-wrap gap-3">
                   <Button asChild size="lg">
                     <Link
-                      href={primarySession ? `/cidade/${citySlug}/sessao/${primarySession.id}` : `/cidade/${citySlug}`}
+                      href={
+                        primarySession && primarySessionCinema
+                          ? buildShowtimeHref({
+                              citySlug,
+                              session: primarySession,
+                              cinema: primarySessionCinema,
+                              movie,
+                            })
+                          : `/cidade/${citySlug}`
+                      }
                     >
                       {copy("movieDetailChooseSession")}
                     </Link>
@@ -414,7 +433,12 @@ export default async function MovieDetailPage({
                       {group.sessions.map((session) => (
                         <li key={session.id}>
                           <Link
-                            href={`/cidade/${citySlug}/sessao/${session.id}`}
+                            href={buildShowtimeHref({
+                              citySlug,
+                              session,
+                              cinema: group.cinema,
+                              movie,
+                            })}
                             className="flex min-h-16 flex-col justify-center rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2.5 hover:border-accent-red-500/40 hover:bg-background-strong"
                           >
                             <span className="text-lg font-semibold text-foreground">{session.time}</span>

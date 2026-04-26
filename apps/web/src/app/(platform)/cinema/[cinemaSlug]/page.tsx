@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { SessionPicker } from "@/components/cinema/session-picker";
-import { getCinemaBySlug, getSessionsForCity } from "@/lib/storefront/service";
+import { getCinemaBySlug, getMoviesForCity, getSessionsForCity } from "@/lib/storefront/service";
+import { resolvePublicTenantSlug } from "@/lib/resolve-public-tenant";
 
 export default async function CinemaPage({
   params,
@@ -10,13 +11,18 @@ export default async function CinemaPage({
   params: Promise<{ cinemaSlug: string }>;
 }) {
   const { cinemaSlug } = await params;
-  const cinema = await getCinemaBySlug(cinemaSlug);
+  const tenantSlug = await resolvePublicTenantSlug();
+  const cinema = tenantSlug ? await getCinemaBySlug(cinemaSlug, tenantSlug) : null;
 
   if (!cinema) {
     notFound();
   }
 
-  const sessions = (await getSessionsForCity(cinema.citySlug, { cinemaId: cinema.id })).slice(0, 4);
+  const [sessions, movies] = await Promise.all([
+    getSessionsForCity(cinema.citySlug, { cinemaId: cinema.id }, tenantSlug ?? undefined),
+    getMoviesForCity(cinema.citySlug, "em-cartaz", tenantSlug ?? undefined),
+  ]);
+  const visibleSessions = sessions.slice(0, 4);
 
   return (
     <main className="page-shell space-y-8 py-10">
@@ -41,7 +47,7 @@ export default async function CinemaPage({
       </Card>
       <section className="space-y-4">
         <h2 className="font-display text-4xl">Sessões disponíveis</h2>
-        <SessionPicker cinemas={[cinema]} citySlug={cinema.citySlug} sessions={sessions} />
+        <SessionPicker cinemas={[cinema]} citySlug={cinema.citySlug} movies={movies} sessions={visibleSessions} />
       </section>
     </main>
   );

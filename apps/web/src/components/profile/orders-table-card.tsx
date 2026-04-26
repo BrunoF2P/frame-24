@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { CustomerOrder } from "@/types/customer-profile";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDateTimeInTimeZone } from "@/lib/utils";
+import { withTenantPath } from "@/lib/tenant-routing";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +18,8 @@ const orderStatusVariant: Record<string, "success" | "accent" | "neutral"> = {
 };
 
 export const OrdersTableCard = ({ orders }: { orders: CustomerOrder[] }) => {
+  const pathname = usePathname();
+
   if (orders.length === 0) {
     return (
       <Card className="space-y-2">
@@ -41,7 +47,10 @@ export const OrdersTableCard = ({ orders }: { orders: CustomerOrder[] }) => {
                 </p>
                 <p className="text-sm text-foreground-muted">
                   {order.showtime?.cinema || "Cinema"} ·{" "}
-                  {new Date(order.sale_date).toLocaleString("pt-BR")}
+                  {formatDateTimeInTimeZone(
+                    order.showtime?.start_time || order.sale_date,
+                    order.showtime?.timezone || undefined,
+                  )}
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant={orderStatusVariant[(order.status || "").toLowerCase()] || "neutral"}>
@@ -60,7 +69,7 @@ export const OrdersTableCard = ({ orders }: { orders: CustomerOrder[] }) => {
                   {formatCurrency(Number(order.net_amount))}
                 </p>
                 <Button asChild size="sm" variant="secondary">
-                  <Link href={`/perfil/pedidos/${order.id}`}>
+                  <Link href={withTenantPath(pathname, `/perfil/pedidos/${order.id}`)}>
                     {copy("profileOrdersDetails")}
                     <Icon name="arrowRight" size="sm" />
                   </Link>
