@@ -19,6 +19,10 @@ import { RedisIoAdapter } from './common/redis/redis-io.adapter';
 import { RedisService } from './common/redis/redis.service';
 import { auth } from './lib/auth';
 import { createBetterAuthPostThrottle } from './common/middleware/better-auth-post-throttle.middleware';
+import {
+  isAllowedTenantOrigin,
+  normalizeOrigin,
+} from './common/utils/tenant-host.util';
 
 const HTTP_METHODS = new Set([
   'get',
@@ -181,13 +185,19 @@ async function bootstrap() {
   const devOrigins = isDev
     ? [
         'http://localhost:3000',
+        'http://127.0.0.1:3000',
         'http://localhost:3002',
+        'http://127.0.0.1:3002',
         'http://localhost:3004',
+        'http://127.0.0.1:3004',
         'http://localhost:4000',
+        'http://127.0.0.1:4000',
       ]
     : [];
 
-  const allowedOrigins = [...devOrigins, ...frontendUrls].filter(Boolean);
+  const allowedOrigins = [...devOrigins, ...frontendUrls]
+    .map(normalizeOrigin)
+    .filter(Boolean);
 
   app.enableCors({
     origin: (
@@ -197,7 +207,11 @@ async function bootstrap() {
       // Permite requisições sem origin (Postman, mobile apps, server-to-server)
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin)) {
+      const normalizedOrigin = normalizeOrigin(origin);
+      if (
+        allowedOrigins.includes(normalizedOrigin) ||
+        isAllowedTenantOrigin(origin)
+      ) {
         callback(null, true);
       } else {
         console.warn(`CORS blocked origin: ${origin}`);

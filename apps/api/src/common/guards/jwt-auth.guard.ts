@@ -77,6 +77,9 @@ export class JwtAuthGuard extends AuthGuard('local-jwt') {
     );
 
     if (!authenticatedUser) {
+      if (allowAnonymousSession) {
+        return true;
+      }
       throw new UnauthorizedException(
         'Usuário sem vínculo ativo para acessar a API',
       );

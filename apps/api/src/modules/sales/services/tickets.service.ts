@@ -21,6 +21,7 @@ type TicketsExecutionContext = {
 type ValidateAndReserveSeatsInput = {
   showtimeId: string;
   seatIds: string[];
+  reservationUuid?: string;
   context?: TicketsExecutionContext;
 };
 
@@ -28,6 +29,7 @@ type ReserveSeatsInput = {
   showtimeId: string;
   seatIds: string[];
   saleId: string;
+  reservationUuid?: string;
   context?: TicketsExecutionContext;
 };
 
@@ -67,7 +69,7 @@ export class TicketsService {
   async validateAndReserveSeats(
     input: ValidateAndReserveSeatsInput,
   ): Promise<void> {
-    const { showtimeId, seatIds, context } = input;
+    const { showtimeId, seatIds, reservationUuid, context } = input;
     const companyId = this.resolveCompanyId(context);
 
     // Validar sessão
@@ -124,9 +126,19 @@ export class TicketsService {
       }
 
       // Verificar se o assento já está vendido/ocupado
+      const isSameActiveReservation =
+        reservationUuid &&
+        sessionSeatStatus.reservation_uuid === reservationUuid &&
+        sessionSeatStatus.expiration_date &&
+        sessionSeatStatus.expiration_date > new Date();
+
       if (
-        sessionSeatStatus.status === reservedStatusId ||
-        sessionSeatStatus.sale_id
+        !isSameActiveReservation &&
+        (sessionSeatStatus.status === reservedStatusId ||
+          sessionSeatStatus.sale_id ||
+          (sessionSeatStatus.reservation_uuid &&
+            sessionSeatStatus.expiration_date &&
+            sessionSeatStatus.expiration_date > new Date()))
       ) {
         throw new ConflictException(
           `Assento ${seat.seat_code} já está ocupado`,
@@ -137,7 +149,7 @@ export class TicketsService {
 
   @Transactional()
   async reserveSeats(input: ReserveSeatsInput): Promise<void> {
-    const { showtimeId, seatIds, saleId, context } = input;
+    const { showtimeId, seatIds, saleId, reservationUuid, context } = input;
     const companyId = this.resolveCompanyId(context);
 
     // Buscar status "vendido"
@@ -153,16 +165,25 @@ export class TicketsService {
     }
 
     const now = new Date();
+    const availabilityGuard = reservationUuid
+      ? {
+          reservation_uuid: reservationUuid,
+          expiration_date: { gt: now },
+        }
+      : {
+          OR: [
+            { reservation_uuid: null },
+            { expiration_date: null },
+            { expiration_date: { lte: now } },
+          ],
+        };
+
     const seatUpdate = await this.sessionSeatStatusRepository.updateMany(
       {
         showtime_id: showtimeId,
         seat_id: { in: seatIds },
         sale_id: null,
-        OR: [
-          { reservation_uuid: null },
-          { expiration_date: null },
-          { expiration_date: { lte: now } },
-        ],
+        ...availabilityGuard,
       },
       {
         status: soldStatus.id,

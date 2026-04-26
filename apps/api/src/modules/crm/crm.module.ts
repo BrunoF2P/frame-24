@@ -5,8 +5,11 @@ import { AuthModule } from 'src/modules/identity/auth/auth.module';
 import { CustomerAuthController } from './controllers/customer-auth.controller';
 import { CustomerController } from './controllers/customer.controller';
 import { CustomerPurchasesController } from './controllers/customer-purchases.controller';
+import { CheckoutSessionsController } from './controllers/checkout-sessions.controller';
+import { PaymentWebhooksController } from './controllers/payment-webhooks.controller';
 import { CustomerAuthService } from './services/customer-auth.service';
 import { CustomerPurchasesService } from './services/customer-purchases.service';
+import { CheckoutSessionsService } from './services/checkout-sessions.service';
 import { CustomersRepository } from './repositories/customers.repository';
 import { CompanyCustomersRepository } from './repositories/company-customers.repository';
 import { SalesModule } from 'src/modules/sales/sales.module';
@@ -19,10 +22,13 @@ import { CustomerAccountService } from './services/customer-account.service';
     CustomerAuthController,
     CustomerController,
     CustomerPurchasesController,
+    CheckoutSessionsController,
+    PaymentWebhooksController,
   ],
   providers: [
     CustomerAuthService,
     CustomerPurchasesService,
+    CheckoutSessionsService,
     CustomerAccountService,
     CustomersRepository,
     CompanyCustomersRepository,
@@ -31,6 +37,7 @@ import { CustomerAccountService } from './services/customer-account.service';
     CustomerAuthService,
     CustomersRepository,
     CompanyCustomersRepository,
+    CheckoutSessionsService,
   ],
 })
 export class CrmModule {}

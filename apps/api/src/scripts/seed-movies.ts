@@ -338,7 +338,12 @@ async function main() {
 
     // Criar o filme
     const movie = await prisma.movies.upsert({
-      where: { slug },
+      where: {
+        company_id_slug: {
+          company_id: companyId,
+          slug,
+        },
+      },
       update: {
         original_title: m.original_title,
         brazil_title: m.brazil_title,

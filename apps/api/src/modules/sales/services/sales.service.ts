@@ -316,6 +316,7 @@ export class SalesService {
           this.ticketsService.validateAndReserveSeats({
             showtimeId: showtime_id,
             seatIds: Array.from(seats),
+            reservationUuid: dto.reservation_uuid,
             context: { companyId: company_id },
           }),
         ),
@@ -502,6 +503,7 @@ export class SalesService {
             showtimeId,
             seatIds,
             saleId: sale.id,
+            reservationUuid: dto.reservation_uuid,
             context: { companyId: company_id },
           }),
         ),
@@ -1022,6 +1024,7 @@ export class SalesService {
     return {
       id: sale.id,
       sale_number: sale.sale_number,
+      public_reference: sale.public_reference,
       cinema_complex_id: sale.cinema_complex_id,
       customer_id: sale.customer_id ?? undefined,
       sale_date: sale.sale_date.toISOString(),

@@ -18,16 +18,22 @@ describe('PublicService', () => {
   let seatsRepository: jest.Mocked<SeatsRepository>;
   let sessionSeatStatusRepository: jest.Mocked<SessionSeatStatusRepository>;
   let companiesFindUnique: jest.Mock;
+  let companiesFindFirst: jest.Mock;
   let productPricesFindFirst: jest.Mock;
   let salesFindFirst: jest.Mock;
 
   beforeEach(() => {
     companiesFindUnique = jest.fn();
+    companiesFindFirst = jest.fn();
     productPricesFindFirst = jest.fn();
     salesFindFirst = jest.fn();
 
     prisma = {
-      companies: { findMany: jest.fn(), findUnique: companiesFindUnique },
+      companies: {
+        findMany: jest.fn(),
+        findUnique: companiesFindUnique,
+        findFirst: companiesFindFirst,
+      },
       showtime_schedule: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
@@ -80,13 +86,21 @@ describe('PublicService', () => {
 
   it('should return only active complexes in getComplexesByCompany', async () => {
     cinemaComplexesRepository.findAllByCompany.mockResolvedValue([
-      { id: 'c1', active: true },
-      { id: 'c2', active: false },
+      { id: 'c1', name: 'Complexo A', city: 'Salvador', active: true },
+      { id: 'c2', name: 'Complexo B', active: false },
     ] as never);
 
     const result = await service.getComplexesByCompany('company-1');
 
-    expect(result).toEqual([{ id: 'c1', active: true }]);
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'c1',
+        active: true,
+        name: 'Complexo A',
+        slug: 'complexo-a-c1',
+        city_slug: 'salvador',
+      }),
+    ]);
   });
 
   it('should throw when company by slug is missing or inactive', async () => {
@@ -101,36 +115,102 @@ describe('PublicService', () => {
     );
   });
 
+  it('should resolve tenant from configured subdomain host', async () => {
+    const previousBaseDomain = process.env.TENANT_BASE_DOMAIN;
+    process.env.TENANT_BASE_DOMAIN = 'frame24.com';
+    companiesFindFirst.mockResolvedValue({
+      id: 'company-a',
+      corporate_name: 'Empresa A',
+      trade_name: 'Empresa A',
+      tenant_slug: 'empresa-a',
+      website: 'https://empresa-a.frame24.com',
+      logo_url: null,
+      active: true,
+      suspended: false,
+    });
+
+    const result = await service.resolveTenant({
+      host: 'empresa-a.frame24.com',
+      path: '/',
+    });
+
+    expect(companiesFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            expect.objectContaining({ tenant_slug: 'empresa-a' }),
+          ]),
+        }),
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        company_id: 'company-a',
+        tenant_slug: 'empresa-a',
+      }),
+    );
+    process.env.TENANT_BASE_DOMAIN = previousBaseDomain;
+  });
+
   it('should return empty list when company has no active movie showtimes', async () => {
     cinemaComplexesRepository.findAllByCompany.mockResolvedValue([
-      { id: 'cx-1' },
+      { id: 'cx-1', active: true },
     ] as never);
     showtimesRepository.findAll.mockResolvedValue([] as never);
 
     const result = await service.getMoviesByCompany('company-1');
 
-    expect(moviesRepository.findByIds).not.toHaveBeenCalled();
+    expect(prisma.movies.findMany).not.toHaveBeenCalled();
     expect(result).toEqual([]);
   });
 
   it('should fetch unique movies from active showtimes', async () => {
     cinemaComplexesRepository.findAllByCompany.mockResolvedValue([
-      { id: 'cx-1' },
+      { id: 'cx-1', active: true },
     ] as never);
     showtimesRepository.findAll.mockResolvedValue([
-      { movie_id: 'm1' },
-      { movie_id: 'm1' },
-      { movie_id: 'm2' },
+      { movie_id: 'm1', base_ticket_price: 20, start_time: new Date() },
+      { movie_id: 'm1', base_ticket_price: 25, start_time: new Date() },
+      { movie_id: 'm2', base_ticket_price: 30, start_time: new Date() },
     ] as never);
-    moviesRepository.findByIds.mockResolvedValue([
-      { id: 'm1' },
-      { id: 'm2' },
+    (prisma.movies.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: 'm1',
+        slug: 'movie-1',
+        brazil_title: 'Filme 1',
+        original_title: 'Movie 1',
+        age_rating: null,
+        movie_media: [],
+        category_links: [],
+        movie_cast: [],
+      },
+      {
+        id: 'm2',
+        slug: 'movie-2',
+        brazil_title: 'Filme 2',
+        original_title: 'Movie 2',
+        age_rating: null,
+        movie_media: [],
+        category_links: [],
+        movie_cast: [],
+      },
     ] as never);
 
     const result = await service.getMoviesByCompany('company-1');
 
-    expect(moviesRepository.findByIds).toHaveBeenCalledWith(['m1', 'm2']);
-    expect(result).toEqual([{ id: 'm1' }, { id: 'm2' }]);
+    expect(prisma.movies.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: { in: ['m1', 'm2'] },
+          company_id: 'company-1',
+          active: true,
+        }),
+      }),
+    );
+    expect(result).toEqual([
+      expect.objectContaining({ id: 'm1', title: 'Filme 1' }),
+      expect.objectContaining({ id: 'm2', title: 'Filme 2' }),
+    ]);
   });
 
   it('should return priced products only when complexId is provided', async () => {
@@ -149,7 +229,7 @@ describe('PublicService', () => {
 
   it('should throw not found when sale details are absent', async () => {
     cinemaComplexesRepository.findAllByCompany.mockResolvedValue([
-      { id: 'cx-1' },
+      { id: 'cx-1', active: true },
     ] as never);
     salesFindFirst.mockResolvedValue(null);
 

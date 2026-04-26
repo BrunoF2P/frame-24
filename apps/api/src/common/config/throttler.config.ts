@@ -1,40 +1,45 @@
 import { ThrottlerModuleOptions, ThrottlerStorage } from '@nestjs/throttler';
 
+const isRelaxedEnv = process.env.NODE_ENV !== 'production';
+
+const limitFor = (productionLimit: number, relaxedLimit: number) =>
+  isRelaxedEnv ? relaxedLimit : productionLimit;
+
 const throttlers = [
   {
     name: 'default',
-    ttl: 60000, // 60 seconds
-    limit: 100, // 100 requests per minute
+    ttl: 60000,
+    limit: limitFor(100, 2000),
   },
   {
     name: 'auth',
-    ttl: 60000, // 60 seconds
-    limit: 10, // 10 requests per minute for auth endpoints
+    ttl: 60000,
+    limit: limitFor(10, 500),
   },
   {
     name: 'signup',
     ttl: 60000,
-    limit: 5,
+    limit: limitFor(5, 250),
   },
   {
     name: 'customerSignup',
     ttl: 60000,
-    limit: 8,
+    limit: limitFor(8, 250),
   },
   {
     name: 'provisioning',
     ttl: 60000,
-    limit: 15,
+    limit: limitFor(15, 500),
   },
   {
     name: 'public',
-    ttl: 60000, // 60 seconds
-    limit: 300, // higher read throughput for storefront browsing
+    ttl: 60000,
+    limit: limitFor(300, 5000),
   },
   {
     name: 'write',
-    ttl: 60000, // 60 seconds
-    limit: 30, // strict mutation budget per minute
+    ttl: 60000,
+    limit: limitFor(30, 500),
   },
 ] as const;
 

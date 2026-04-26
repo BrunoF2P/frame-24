@@ -3,11 +3,15 @@ import { ClsService } from 'nestjs-cls';
 import { CompanyCustomersRepository } from '../repositories/company-customers.repository';
 import { CustomersRepository } from '../repositories/customers.repository';
 import { CustomerController } from './customer.controller';
+import { CustomerAccountService } from '../services/customer-account.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 describe('CustomerController', () => {
   let controller: CustomerController;
   let customersRepository: jest.Mocked<CustomersRepository>;
   let companyCustomersRepository: jest.Mocked<CompanyCustomersRepository>;
+  let customerAccountService: jest.Mocked<CustomerAccountService>;
+  let prisma: jest.Mocked<PrismaService>;
   let cls: jest.Mocked<ClsService>;
 
   beforeEach(() => {
@@ -19,6 +23,17 @@ describe('CustomerController', () => {
     companyCustomersRepository = {
       findByCompanyAndCustomer: jest.fn(),
     } as unknown as jest.Mocked<CompanyCustomersRepository>;
+
+    customerAccountService = {} as unknown as jest.Mocked<CustomerAccountService>;
+
+    prisma = {
+      company_customers: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      companies: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    } as unknown as jest.Mocked<PrismaService>;
 
     cls = {
       get: jest.fn((key?: string | symbol) => {
@@ -32,6 +47,8 @@ describe('CustomerController', () => {
     controller = new CustomerController(
       customersRepository,
       companyCustomersRepository,
+      customerAccountService,
+      prisma,
       cls,
     );
   });
@@ -75,6 +92,15 @@ describe('CustomerController', () => {
       if (key === 'tenantSlug') return 'cinema-central';
       return undefined;
     });
+
+    const result = await controller.resolveProfile();
+
+    expect(result).toEqual({ profile: null });
+    expect(customersRepository.findById).not.toHaveBeenCalled();
+  });
+
+  it('should return null when resolving profile without linked tenant context', async () => {
+    cls.get.mockReturnValue(undefined);
 
     const result = await controller.resolveProfile();
 

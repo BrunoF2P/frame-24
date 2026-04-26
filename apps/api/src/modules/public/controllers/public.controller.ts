@@ -51,6 +51,23 @@ export class PublicController {
     return this.publicService.getCompanies();
   }
 
+  @Get('tenants/resolve')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Resolver tenant público por host ou path',
+    description:
+      'Resolve a empresa atual por subdomínio, domínio cadastrado ou fallback /:tenant.',
+  })
+  @ApiQuery({ name: 'host', required: false })
+  @ApiQuery({ name: 'path', required: false })
+  async resolveTenant(
+    @Query('host') host?: string,
+    @Query('path') path?: string,
+  ) {
+    return this.publicService.resolveTenant({ host, path });
+  }
+
   @Get('companies/:tenant_slug')
   @Public()
   @HttpCode(HttpStatus.OK)
@@ -84,6 +101,109 @@ export class PublicController {
   async getComplexes(@Param('tenant_slug') tenantSlug: string) {
     const company = await this.publicService.getCompanyBySlug(tenantSlug);
     return this.publicService.getComplexesByCompany(company.id);
+  }
+
+  @Get('companies/:tenant_slug/cities')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Listar cidades públicas de um tenant',
+    description:
+      'Retorna cidades com cinemas ativos dentro do site de uma empresa.',
+  })
+  async getCities(@Param('tenant_slug') tenantSlug: string) {
+    const company = await this.publicService.getCompanyBySlug(tenantSlug);
+    return this.publicService.getCitiesByCompany(company.id);
+  }
+
+  @Get('companies/:tenant_slug/cities/:city_slug/cinemas')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Listar cinemas de uma cidade do tenant' })
+  async getCinemasByCity(
+    @Param('tenant_slug') tenantSlug: string,
+    @Param('city_slug') citySlug: string,
+  ) {
+    const company = await this.publicService.getCompanyBySlug(tenantSlug);
+    return this.publicService.getCinemasByCity(company.id, citySlug);
+  }
+
+  @Get('companies/:tenant_slug/cities/:city_slug/movies')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Listar filmes de uma cidade do tenant' })
+  async getMoviesByCity(
+    @Param('tenant_slug') tenantSlug: string,
+    @Param('city_slug') citySlug: string,
+    @Query('status') status?: string,
+    @Query('date') date?: string,
+  ) {
+    const company = await this.publicService.getCompanyBySlug(tenantSlug);
+    return this.publicService.getMoviesByCity(company.id, citySlug, {
+      status,
+      date,
+    });
+  }
+
+  @Get('companies/:tenant_slug/cities/:city_slug/movies/:movie_slug')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Detalhar filme por cidade e tenant' })
+  async getMovieBySlugForCity(
+    @Param('tenant_slug') tenantSlug: string,
+    @Param('city_slug') citySlug: string,
+    @Param('movie_slug') movieSlug: string,
+  ) {
+    const company = await this.publicService.getCompanyBySlug(tenantSlug);
+    return this.publicService.getMovieBySlugForCity(
+      company.id,
+      citySlug,
+      movieSlug,
+    );
+  }
+
+  @Get('companies/:tenant_slug/cities/:city_slug/movies/:movie_slug/showtimes')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Listar sessões de um filme por cidade' })
+  async getShowtimesForMovieSlug(
+    @Param('tenant_slug') tenantSlug: string,
+    @Param('city_slug') citySlug: string,
+    @Param('movie_slug') movieSlug: string,
+    @Query('date') date?: string,
+    @Query('format') format?: string,
+    @Query('language') language?: string,
+    @Query('cinema_id') cinemaId?: string,
+  ) {
+    const company = await this.publicService.getCompanyBySlug(tenantSlug);
+    return this.publicService.getShowtimesForMovieSlug(
+      company.id,
+      citySlug,
+      movieSlug,
+      {
+        date,
+        format,
+        language,
+        cinemaId,
+      },
+    );
+  }
+
+  @Get('companies/:tenant_slug/search')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Buscar filmes, cinemas e cidades no tenant' })
+  async searchTenantStorefront(
+    @Param('tenant_slug') tenantSlug: string,
+    @Query('q') query = '',
+    @Query('city_slug') citySlug?: string,
+  ) {
+    const company = await this.publicService.getCompanyBySlug(tenantSlug);
+    return this.publicService.searchTenantStorefront(
+      company.id,
+      query,
+      citySlug,
+    );
   }
 
   @Get('companies/:tenant_slug/movies')
@@ -141,6 +261,7 @@ export class PublicController {
     @Param('tenant_slug') tenantSlug: string,
     @Query('complex_id') complexId?: string,
     @Query('movie_id') movieId?: string,
+    @Query('city_slug') citySlug?: string,
     @Query('date') date?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -157,7 +278,8 @@ export class PublicController {
     return this.publicService.getShowtimesByCompany(company.id, {
       complexId,
       movieId,
-      date: date ? new Date(date) : undefined,
+      citySlug,
+      date,
       page: parsedPage,
       limit: parsedLimit,
     });
@@ -260,6 +382,11 @@ export class PublicController {
       'Filtro opcional de complexo para sessões e preços de produtos',
   })
   @ApiQuery({
+    name: 'city_slug',
+    required: false,
+    description: 'Filtro opcional de cidade do tenant',
+  })
+  @ApiQuery({
     name: 'movie_id',
     required: false,
     description: 'Filtro opcional de filme para sessões',
@@ -297,6 +424,7 @@ export class PublicController {
     @Query('include_showtimes') includeShowtimes?: string,
     @Query('complex_id') complexId?: string,
     @Query('movie_id') movieId?: string,
+    @Query('city_slug') citySlug?: string,
     @Query('date') date?: string,
     @Query('showtimes_page') showtimesPage?: string,
     @Query('showtimes_limit') showtimesLimit?: string,
@@ -314,13 +442,15 @@ export class PublicController {
       includeShowtimes: includeShowtimes === 'true',
       complexId,
       movieId,
-      date: date ? new Date(date) : undefined,
+      citySlug,
+      date,
       showtimesPage: parsedShowtimesPage,
       showtimesLimit: parsedShowtimesLimit,
     });
 
     const payload = {
       company: data.company,
+      cities: data.cities,
       complexes: data.complexes,
       movies: data.movies,
       products: data.products,

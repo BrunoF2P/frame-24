@@ -8,7 +8,7 @@ function getRateLimitClientIp(req: Request): string {
 
 /** Alinhado ao limite `auth` do Throttler Nest (POST em `/api/auth`). */
 const WINDOW_MS = 60_000;
-const LIMIT = 10;
+const LIMIT = process.env.NODE_ENV === 'production' ? 10 : 500;
 const REDIS_KEY_PREFIX = 'throttle:better-auth-post:';
 
 type Bucket = { count: number; resetAt: number };

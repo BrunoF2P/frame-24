@@ -3,6 +3,7 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { PrismaClient, getPrismaClientOptions } from '@repo/db';
 import { requireEnv } from 'src/config/env.util';
 import { validateEnvironment } from 'src/config/validate-env';
+import { getTenantBaseDomains } from 'src/common/utils/tenant-host.util';
 
 validateEnvironment();
 
@@ -46,11 +47,21 @@ function resolveTrustedOrigins(): string[] {
     .map((origin) => origin.trim())
     .filter(Boolean);
 
+  for (const domain of getTenantBaseDomains()) {
+    origins.push(`https://*.${domain}`);
+    origins.push(`https://${domain}`);
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     origins.push(
       'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://*.localhost:3000',
+      'http://*.lvh.me:3000',
       'http://localhost:3003',
+      'http://127.0.0.1:3003',
       'http://localhost:3004',
+      'http://127.0.0.1:3004',
     );
   }
 

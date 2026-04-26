@@ -5,6 +5,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export const CreateSaleSchema = z.object({
   cinema_complex_id: z.string(),
   customer_id: z.string().optional(),
+  reservation_uuid: z.string().optional(),
   sale_type: z.string().optional(),
   payment_method: z.string(),
   promotion_code: z.string().optional(),
@@ -42,6 +43,12 @@ export class CreateSaleDto extends createZodDto(CreateSaleSchema) {
     example: '243244130367442999',
   })
   customer_id?: string;
+
+  @ApiPropertyOptional({
+    description: 'UUID da reserva de assentos criada no checkout/socket',
+    example: '243244130367443001-1234567890-abc123',
+  })
+  reservation_uuid?: string;
 
   @ApiPropertyOptional({
     description: 'ID do tipo de venda',

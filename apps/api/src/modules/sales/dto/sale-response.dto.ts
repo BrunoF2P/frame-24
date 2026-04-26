@@ -36,6 +36,11 @@ export class SaleResponseDto {
   @ApiProperty()
   sale_number!: string;
 
+  @ApiPropertyOptional({
+    description: 'Referência pública opaca para recuperação/links de confirmação',
+  })
+  public_reference?: string;
+
   @ApiProperty()
   cinema_complex_id!: string;
 
@@ -87,6 +92,7 @@ export class SaleResponseDto {
     start_time: string;
     cinema: string;
     room: string | null;
+    timezone?: string | null;
   };
 
   @ApiPropertyOptional({

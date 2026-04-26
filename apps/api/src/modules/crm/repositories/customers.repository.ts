@@ -17,7 +17,7 @@ export class CustomersRepository {
   }
 
   async findByCpf(cpf: string): Promise<customers | null> {
-    return this.prisma.customers.findUnique({
+    return this.prisma.customers.findFirst({
       where: { cpf },
     });
   }

@@ -96,6 +96,18 @@ type CustomerTicketResponse = {
     sale_date: string;
     cinema_complex_id: string;
   };
+  showtime?: {
+    id: string;
+    start_time: string;
+    cinema: string | null;
+    room: string | null;
+  } | null;
+  movie?: {
+    id: string;
+    title: string;
+    poster_url: string | null;
+    age_rating: string | null;
+  } | null;
   created_at?: string;
 };
 
@@ -130,6 +142,7 @@ type CustomerOrderResponse = {
     start_time: string;
     cinema: string;
     room: string | null;
+    timezone?: string | null;
   } | null;
   movie: {
     id: string;
@@ -393,6 +406,7 @@ export class CustomerPurchasesService {
               start_time: showtimeDetails.start_time.toISOString(),
               cinema: showtimeDetails.cinema_complexes?.name || '',
               room: showtimeDetails.rooms?.name,
+              timezone: showtimeDetails.cinema_complexes?.timezone || null,
             }
           : undefined,
         movie: movieDetails,
@@ -449,11 +463,15 @@ export class CustomerPurchasesService {
       },
     });
 
-    return tickets
-      .filter((ticket): ticket is TicketWithSaleSummary =>
-        Boolean(ticket.sales),
-      )
-      .map((ticket) => this.mapTicketToResponse(ticket));
+    const validTickets = tickets.filter(
+      (ticket): ticket is TicketWithSaleSummary => Boolean(ticket.sales),
+    );
+    const presentationMap =
+      await this.buildTicketPresentationMap(validTickets, context.companyId);
+
+    return validTickets.map((ticket) =>
+      this.mapTicketToResponse(ticket, presentationMap.get(ticket.id)),
+    );
   }
 
   async findTicketById(id: string): Promise<CustomerTicketResponse> {
@@ -484,7 +502,12 @@ export class CustomerPurchasesService {
       );
     }
 
-    return this.mapTicketToResponse(ticket);
+    const presentationMap = await this.buildTicketPresentationMap(
+      [ticket],
+      context.companyId,
+    );
+
+    return this.mapTicketToResponse(ticket, presentationMap.get(ticket.id));
   }
 
   async getTicketQrCode(
@@ -727,21 +750,42 @@ export class CustomerPurchasesService {
       throw new BadRequestException(validationErrors.join(' '));
     }
 
-    const requestId = randomUUID();
-    const payload = {
-      status: 'requested',
-      order_id: orderId,
-      reason: dto.reason ?? null,
-      items: normalizedItems.filter(Boolean),
-      requested_at: new Date().toISOString(),
-    };
+    const persistedItems = normalizedItems.filter(
+      (item): item is NonNullable<typeof item> => Boolean(item),
+    );
+
+    const request = await this.prisma.refund_requests.create({
+      data: {
+        id: randomUUID(),
+        company_id: context.companyId,
+        customer_id: context.customerId,
+        order_id: orderId,
+        status: 'requested',
+        reason: dto.reason ?? null,
+        refund_request_items: {
+          create: persistedItems.map((item) => ({
+            id: randomUUID(),
+            item_type: item.item_type,
+            item_id: item.item_id,
+            quantity: item.quantity,
+            requested_quantity: item.requested_quantity,
+            eligibility_json: JSON.stringify(item.eligibility),
+          })),
+        },
+      },
+      include: {
+        refund_request_items: true,
+      },
+    });
+
+    const payload = this.mapRefundRequest(request);
 
     await this.prisma.audit_logs.create({
       data: {
         company_id: context.companyId,
         event_type: 'customer.refund.requested',
         resource_type: 'CUSTOMER_REFUND_REQUEST',
-        resource_id: requestId,
+        resource_id: request.id,
         action: 'REFUND_REQUESTED',
         user_id: context.customerId,
         old_values: {
@@ -751,43 +795,37 @@ export class CustomerPurchasesService {
       },
     });
 
-    return {
-      request_id: requestId,
-      ...payload,
-    };
+    return payload;
   }
 
   async listRefundRequests() {
     const context = this.getCustomerContext();
-    const requests = await this.prisma.audit_logs.findMany({
+    const requests = await this.prisma.refund_requests.findMany({
       where: {
-        resource_type: 'CUSTOMER_REFUND_REQUEST',
-        action: 'REFUND_REQUESTED',
-        user_id: context.customerId,
+        company_id: context.companyId,
+        customer_id: context.customerId,
+      },
+      include: {
+        refund_request_items: true,
       },
       orderBy: {
-        created_at: 'desc',
+        requested_at: 'desc',
       },
     });
 
-    return requests.map((item) => ({
-      request_id: item.resource_id,
-      ...(item.new_values as Record<string, unknown>),
-      created_at: item.created_at.toISOString(),
-    }));
+    return requests.map((item) => this.mapRefundRequest(item));
   }
 
   async getRefundRequestById(requestId: string) {
     const context = this.getCustomerContext();
-    const request = await this.prisma.audit_logs.findFirst({
+    const request = await this.prisma.refund_requests.findFirst({
       where: {
-        resource_type: 'CUSTOMER_REFUND_REQUEST',
-        action: 'REFUND_REQUESTED',
-        user_id: context.customerId,
-        resource_id: requestId,
+        id: requestId,
+        company_id: context.companyId,
+        customer_id: context.customerId,
       },
-      orderBy: {
-        created_at: 'desc',
+      include: {
+        refund_request_items: true,
       },
     });
 
@@ -795,11 +833,7 @@ export class CustomerPurchasesService {
       throw new NotFoundException('Solicitação de reembolso não encontrada.');
     }
 
-    return {
-      request_id: request.resource_id,
-      ...(request.new_values as Record<string, unknown>),
-      created_at: request.created_at.toISOString(),
-    };
+    return this.mapRefundRequest(request);
   }
 
   async getTicketPdf(ticketId: string): Promise<Buffer> {
@@ -1258,6 +1292,32 @@ export class CustomerPurchasesService {
     return { eligible: true, reason: null };
   }
 
+  private mapRefundRequest(
+    request: Prisma.refund_requestsGetPayload<{
+      include: {
+        refund_request_items: true;
+      };
+    }>,
+  ) {
+    return {
+      request_id: request.id,
+      status: request.status,
+      order_id: request.order_id,
+      reason: request.reason,
+      requested_at: request.requested_at.toISOString(),
+      created_at: request.created_at.toISOString(),
+      items: request.refund_request_items.map((item) => ({
+        item_type: item.item_type,
+        item_id: item.item_id,
+        quantity: item.quantity,
+        requested_quantity: item.requested_quantity,
+        eligibility: item.eligibility_json
+          ? JSON.parse(item.eligibility_json)
+          : null,
+      })),
+    };
+  }
+
   private generateSimpleTicketPdf(params: {
     title: string;
     cinemaLabel: string;
@@ -1346,6 +1406,10 @@ export class CustomerPurchasesService {
 
   private mapTicketToResponse(
     ticket: TicketWithSaleSummary,
+    presentation?: {
+      showtime?: CustomerTicketResponse['showtime'];
+      movie?: CustomerTicketResponse['movie'];
+    },
   ): CustomerTicketResponse {
     return {
       id: ticket.id,
@@ -1362,7 +1426,105 @@ export class CustomerPurchasesService {
         sale_date: ticket.sales.sale_date.toISOString(),
         cinema_complex_id: ticket.sales.cinema_complex_id,
       },
+      showtime: presentation?.showtime ?? null,
+      movie: presentation?.movie ?? null,
       created_at: ticket.created_at?.toISOString(),
     };
+  }
+
+  private async buildTicketPresentationMap(
+    tickets: TicketWithSaleSummary[],
+    companyId: string,
+  ): Promise<
+    Map<
+      string,
+      {
+        showtime: CustomerTicketResponse['showtime'];
+        movie: CustomerTicketResponse['movie'];
+      }
+    >
+  > {
+    const showtimeIds = [
+      ...new Set(
+        tickets
+          .map((ticket) => ticket.showtime_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+
+    if (showtimeIds.length === 0) {
+      return new Map();
+    }
+
+    const showtimes = await this.prisma.showtime_schedule.findMany({
+      where: { id: { in: showtimeIds } },
+      include: {
+        cinema_complexes: true,
+        rooms: true,
+      },
+    });
+    const tenantShowtimes = showtimes.filter(
+      (showtime) => showtime.cinema_complexes.company_id === companyId,
+    );
+    const showtimeMap = new Map(tenantShowtimes.map((item) => [item.id, item]));
+    const movieIds = [
+      ...new Set(
+        tenantShowtimes
+          .map((showtime) => showtime.movie_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const movies = await this.prisma.movies.findMany({
+      where: { company_id: companyId, id: { in: movieIds } },
+      include: {
+        age_rating: true,
+        movie_media: {
+          where: {
+            active: true,
+            media_types: {
+              name: 'Poster',
+            },
+          },
+          include: {
+            media_types: true,
+          },
+          take: 1,
+        },
+      },
+    });
+    const movieMap = new Map(
+      movies.map((movie) => [
+        movie.id,
+        {
+          id: movie.id,
+          title: movie.brazil_title || movie.original_title || '',
+          poster_url: movie.movie_media[0]?.media_url || null,
+          age_rating: movie.age_rating?.code || null,
+        },
+      ]),
+    );
+
+    return new Map(
+      tickets.map((ticket) => {
+        const showtime = showtimeMap.get(ticket.showtime_id);
+        const movie = showtime ? movieMap.get(showtime.movie_id) : undefined;
+
+        return [
+          ticket.id,
+          {
+            showtime: showtime
+              ? {
+                  id: showtime.id,
+                  start_time: showtime.start_time.toISOString(),
+                  cinema: showtime.cinema_complexes.name,
+                  room: showtime.rooms.name,
+                  timezone: showtime.cinema_complexes.timezone || null,
+                }
+              : null,
+            movie: movie ?? null,
+          },
+        ];
+      }),
+    );
   }
 }

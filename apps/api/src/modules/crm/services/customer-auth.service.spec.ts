@@ -5,6 +5,13 @@ jest.mock('@nestjs-cls/transactional', () => ({
     () => (_target: unknown, _key: string, descriptor: PropertyDescriptor) =>
       descriptor,
 }));
+jest.mock('src/lib/auth', () => ({
+  auth: {
+    api: {
+      signUpEmail: jest.fn().mockResolvedValue({ user: { id: 'auth-user-1' } }),
+    },
+  },
+}));
 
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { CustomerAuthService } from './customer-auth.service';
@@ -35,7 +42,14 @@ describe('CustomerAuthService', () => {
 
     prisma = {
       companies: {
+        findFirst: jest.fn(),
+      },
+      customers: {
+        findFirst: jest.fn(),
+      },
+      user: {
         findUnique: jest.fn(),
+        delete: jest.fn().mockResolvedValue({}),
       },
       identities: {
         create: jest.fn(),
@@ -64,14 +78,14 @@ describe('CustomerAuthService', () => {
   });
 
   it('register should create customer and return onboarding payload', async () => {
-    (prisma.companies.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.companies.findFirst as jest.Mock).mockResolvedValue({
       id: 'company-1',
       active: true,
       suspended: false,
       tenant_slug: 'tenant-a',
     });
-    customersRepository.findByEmail.mockResolvedValue(null as never);
-    customersRepository.findByCpf.mockResolvedValue(null as never);
+    (prisma.customers.findFirst as jest.Mock).mockResolvedValue(null);
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
     (prisma.identities.create as jest.Mock).mockResolvedValue({
       id: 'identity-1',
     });
@@ -101,14 +115,15 @@ describe('CustomerAuthService', () => {
   });
 
   it('register should reject duplicate email', async () => {
-    (prisma.companies.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.companies.findFirst as jest.Mock).mockResolvedValue({
       id: 'company-1',
       active: true,
       suspended: false,
+      tenant_slug: 'tenant-a',
     });
-    customersRepository.findByEmail.mockResolvedValue({
+    (prisma.customers.findFirst as jest.Mock).mockResolvedValueOnce({
       id: 'existing',
-    } as never);
+    });
 
     await expect(
       service.register({
@@ -120,13 +135,14 @@ describe('CustomerAuthService', () => {
   });
 
   it('register should propagate local persistence error', async () => {
-    (prisma.companies.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.companies.findFirst as jest.Mock).mockResolvedValue({
       id: 'company-1',
       active: true,
       suspended: false,
+      tenant_slug: 'tenant-a',
     });
-    customersRepository.findByEmail.mockResolvedValue(null as never);
-    customersRepository.findByCpf.mockResolvedValue(null as never);
+    (prisma.customers.findFirst as jest.Mock).mockResolvedValue(null);
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
     (prisma.identities.create as jest.Mock).mockRejectedValue(
       new Error('db write failed'),
     );
@@ -143,7 +159,7 @@ describe('CustomerAuthService', () => {
   });
 
   it('register should reject when company is missing/inactive', async () => {
-    (prisma.companies.findUnique as jest.Mock).mockResolvedValue(null);
+    (prisma.companies.findFirst as jest.Mock).mockResolvedValue(null);
 
     await expect(
       service.register({
