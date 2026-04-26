@@ -8,6 +8,7 @@ import { LoggerService } from 'src/common/services/logger.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SalesRepository } from 'src/modules/sales/repositories/sales.repository';
 import { SalesService } from 'src/modules/sales/services/sales.service';
+import { EmailService } from 'src/modules/email/services/email.service';
 import { CompanyCustomersRepository } from '../repositories/company-customers.repository';
 import { CustomerPurchasesService } from './customer-purchases.service';
 
@@ -23,6 +24,7 @@ describe('CustomerPurchasesService', () => {
   let salesRepository: jest.Mocked<SalesRepository>;
   let companyCustomersRepository: jest.Mocked<CompanyCustomersRepository>;
   let prisma: any;
+  let emailService: jest.Mocked<EmailService>;
   let logger: jest.Mocked<LoggerService>;
   let cls: jest.Mocked<ClsService>;
 
@@ -62,6 +64,10 @@ describe('CustomerPurchasesService', () => {
       },
     } as any;
 
+    emailService = {
+      sendCustomerTicketEmail: jest.fn(),
+    } as unknown as jest.Mocked<EmailService>;
+
     logger = {
       log: jest.fn(),
       error: jest.fn(),
@@ -83,6 +89,7 @@ describe('CustomerPurchasesService', () => {
       salesRepository,
       companyCustomersRepository,
       prisma,
+      emailService,
       logger,
       cls,
     );
