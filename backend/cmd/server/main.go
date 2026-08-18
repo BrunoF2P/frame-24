@@ -11,9 +11,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	catalogApp "frame-24/internal/catalog/app"
+	catalogHttp "frame-24/internal/catalog/http"
+	catalogRepo "frame-24/internal/catalog/repo"
 	identityApp "frame-24/internal/identity/app"
 	identityHttp "frame-24/internal/identity/http"
 	identityRepo "frame-24/internal/identity/repo"
+	operationsApp "frame-24/internal/operations/app"
+	operationsHttp "frame-24/internal/operations/http"
+	operationsRepo "frame-24/internal/operations/repo"
 	"frame-24/internal/platform/auth"
 	"frame-24/internal/platform/db"
 	"frame-24/internal/platform/outbox"
@@ -73,12 +79,23 @@ func main() {
 	// 3. Inicializar Auth Token Manager (JWT)
 	tokenManager := auth.NewTokenManager(jwtSecret, 24*time.Hour)
 
-	// 4. Inicializar Bounded Context de Identidade
+	// 4. Inicializar Bounded Contexts (Identidade, Operações, Catálogo)
 	var identityHandler *identityHttp.Handler
+	var operationsHandler *operationsHttp.Handler
+	var catalogHandler *catalogHttp.Handler
+
 	if pool != nil {
 		idRepo := identityRepo.NewPostgresRepository(pool)
 		idService := identityApp.NewService(pool, idRepo, tokenManager)
 		identityHandler = identityHttp.NewHandler(idService)
+
+		catRepo := catalogRepo.NewPostgresRepository(pool)
+		catService := catalogApp.NewService(pool, catRepo)
+		catalogHandler = catalogHttp.NewHandler(catService)
+
+		opsRepo := operationsRepo.NewPostgresRepository(pool)
+		opsService := operationsApp.NewService(pool, opsRepo, catRepo)
+		operationsHandler = operationsHttp.NewHandler(opsService)
 	}
 
 	// 5. Configurar Roteador HTTP com Chi
@@ -111,12 +128,18 @@ func main() {
 	r.Get("/api/v1/info", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"app":"Frame-24 ERP","version":"2.1.0","arch":"Modular Monolith (Go)","phase":"Phase 1 - Platform & Identity"}`))
+		_, _ = w.Write([]byte(`{"app":"Frame-24 ERP","version":"2.2.0","arch":"Modular Monolith (Go)","phase":"Phase 2 - Catalog & Operations"}`))
 	})
 
-	// Montar rotas de Identidade & Auth
+	// Montar rotas dos Bounded Contexts
 	if identityHandler != nil {
 		identityHttp.MountRoutes(r, identityHandler, tokenManager)
+	}
+	if operationsHandler != nil {
+		operationsHttp.MountRoutes(r, operationsHandler, tokenManager)
+	}
+	if catalogHandler != nil {
+		catalogHttp.MountRoutes(r, catalogHandler, tokenManager)
 	}
 
 	srv := &http.Server{

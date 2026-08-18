@@ -292,7 +292,31 @@ FOR UPDATE SKIP LOCKED;
 
 ---
 
-### 3.5 Contabilidade com Ledger Double-Entry Imutável
+### 3.5 Formato Canônico de Respostas e Erros da API (RFC 7807 / Invariante de Plataforma)
+
+Para garantir que o frontend (SPA React 19 Backoffice e Next.js 15 Storefront) possa tratar validações de formulário por campo, exibir notificações/toasts amigáveis e fornecer observabilidade completa ao suporte, **todas as respostas de erro da API seguem estritamente um envelope canônico rico (`internal/platform/httputil`)**:
+
+```json
+{
+  "code": "SHOWTIME_OVERLAP",
+  "message": "Conflito de horario: a sala ja possui uma sessao agendada ou em limpeza neste intervalo.",
+  "requestId": "req-c839f2a0-1234-5678",
+  "timestamp": "2026-08-18T19:35:00Z",
+  "fields": {
+    "startTime": "Horario de inicio coincide com a sessao das 19:00 na Sala 1"
+  }
+}
+```
+
+#### Invariantes da Resposta de Erro:
+1. **`code` (Constante de Máquina):** Código textual em CAIXA_ALTA que nunca muda (ex: `INVALID_CREDENTIALS`, `SHOWTIME_OVERLAP`, `USER_ALREADY_EXISTS`), permitindo lógica determinística no React sem dépendencia de strings voláteis.
+2. **`message` (Mensagem Humana):** Descrição textual amigável pronta para consumo em componentes de Toast/Snackbar.
+3. **`requestId` (Trace ID):** Correlacionado diretamente com o middleware de observabilidade do Chi e os logs JSON do Go `slog` para rastreamento de bugs em produção.
+4. **`fields` (Erros de Validação por Campo):** Dicionário opcional mapeando o nome do campo ao motivo da falha para highlight automático em bibliotecas como React Hook Form e Zod.
+
+---
+
+### 3.6 Contabilidade com Ledger Double-Entry Imutável
 
 Dinheiro no Frame-24 não é um campo numérico solto que sofre mutação. Toda movimentação financeira gera um par equilibrado de débito e crédito imutável.
 

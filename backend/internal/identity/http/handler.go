@@ -2,14 +2,13 @@ package http
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"frame-24/internal/identity/app"
-	"frame-24/internal/identity/domain"
 	"frame-24/internal/platform/auth"
+	"frame-24/internal/platform/httputil"
 )
 
 type Handler struct {
@@ -40,7 +39,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		Phone:    req.Phone,
 	})
 	if err != nil {
-		respondError(w, err)
+		respondError(w, r, err)
 		return
 	}
 
@@ -65,7 +64,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.svc.Authenticate(r.Context(), req.Email, req.Password, req.PreferredTenantID)
 	if err != nil {
-		respondError(w, err)
+		respondError(w, r, err)
 		return
 	}
 
@@ -93,7 +92,7 @@ func (h *Handler) SwitchTenant(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.svc.SwitchTenantContext(r.Context(), userID, targetTenantID)
 	if err != nil {
-		respondError(w, err)
+		respondError(w, r, err)
 		return
 	}
 
@@ -110,7 +109,7 @@ func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
 
 	memberships, err := h.svc.ListUserMemberships(r.Context(), claims.UserID)
 	if err != nil {
-		respondError(w, err)
+		respondError(w, r, err)
 		return
 	}
 
@@ -136,7 +135,7 @@ func (h *Handler) GetMyMemberships(w http.ResponseWriter, r *http.Request) {
 
 	memberships, err := h.svc.ListUserMemberships(r.Context(), userID)
 	if err != nil {
-		respondError(w, err)
+		respondError(w, r, err)
 		return
 	}
 
@@ -180,7 +179,7 @@ func (h *Handler) CreateTenant(w http.ResponseWriter, r *http.Request) {
 		AdminUserID:           userID,
 	})
 	if err != nil {
-		respondError(w, err)
+		respondError(w, r, err)
 		return
 	}
 
@@ -192,49 +191,34 @@ func (h *Handler) AddMember(w http.ResponseWriter, r *http.Request) {
 	tenantIDParam := chi.URLParam(r, "tenantID")
 	targetTenantID, err := uuid.Parse(tenantIDParam)
 	if err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "tenantID invalido na URL"})
+		httputil.RespondError(w, r, http.StatusBadRequest, "INVALID_URL_PARAM", "tenantID invalido na URL", nil)
 		return
 	}
 
 	var req AddMemberRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "corpo da requisicao invalido"})
+		httputil.RespondError(w, r, http.StatusBadRequest, "BAD_REQUEST", "corpo da requisicao invalido", nil)
 		return
 	}
 	uID, complexUUIDs, err := req.Validate()
 	if err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		httputil.RespondError(w, r, http.StatusBadRequest, "VALIDATION_FAILED", err.Error(), nil)
 		return
 	}
 
 	err = h.svc.AddTenantMember(r.Context(), targetTenantID, uID, req.Roles, req.Permissions, complexUUIDs)
 	if err != nil {
-		respondError(w, err)
+		httputil.RespondDomainError(w, r, err)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{"status": "membro adicionado com sucesso"})
+	httputil.RespondJSON(w, http.StatusOK, map[string]string{"status": "membro adicionado com sucesso"})
 }
 
 func respondJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(data)
+	httputil.RespondJSON(w, status, data)
 }
 
-func respondError(w http.ResponseWriter, err error) {
-	statusCode := http.StatusInternalServerError
-	switch {
-	case errors.Is(err, domain.ErrInvalidCredentials), errors.Is(err, domain.ErrUserInactive):
-		statusCode = http.StatusUnauthorized
-	case errors.Is(err, domain.ErrUserAlreadyExists), errors.Is(err, domain.ErrTenantAlreadyExists):
-		statusCode = http.StatusConflict
-	case errors.Is(err, domain.ErrUserNotFound), errors.Is(err, domain.ErrTenantNotFound), errors.Is(err, domain.ErrMembershipNotFound):
-		statusCode = http.StatusNotFound
-	case errors.Is(err, domain.ErrMembershipInactive), errors.Is(err, domain.ErrTenantInactive):
-		statusCode = http.StatusForbidden
-	case errors.Is(err, domain.ErrInvalidEmail), errors.Is(err, domain.ErrInvalidPassword), errors.Is(err, domain.ErrInvalidCNPJ):
-		statusCode = http.StatusUnprocessableEntity
-	}
-	respondJSON(w, statusCode, map[string]string{"error": err.Error()})
+func respondError(w http.ResponseWriter, r *http.Request, err error) {
+	httputil.RespondDomainError(w, r, err)
 }

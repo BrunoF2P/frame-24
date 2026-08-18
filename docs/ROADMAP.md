@@ -111,18 +111,18 @@ frame-24/
 ### Fase 2: Catálogo, Unidades de Medida e Cinema/Operações
 *Objetivo: Cadastrar complexos físicos com fusos horários, salas, sessões e catálogo com conversão de unidades.*
 
-- [ ] **2.1 Bounded Context `operations` (Cinema & Programação):**
-  - [ ] Migration `operations.cinema_complexes` (CNPJ Filial, Inscrição Estadual, `timezone` IANA, código Ancine).
-  - [ ] Migration `operations.rooms` (Capacidade, layout de assentos, código Ancine).
-  - [ ] Migration `operations.seats` (Coordenadas de grade, tipos: convencional, VIP, D-BOX, cadeirante, namoradeira).
-  - [ ] Migration `operations.showtimes` com **constraint de exclusão temporal** (`EXCLUDE USING gist`) impedindo 2 sessões no mesmo horário/sala.
-  - [ ] Casos de uso de agendamento de sessões com conversão e validação no fuso horário do complexo.
-- [ ] **2.2 Bounded Context `catalog` (Filmes, Produtos & Unidades):**
-  - [ ] Migration `catalog.movies` (Título, classificação indicativa, duração, formato 2D/3D, áudio DUB/LEG/ORIG).
-  - [ ] Migration `catalog.products` (Itens de bomboniere, NCM, CEST).
-  - [ ] Migration `catalog.product_units` (Conversão de unidades: CX, UN, KG, LT com fator multiplicador).
-  - [ ] Migration `catalog.product_barcodes` (Múltiplos códigos EAN por unidade de medida).
-  - [ ] Migration `catalog.combos` (Combos de pipoca + refrigerante com preços promocionais).
+- [x] **2.1 Bounded Context `operations` (Cinema & Programação):**
+  - [x] Migration `operations.cinema_complexes` (CNPJ Filial, Inscrição Estadual, `timezone` IANA, código Ancine).
+  - [x] Migration `operations.rooms` (Capacidade, layout de assentos, código Ancine).
+  - [x] Migration `operations.seats` (Coordenadas de grade, tipos: convencional, VIP, D-BOX, cadeirante, reduzida, namoradeira).
+  - [x] Migration `operations.showtimes` com **constraint de exclusão temporal** (`EXCLUDE USING gist`) impedindo 2 sessões no mesmo horário/sala.
+  - [x] Casos de uso de agendamento de sessões com conversão e validação no fuso horário do complexo e tempo de limpeza.
+- [x] **2.2 Bounded Context `catalog` (Filmes, Produtos & Unidades):**
+  - [x] Migration `catalog.movies` (Título, classificação indicativa, duração, formato 2D/3D, áudio DUB/LEG/ORIG, CPB/CRT Ancine).
+  - [x] Migration `catalog.products` (Itens de bomboniere, NCM, CEST, preços de custo e venda).
+  - [x] Migration `catalog.product_units` (Conversão de unidades: CX, UN, KG, LT com fator multiplicador e cálculo automático).
+  - [x] Migration `catalog.product_barcodes` (Múltiplos códigos EAN por unidade de medida).
+  - [x] Migration `catalog.combos` (Combos de pipoca + refrigerante com itens selecionáveis e adicionais de preço).
 
 ---
 

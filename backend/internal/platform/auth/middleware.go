@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"frame-24/internal/platform/httputil"
 )
 
 type contextKey string
@@ -22,20 +23,20 @@ func Middleware(tm *TokenManager) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
-				http.Error(w, `{"error":"Authorization header ausente"}`, http.StatusUnauthorized)
+				httputil.RespondError(w, r, http.StatusUnauthorized, "AUTH_HEADER_MISSING", "Cabecalho de autorizacao ausente", nil)
 				return
 			}
 
 			parts := strings.SplitN(authHeader, " ", 2)
 			if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-				http.Error(w, `{"error":"Formato de token invalido, use 'Bearer <token>'"}`, http.StatusUnauthorized)
+				httputil.RespondError(w, r, http.StatusUnauthorized, "INVALID_TOKEN_FORMAT", "Formato de token invalido, use 'Bearer <token>'", nil)
 				return
 			}
 
 			tokenString := parts[1]
 			claims, err := tm.ValidateToken(tokenString)
 			if err != nil {
-				http.Error(w, `{"error":"Token invalido ou expirado"}`, http.StatusUnauthorized)
+				httputil.RespondError(w, r, http.StatusUnauthorized, "INVALID_OR_EXPIRED_TOKEN", "Token de autorizacao invalido ou expirado", nil)
 				return
 			}
 
@@ -74,7 +75,7 @@ func RequireRole(allowedRoles ...string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims, ok := GetClaims(r.Context())
 			if !ok || claims == nil {
-				http.Error(w, `{"error":"Acesso nao autenticado"}`, http.StatusUnauthorized)
+				httputil.RespondError(w, r, http.StatusUnauthorized, "UNAUTHENTICATED", "Acesso nao autenticado", nil)
 				return
 			}
 
@@ -92,7 +93,7 @@ func RequireRole(allowedRoles ...string) func(http.Handler) http.Handler {
 			}
 
 			if !hasRole {
-				http.Error(w, `{"error":"Acesso negado: permissao insuficiente"}`, http.StatusForbidden)
+				httputil.RespondError(w, r, http.StatusForbidden, "INSUFFICIENT_PERMISSIONS", "Acesso negado: permissao insuficiente", nil)
 				return
 			}
 
