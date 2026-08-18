@@ -1,0 +1,34 @@
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck       # Garante que todos os erros sao checados
+    - gosimple       # Simplificacoes idiomaticas de Go
+    - govet          # Analise estatica oficial do Go
+    - ineffassign    # Atribuicoes que nunca sao usadas
+    - staticcheck    # Suite de analise avancada
+    - unused         # Codigo nao utilizado
+    - gofmt          # Formatacao obrigatoria
+    - misspell       # Erros de ortografia em comentarios
+    - gosec          # Vulnerabilidades de seguranca comuns
+    - bodyclose      # Garante fechamento de response.Body
+    - prealloc       # Otimizacao de slices
+
+  settings:
+    gofmt:
+      simplify: true
+    gosec:
+      excludes:
+        - G104 # Erros ignorados — cobertos pelo errcheck
+
+issues:
+  exclude-rules:
+    # Testes podem ter mais flexibilidade
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck

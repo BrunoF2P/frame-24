@@ -1,24 +1,12 @@
-# Ficheiros e pastas a serem ignorados pelo Docker
-node_modules/
-node_modules
-**/node_modules
-.pnpm-store
-**/.turbo
-dist
-**/dist
-!apps/api/dist
-!packages/db/dist
-build
-**/build
-.next
-**/.next
-.vercel
-**/.vercel
-coverage
-**/coverage
-apps/frontend/dist
-*.log
-
-# Ficheiros de ambiente não devem ser copiados para a imagem
+.git
+.github
+.vscode
+legacy
+frontend/node_modules
+frontend/**/.next
+frontend/**/dist
+backend/bin
+*.md
+coverage.txt
 .env
-.env.*
+.env.local

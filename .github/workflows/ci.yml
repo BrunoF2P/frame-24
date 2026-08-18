@@ -1,68 +1,47 @@
-name: CI
+name: CI Pipeline
 
 on:
   push:
     branches:
       - main
-      - 'preview/**'
+      - 'feature/**'
+      - 'fix/**'
   pull_request:
     branches:
       - main
-      - 'preview/**'
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  verify:
-    name: lint + check-types + build
+  backend-check:
+    name: Backend (Go Lint, Test & Build)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          version: 10.33.0
+          go-version: '1.22'
+          check-latest: true
+          cache-dependency-path: backend/go.sum
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
+      - name: Download Go Dependencies
+        run: go mod download
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Vet Code
+        run: go vet ./...
 
-      - name: Generate Prisma client
-        working-directory: packages/db
-        env:
-          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
-          DIRECT_URL: postgresql://dummy:dummy@localhost:5432/dummy
-        run: |
-          pnpm run db:generate
-          pnpm run build
+      - name: Run Tests (Race Detector & Coverage)
+        run: go test -v -race -coverprofile=coverage.txt ./...
 
-      - name: Lint
-        run: pnpm lint
-
-      - name: Type check
-        run: pnpm check-types
-
-      - name: Build
-        run: pnpm build
-        env:
-          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
-          DIRECT_URL: postgresql://dummy:dummy@localhost:5432/dummy
-
-      - name: Upload Turbo cache
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            .turbo
-            node_modules/.cache
-          key: turbo-${{ runner.os }}-${{ github.sha }}
+      - name: Build Server Binary
+        run: go build -v -o bin/server ./cmd/server
