@@ -212,6 +212,18 @@ func (s *Service) ListShowtimesByComplex(ctx context.Context, tenantID, complexI
 	return s.repo.ListShowtimesByComplex(ctx, tenantID, complexID, from, to)
 }
 
+func (s *Service) GetShowtimeByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.Showtime, error) {
+	return s.repo.GetShowtimeByID(ctx, tenantID, id)
+}
+
+func (s *Service) GetRoomByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.Room, error) {
+	return s.repo.GetRoomByID(ctx, tenantID, id)
+}
+
+func (s *Service) ListSeatsByRoom(ctx context.Context, tenantID, roomID uuid.UUID) ([]domain.Seat, error) {
+	return s.repo.ListSeatsByRoom(ctx, tenantID, roomID)
+}
+
 func (s *Service) GetRoomSeats(ctx context.Context, tenantID, roomID uuid.UUID) ([]domain.Seat, error) {
 	return s.repo.ListSeatsByRoom(ctx, tenantID, roomID)
 }

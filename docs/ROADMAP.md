@@ -129,16 +129,16 @@ frame-24/
 ### Fase 3: Núcleo de Vendas (Sales), PDV Touch e Concorrência
 *Objetivo: Checkout unificado de ingressos e bomboniere, reserva atômica de assentos no Redis e PDV com contingência.*
 
-- [ ] **3.1 Motor de Reserva Atômica de Assentos:**
-  - [ ] Implementar script Lua no Redis para lock atômico de assento em $< 1\text{ms}$ com TTL de 5 minutos.
-  - [ ] Implementar endpoint de heartbeat de renovação da reserva durante o checkout.
-  - [ ] Broadcast de mapa de assentos via WebSocket quando assentos forem reservados/liberados.
-- [ ] **3.2 Caso de Uso `CreateSale` (Venda de Ingressos e Concessão):**
-  - [ ] Migration `sales.sales` e `sales.tickets` com RLS ativado.
-  - [ ] Validação legal da **cota de 40% de meia-entrada** por sessão (Lei Federal 12.933/2013).
-  - [ ] Validação de integridade: $\text{Total da Venda} = \sum \text{Itens}$.
-  - [ ] Gravação transacional da venda $+$ tickets $+$ evento `sales.sale.completed` na Outbox.
-- [ ] **3.3 PDV Touch no Frontend Backoffice:**
+- [x] **3.1 Motor de Reserva Atômica de Assentos:**
+  - [x] Implementar script Lua no Redis para lock atômico de assento em $< 1\text{ms}$ com TTL de 5 minutos (`All-or-Nothing`).
+  - [x] Implementar endpoint de heartbeat de renovação da reserva durante o checkout.
+  - [x] Broadcast de mapa de assentos via WebSocket (`SeatMapHub`) quando assentos forem reservados/liberados/vendidos.
+- [x] **3.2 Caso de Uso `CreateSale` (Venda de Ingressos e Concessão):**
+  - [x] Migration `0003_sales_and_pos.up.sql` com `sales.sales`, `sales.sale_items`, `sales.tickets` e `sales.payments` com RLS ativado.
+  - [x] Validação legal da **cota de 40% de meia-entrada** por sessão (Lei Federal 12.933/2013).
+  - [x] Validação de integridade: $\text{Total da Venda} = \sum \text{Itens de Ingresso} + \sum \text{Itens de Bomboniere} - \text{Descontos}$.
+  - [x] Gravação transacional da venda $+$ tickets $+$ evento `sales.sale.completed` na Outbox.
+- [ ] **3.3 PDV Touch no Frontend Backoffice (Consolidação de Frontend no Fim do Projeto):**
   - [ ] Construção da interface de PDV em tela cheia (touch-screen e atalhos de teclado `F1-F12`).
   - [ ] Suporte a leitura de código de barras USB/Serial para bomboniere e busca rápida.
   - [ ] **Modo Contingência Offline:** Armazenamento em IndexedDB local com sincronização assíncrona ao reconectar.
@@ -181,6 +181,8 @@ frame-24/
     * Abertura de Caixa com Suprimento (Troco inicial);
     * Registro de Sangrias periódicas com impressão de recibo;
     * **Fechamento Cego de Caixa (*Blind Close*):** Operador digita valores contados sem ver o saldo esperado; o sistema gera borderô de conferência e lançamentos de ajuste contábil.
+- [ ] **5.3 Evolução do RLS de Plataforma (Multi-Claims):**
+  - [ ] Injetar `app.user_id` em conjunto com `app.tenant_id` em `RunInTenantTx` (`SELECT set_config('app.tenant_id', $1, true), set_config('app.user_id', $2, true)`) para políticas de auditoria e ownership por usuário.
 
 ---
 
@@ -205,26 +207,39 @@ frame-24/
 - [ ] **7.1 Bounded Context `crm` & `marketing`:**
   - [ ] Migration `crm.customer_profiles` (Pontuação de fidelidade *Cinema Club*, histórico).
   - [ ] Motor de regras de cupons e promoções (ex.: pipoca em dobro, descontos por dia da semana).
-- [ ] **7.2 Frontend `frontend/storefront` (Venda Online Pública):**
+- [ ] **7.2 Frontend `frontend/storefront` (Venda Online Pública & Totem):**
   - [ ] Programação de filmes por cidade e cinema com SEO otimizado (SSR/SSG).
   - [ ] Seleção visual interativa de assentos conectada ao WebSocket de tempo real.
   - [ ] Checkout online fluido com login único OIDC, PIX imediato e cartão de crédito.
+  - [ ] Modo quiosque (*kiosk mode*) para totem com leitor de cartão de crédito e impressora térmica ESC/POS.
+  - [ ] **`ALLOWED_ORIGINS` por variável de ambiente:** Substituir a lista estática de origens permitidas no `CheckOrigin` do `SeatMapHub` (`ws.go`) por uma variável de ambiente `ALLOWED_ORIGINS` (lista separada por vírgula), garantindo que o WebSocket aceite conexões do domínio real do storefront e do backoffice em produção sem alterar código.
+  - [ ] **Autenticação WebSocket por handler:** Remover a rota `/ws/showtimes/:showtimeId/seats` do middleware de auth HTTP e validar o token JWT dentro do handler via subprotocolo WebSocket (`Sec-WebSocket-Protocol`) — o fallback `?token=` atual nunca é alcançado pois a rota está sob `auth.Middleware`.
 - [ ] **7.3 Portal de Suporte & Offboarding de Dados:**
   - [ ] Backoffice com visualização cross-tenant para equipe de suporte com roles de `staff`.
   - [ ] **CLI de Exportação de Dados por Tenant (`frame24 export-tenant`):** Geração de `.tar.gz` contendo dumps SQL, CSVs e XMLs fiscais para offboarding / compliance LGPD.
 
 ---
 
-### Fase 8: Homologação, Observabilidade e Cutover
-*Objetivo: Testes de carga, validação de produção e entrega final.*
+### Fase 8: Hardening, Performance (pgx.Batch), Observabilidade e Cutover
+*Objetivo: Garantir resiliência, latência ultra-baixa em rotas críticas com pgx.Batch e entrega final.*
 
-- [ ] **8.1 Observabilidade e Hardening:**
+- [ ] **8.1 Otimização de Throughput RLS com `pgx.Batch`:**
+  - [ ] Consolidar `set_config` e queries em lote via `pgx.Batch` nas rotas mais críticas (Checkout PDV, Ingressos em lote, Leitura de catálogo) para atingir **1 único round-trip TCP**.
+- [ ] **8.2 Hardening Financeiro — Migração de `float64` para centavos inteiros (`int64`):**
+  - [ ] Substituir todos os campos de valor monetário (`total_amount`, `unit_price`, `subtotal_tickets`, etc.) de `float64` para representação em centavos inteiros (`int64` no domínio Go / `BIGINT` no PostgreSQL).
+  - [ ] O epsilon `0.01` em `ValidatePayments` e `NewSale` é um workaround temporário para drift de ponto flutuante; com `int64` a comparação passa a ser exata (`sum == s.TotalAmountCents`).
+  - [ ] Esta refatoração impacta: `domain/sale.go`, `domain/ticket.go`, `domain/payment.go`, todas as migrations e os handlers HTTP (serialização/deserialização de centavos ↔ reais).
+- [ ] **8.3 Hardening de Resiliência — Flag `SEATLOCK_REQUIRE` (fail-fast em produção):**
+  - [ ] Adicionar variável de ambiente `SEATLOCK_REQUIRE=1` (padrão `0` em dev, `1` em prod).
+  - [ ] Quando `SEATLOCK_REQUIRE=1` e o Redis estiver indisponível, `VerifySeatLocks` deve retornar `ErrSeatLockFailed` imediatamente em vez de `nil` — o `UNIQUE (showtime_id, seat_id)` ainda impede venda dupla, mas a reserva transitória deixa de ser inócua em caso de queda do Redis.
+- [ ] **8.4 Observabilidade e Logs Estruturados:**
   - [ ] Configuração de logs estruturados em JSON (`log/slog`) com `tenant_id` e `trace_id`.
   - [ ] Configuração de métricas Prometheus em `/metrics` e healthchecks `/healthz/live` e `/healthz/ready`.
-  - [ ] Geração automática da documentação Swagger/OpenAPI em `/swagger` a partir das structs Go.
-- [ ] **8.2 Testes de Carga e Homologação:**
-  - [ ] Testes de carga de concorrência com `k6` simulando abertura de vendas de blockbuster (1.000 req/s em assentos).
+  - [ ] Tracing distribuído OpenTelemetry.
+- [ ] **8.5 Homologação e Testes de Carga:**
+  - [ ] Testes de carga com k6 simulando pico de abertura de vendas de grande lançamento (1.000 req/s em mapa de assentos).
   - [ ] Testes E2E de ponta a ponta: *Reserva $\rightarrow$ Pagamento $\rightarrow$ Baixa Estoque $\rightarrow$ Emissão NFC-e/NFS-e $\rightarrow$ Ledger Double-Entry*.
-- [ ] **8.3 Arquivamento Final do Legado:**
+  - [ ] Geração automática da documentação Swagger/OpenAPI em `/swagger`.
+- [ ] **8.6 Arquivamento Final do Legado:**
   - [ ] Validação de que 100% das regras do legado foram absorvidas.
   - [ ] Atualização do `README.md` principal com as instruções de execução do novo ecossistema Go.

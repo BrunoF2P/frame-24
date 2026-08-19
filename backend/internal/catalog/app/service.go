@@ -231,10 +231,18 @@ func (s *Service) ListProducts(ctx context.Context, tenantID uuid.UUID) ([]domai
 	return s.repo.ListProducts(ctx, tenantID)
 }
 
+func (s *Service) GetProductByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.Product, error) {
+	return s.repo.GetProductByID(ctx, tenantID, id)
+}
+
 func (s *Service) GetProductByBarcode(ctx context.Context, tenantID uuid.UUID, barcode string) (*domain.Product, *domain.ProductUnit, error) {
 	return s.repo.GetProductByBarcode(ctx, tenantID, barcode)
 }
 
 func (s *Service) ListCombos(ctx context.Context, tenantID uuid.UUID) ([]domain.Combo, error) {
 	return s.repo.ListCombos(ctx, tenantID)
+}
+
+func (s *Service) GetComboByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.Combo, error) {
+	return s.repo.GetComboByID(ctx, tenantID, id)
 }

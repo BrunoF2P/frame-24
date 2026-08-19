@@ -10,6 +10,7 @@ import (
 	catalogDomain "frame-24/internal/catalog/domain"
 	identityDomain "frame-24/internal/identity/domain"
 	opsDomain "frame-24/internal/operations/domain"
+	salesDomain "frame-24/internal/sales/domain"
 )
 
 // ErrorResponse define o envelope canônico de erros da API para consumo seguro pelo Frontend (React/Next.js).
@@ -108,18 +109,49 @@ func MapDomainError(err error) (status int, code string) {
 		return http.StatusConflict, "UNIT_ALREADY_EXISTS"
 	case errors.Is(err, catalogDomain.ErrBarcodeAlreadyExists):
 		return http.StatusConflict, "BARCODE_ALREADY_EXISTS"
-	case errors.Is(err, catalogDomain.ErrInvalidConversion):
-		return http.StatusUnprocessableEntity, "INVALID_UNIT_CONVERSION"
 	case errors.Is(err, catalogDomain.ErrInvalidNCM):
 		return http.StatusUnprocessableEntity, "INVALID_NCM"
+	case errors.Is(err, catalogDomain.ErrInvalidConversion):
+		return http.StatusUnprocessableEntity, "INVALID_CONVERSION"
+
+	// Bounded Context: Sales & POS
+	case errors.Is(err, salesDomain.ErrSaleNotFound):
+		return http.StatusNotFound, "SALE_NOT_FOUND"
+	case errors.Is(err, salesDomain.ErrTicketNotFound):
+		return http.StatusNotFound, "TICKET_NOT_FOUND"
+	case errors.Is(err, salesDomain.ErrSeatAlreadySold):
+		return http.StatusConflict, "SEAT_ALREADY_SOLD"
+	case errors.Is(err, salesDomain.ErrSeatLockFailed):
+		return http.StatusConflict, "SEAT_LOCK_FAILED"
+	case errors.Is(err, salesDomain.ErrTicketAlreadyUsed):
+		return http.StatusConflict, "TICKET_ALREADY_USED"
+	case errors.Is(err, salesDomain.ErrSeatLockExpired):
+		return http.StatusGone, "SEAT_LOCK_EXPIRED"
+	case errors.Is(err, salesDomain.ErrHalfPriceLimitExceeded):
+		return http.StatusUnprocessableEntity, "HALF_PRICE_LIMIT_EXCEEDED"
+	case errors.Is(err, salesDomain.ErrInvalidSaleTotal):
+		return http.StatusUnprocessableEntity, "INVALID_SALE_TOTAL"
+	case errors.Is(err, salesDomain.ErrEmptySale):
+		return http.StatusUnprocessableEntity, "EMPTY_SALE"
+	case errors.Is(err, salesDomain.ErrInvalidPaymentAmount):
+		return http.StatusUnprocessableEntity, "INVALID_PAYMENT_AMOUNT"
+	case errors.Is(err, salesDomain.ErrInvalidPaymentMethod):
+		return http.StatusUnprocessableEntity, "INVALID_PAYMENT_METHOD"
+	case errors.Is(err, salesDomain.ErrInvalidTicketType):
+		return http.StatusUnprocessableEntity, "INVALID_TICKET_TYPE"
+	case errors.Is(err, salesDomain.ErrInvalidShowtimePrice):
+		return http.StatusUnprocessableEntity, "INVALID_SHOWTIME_PRICE"
 
 	default:
 		return http.StatusInternalServerError, "INTERNAL_SERVER_ERROR"
 	}
 }
 
-// RespondDomainError mapeia e responde automaticamente um erro de domínio no padrão da plataforma
+// RespondDomainError mapeia um erro de domínio e responde com o envelope canônico
 func RespondDomainError(w http.ResponseWriter, r *http.Request, err error) {
+	if err == nil {
+		return
+	}
 	status, code := MapDomainError(err)
 	RespondError(w, r, status, code, err.Error(), nil)
 }
