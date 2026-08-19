@@ -30,7 +30,7 @@ type Transaction struct {
 	TenantID        uuid.UUID     `json:"tenantId"`
 	TransactionDate time.Time     `json:"transactionDate"`
 	Description     string        `json:"description"`
-	ReferenceType   string        `json:"referenceType"` // sale | cash_session | inventory_discard | purchase | manual | split_tax
+	ReferenceType   string        `json:"referenceType"` // sale | payment | cash_session | inventory_discard | purchase | manual | split_tax
 	ReferenceID     *uuid.UUID    `json:"referenceId,omitempty"`
 	CreatedAt       time.Time     `json:"createdAt"`
 	Entries         []LedgerEntry `json:"entries"`
@@ -38,6 +38,7 @@ type Transaction struct {
 
 var validReferenceTypes = map[string]bool{
 	"sale":              true,
+	"payment":           true,
 	"cash_session":      true,
 	"inventory_discard": true,
 	"purchase":          true,
@@ -106,9 +107,10 @@ func (t *Transaction) Validate() error {
 
 	var sumDebit, sumCredit float64
 	for _, entry := range t.Entries {
-		if entry.EntryType == EntryTypeDebit {
+		switch entry.EntryType {
+		case EntryTypeDebit:
 			sumDebit += entry.Amount
-		} else if entry.EntryType == EntryTypeCredit {
+		case EntryTypeCredit:
 			sumCredit += entry.Amount
 		}
 	}

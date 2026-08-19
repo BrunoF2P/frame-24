@@ -30,6 +30,13 @@
 - [x] Emissão de tickets com QR Code seguro (SHA-256) e evento transacional `sales.sale.completed` na Outbox.
 - [x] 100% dos testes unitários passando.
 
+### [x] Fase 4: Pagamentos, TEF e Emissão Fiscal Dual (Concluída ✅)
+- [x] Migration `0005_combos_payments_and_fiscal.up.sql` (`payments.payment_attempts`, `payments.tef_transactions`, `fiscal.fiscal_profiles`, `fiscal.fiscal_documents`, `fiscal.fiscal_document_items`).
+- [x] Bounded Context `payments`: Pagamento PIX dinâmico (BACEN EMVCo), ciclo de vida TEF com 2-phase commit (Authorize $\rightarrow$ Confirm CNC / Auto-Reversal NCN) e idempotência de webhooks.
+- [x] Bounded Context `fiscal`: Separação dual de emissão (Ingressos $\rightarrow$ NFS-e / Bomboniere $\rightarrow$ NFC-e), cálculo da Reforma Tributária (CBS 0.90% e IBS 0.10% em 2026) e regra SEFAZ de cancelamento ($\le 30\text{m}$ cancelamento direto vs $> 30\text{m}$ NF-e de Devolução CFOP 1.202).
+- [x] Resolução de Gaps: Decomposição de combos em insumos físicos e agregação de estoque por produto antes da baixa.
+- [x] 100% dos testes unitários passando em 14 pacotes.
+
 ### [x] Fase 5: Financeiro (Ledger Double-Entry, Fechamento Cego) e Estoque (Concluída ✅)
 - [x] Injeção de RLS Multi-Claims: `RunInTenantTx` com `app.tenant_id` e `app.user_id` em 1 query SQL + helper `platform.current_user_id()`.
 - [x] Migration `0004_finance_and_inventory.up.sql` com RLS FORCE RESTRICTIVE em 8 tabelas de estoque e financeiro.
@@ -38,7 +45,7 @@
 - [x] Módulo de Caixa de PDV: Abertura de sessão com suprimento, sangrias periódicas e **Fechamento Cego de Caixa (*Blind Close*)** com apuração automática de Quebras (despesa) e Sobras (receita).
 - [x] 100% dos testes unitários passando em todos os pacotes.
 
-### [ ] Próximo Foco: Fase 4 — Pagamentos, TEF e Emissão Fiscal Dual (NFC-e / NFS-e)
+### [ ] Próximo Foco: Fase 6 — Contratos de Exibição, Distribuidoras e Ancine SCB
 
 ---
 

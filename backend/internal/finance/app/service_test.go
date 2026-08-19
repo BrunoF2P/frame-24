@@ -243,3 +243,49 @@ func TestFinanceService_SaleCompletedWithCMV(t *testing.T) {
 	// Deve conter: 2 débitos (cartão, pix) + 2 créditos (bilheteria, bomboniere) + 1 débito CMV + 1 crédito Estoque = 6 pernas
 	assert.Len(t, txs[0].Entries, 6)
 }
+
+func TestFinanceService_RecordOnlinePaymentReceipt(t *testing.T) {
+	repo := NewFakeFinanceRepo()
+	svc := NewService(nil, repo)
+	tenantID := uuid.New()
+	saleID := uuid.New()
+	attemptID := uuid.New()
+	ctx := context.Background()
+
+	// 1. Recebimento PIX aprovado (webhook) — liquida Recebíveis PIX → Bancos
+	err := svc.RecordOnlinePaymentReceipt(ctx, tenantID, saleID, attemptID, 20.0, "pix")
+	require.NoError(t, err)
+
+	txs, err := svc.ListTransactions(ctx, tenantID, 10)
+	require.NoError(t, err)
+	require.Len(t, txs, 1)
+	assert.Equal(t, "payment", txs[0].ReferenceType)
+	require.Len(t, txs[0].Entries, 2)
+	assert.Equal(t, domain.EntryTypeDebit, txs[0].Entries[0].EntryType)
+	assert.Equal(t, domain.EntryTypeCredit, txs[0].Entries[1].EntryType)
+	assert.Equal(t, 20.0, txs[0].Entries[0].Amount)
+	assert.Equal(t, 20.0, txs[0].Entries[1].Amount)
+
+	// 2. Recebimento de cartão — liquida Adquirentes de Cartão → Bancos
+	cardAttemptID := uuid.New()
+	err = svc.RecordOnlinePaymentReceipt(ctx, tenantID, saleID, cardAttemptID, 50.0, "credit_card")
+	require.NoError(t, err)
+
+	txs, err = svc.ListTransactions(ctx, tenantID, 10)
+	require.NoError(t, err)
+	assert.Len(t, txs, 2)
+
+	// 3. Método não online (cash/voucher) não gera lançamento de recebível
+	err = svc.RecordOnlinePaymentReceipt(ctx, tenantID, saleID, uuid.New(), 10.0, "cash")
+	require.NoError(t, err)
+	txs, err = svc.ListTransactions(ctx, tenantID, 10)
+	require.NoError(t, err)
+	assert.Len(t, txs, 2)
+
+	// 4. Valor <= 0 é ignorado silenciosamente
+	err = svc.RecordOnlinePaymentReceipt(ctx, tenantID, saleID, uuid.New(), 0.0, "pix")
+	require.NoError(t, err)
+	txs, err = svc.ListTransactions(ctx, tenantID, 10)
+	require.NoError(t, err)
+	assert.Len(t, txs, 2)
+}

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -20,6 +21,9 @@ import (
 	financeApp "frame-24/internal/finance/app"
 	financeHttp "frame-24/internal/finance/http"
 	financeRepo "frame-24/internal/finance/repo"
+	fiscalApp "frame-24/internal/fiscal/app"
+	fiscalHttp "frame-24/internal/fiscal/http"
+	fiscalRepo "frame-24/internal/fiscal/repo"
 	identityApp "frame-24/internal/identity/app"
 	identityHttp "frame-24/internal/identity/http"
 	identityRepo "frame-24/internal/identity/repo"
@@ -29,6 +33,9 @@ import (
 	operationsApp "frame-24/internal/operations/app"
 	operationsHttp "frame-24/internal/operations/http"
 	operationsRepo "frame-24/internal/operations/repo"
+	paymentsApp "frame-24/internal/payments/app"
+	paymentsHttp "frame-24/internal/payments/http"
+	paymentsRepo "frame-24/internal/payments/repo"
 	salesApp "frame-24/internal/sales/app"
 	salesHttp "frame-24/internal/sales/http"
 	salesRepo "frame-24/internal/sales/repo"
@@ -112,13 +119,15 @@ func main() {
 	// 4. Inicializar Auth Token Manager (JWT)
 	tokenManager := auth.NewTokenManager(jwtSecret, 24*time.Hour)
 
-	// 5. Inicializar Bounded Contexts (Identidade, Operações, Catálogo, Vendas, Estoque, Financeiro)
+	// 5. Inicializar Bounded Contexts (Identidade, Operações, Catálogo, Vendas, Estoque, Financeiro, Pagamentos, Fiscal)
 	var identityHandler *identityHttp.Handler
 	var operationsHandler *operationsHttp.Handler
 	var catalogHandler *catalogHttp.Handler
 	var salesHandler *salesHttp.Handler
 	var inventoryHandler *inventoryHttp.Handler
 	var financeHandler *financeHttp.Handler
+	var paymentsHandler *paymentsHttp.Handler
+	var fiscalHandler *fiscalHttp.Handler
 
 	if pool != nil {
 		idRepo := identityRepo.NewPostgresRepository(pool)
@@ -145,6 +154,14 @@ func main() {
 		finService := financeApp.NewService(pool, finRepo)
 		financeHandler = financeHttp.NewHandler(finService)
 
+		payRepo := paymentsRepo.NewPostgresRepository(pool)
+		payService := paymentsApp.NewService(pool, payRepo, nil, nil)
+		paymentsHandler = paymentsHttp.NewHandler(payService)
+
+		fiscRepo := fiscalRepo.NewPostgresRepository(pool)
+		fiscService := fiscalApp.NewService(pool, fiscRepo)
+		fiscalHandler = fiscalHttp.NewHandler(fiscService)
+
 		// Registrar automações assíncronas do EventBus para o evento sales.sale.completed
 		eventBus.Subscribe("sales.sale.completed", func(ctx context.Context, event outbox.Event) error {
 			var payload struct {
@@ -170,6 +187,13 @@ func main() {
 					UnitPrice  float64    `json:"unitPrice"`
 					TotalPrice float64    `json:"totalPrice"`
 				} `json:"items"`
+				Tickets []struct {
+					TicketID   uuid.UUID `json:"ticketId"`
+					ShowtimeID uuid.UUID `json:"showtimeId"`
+					SeatID     uuid.UUID `json:"seatId"`
+					TicketType string    `json:"ticketType"`
+					Price      float64   `json:"price"`
+				} `json:"tickets"`
 			}
 
 			if err := json.Unmarshal(event.Payload, &payload); err != nil {
@@ -177,16 +201,100 @@ func main() {
 				return err
 			}
 
-			// 1. Baixa automática de Estoque para itens de bomboniere
+			// 1. Decomposição de Combos e Agregação de Quantidades por Produto para Baixa de Estoque e CMV
+			type stockKey struct {
+				ProductID uuid.UUID
+				UnitID    uuid.UUID
+			}
+			stockAggregation := make(map[stockKey]float64)
+			var concessionCMVItems []financeApp.SaleConcessionItemPayload
+			var fiscalConcessionItems []fiscalApp.SaleConcessionInput
+
 			for _, item := range payload.Items {
 				if item.ProductID != nil && item.Quantity > 0 {
-					if err := invService.DeductSaleItem(ctx, event.TenantID, payload.ComplexID, *item.ProductID, item.UnitID, item.Quantity, payload.SaleID); err != nil {
-						slog.Warn("aviso: baixa de estoque falhou para item de venda", "saleId", payload.SaleID, "productId", item.ProductID, "error", err)
+					// Produto avulso
+					key := stockKey{ProductID: *item.ProductID, UnitID: item.UnitID}
+					stockAggregation[key] += item.Quantity
+
+					unitCost := 0.0
+					description := "Item de Bomboniere"
+					var ncm, cest *string
+					if catService != nil {
+						prod, err := catService.GetProductByID(ctx, event.TenantID, *item.ProductID)
+						if err == nil && prod != nil {
+							unitCost = prod.CostPrice
+							description = prod.Name
+							ncm = prod.NCM
+							cest = prod.CEST
+						}
 					}
+					concessionCMVItems = append(concessionCMVItems, financeApp.SaleConcessionItemPayload{
+						ProductID: item.ProductID,
+						Quantity:  item.Quantity,
+						UnitCost:  unitCost,
+					})
+					fiscalConcessionItems = append(fiscalConcessionItems, fiscalApp.SaleConcessionInput{
+						ItemID:      item.ItemID,
+						ItemType:    item.ItemType,
+						Description: description,
+						NCM:         ncm,
+						CEST:        cest,
+						UnitPrice:   item.UnitPrice,
+						Quantity:    item.Quantity,
+					})
+				} else if item.ComboID != nil && item.Quantity > 0 {
+					// Decomposição de Combo em Insumos de Estoque e CMV
+					comboDesc := "Combo Bomboniere"
+					var comboNCM, comboCEST *string
+					if catService != nil {
+						combo, err := catService.GetComboByID(ctx, event.TenantID, *item.ComboID)
+						if err == nil && combo != nil {
+							comboDesc = combo.Name
+							// Buscar NCM/CEST do produto-pai do combo no catálogo fiscal
+							parentProd, errParent := catService.GetProductByID(ctx, event.TenantID, combo.ProductID)
+							if errParent == nil && parentProd != nil {
+								comboNCM = parentProd.NCM
+								comboCEST = parentProd.CEST
+							}
+
+							for _, ci := range combo.Items {
+								expandedQty := item.Quantity * ci.Quantity
+								key := stockKey{ProductID: ci.ProductID, UnitID: ci.UnitID}
+								stockAggregation[key] += expandedQty
+
+								unitCost := 0.0
+								prod, errP := catService.GetProductByID(ctx, event.TenantID, ci.ProductID)
+								if errP == nil && prod != nil {
+									unitCost = prod.CostPrice
+								}
+								concessionCMVItems = append(concessionCMVItems, financeApp.SaleConcessionItemPayload{
+									ProductID: &ci.ProductID,
+									Quantity:  expandedQty,
+									UnitCost:  unitCost,
+								})
+							}
+						}
+					}
+					fiscalConcessionItems = append(fiscalConcessionItems, fiscalApp.SaleConcessionInput{
+						ItemID:      item.ItemID,
+						ItemType:    "combo",
+						Description: comboDesc,
+						NCM:         comboNCM,
+						CEST:        comboCEST,
+						UnitPrice:   item.UnitPrice,
+						Quantity:    item.Quantity,
+					})
 				}
 			}
 
-			// 2. Registro de vendas em dinheiro físico na sessão aberta de caixa do PDV
+			// 2. Baixa de estoque consolidada (1 chamada agregada por produto/unidade, prevenindo colisão de dedup)
+			for key, totalQty := range stockAggregation {
+				if err := invService.DeductSaleItem(ctx, event.TenantID, payload.ComplexID, key.ProductID, key.UnitID, totalQty, payload.SaleID); err != nil {
+					slog.Warn("aviso: baixa de estoque falhou para item de venda", "saleId", payload.SaleID, "productId", key.ProductID, "error", err)
+				}
+			}
+
+			// 3. Registro de vendas em dinheiro físico na sessão aberta de caixa do PDV
 			var cashAmount float64
 			paymentsMap := make(map[string]float64)
 			for _, pm := range payload.Payments {
@@ -205,35 +313,70 @@ func main() {
 				}
 			}
 
-			// 3. Reconhecimento Contábil no Livro-Razão (Partidas Dobradas + CMV)
-			var concessionItems []financeApp.SaleConcessionItemPayload
-			for _, it := range payload.Items {
-				if it.ProductID != nil {
-					unitCost := 0.0
-					if catService != nil {
-						prod, err := catService.GetProductByID(ctx, event.TenantID, *it.ProductID)
-						if err == nil && prod != nil {
-							unitCost = prod.CostPrice
-						}
-					}
-					concessionItems = append(concessionItems, financeApp.SaleConcessionItemPayload{
-						ProductID: it.ProductID,
-						Quantity:  it.Quantity,
-						UnitCost:  unitCost,
-					})
-				}
-			}
-
+			// 4. Reconhecimento Contábil no Livro-Razão (Partidas Dobradas + CMV consolidado)
 			if err := finService.ProcessSaleCompletedEvent(
 				ctx, event.TenantID, payload.SaleID,
 				payload.SubtotalTickets, payload.SubtotalConcession,
 				payload.DiscountAmount, payload.TotalAmount,
-				paymentsMap, concessionItems,
+				paymentsMap, concessionCMVItems,
 			); err != nil {
 				slog.Error("falha ao processar lancamento contabil da venda", "saleId", payload.SaleID, "error", err)
 				return err
 			}
 
+			// 5. Emissão Fiscal Dual (NFS-e para Ingressos + NFC-e para Bomboniere) com Reforma Tributária
+			var fiscalTickets []fiscalApp.SaleTicketInput
+			for _, tk := range payload.Tickets {
+				fiscalTickets = append(fiscalTickets, fiscalApp.SaleTicketInput{
+					TicketID:    tk.TicketID,
+					Description: fmt.Sprintf("Ingresso Cinematografico (%s)", tk.TicketType),
+					UnitPrice:   tk.Price,
+					Quantity:    1,
+				})
+			}
+
+			if fiscService != nil && (len(fiscalTickets) > 0 || len(fiscalConcessionItems) > 0) {
+				if _, err := fiscService.ProcessSaleCompleted(ctx, event.TenantID, payload.ComplexID, payload.SaleID, fiscalTickets, fiscalConcessionItems); err != nil {
+					slog.Error("falha ao emitir documentos fiscais da venda", "saleId", payload.SaleID, "error", err)
+					return err
+				}
+			}
+
+			return nil
+		})
+
+		// Subscriber: payments.payment.approved → reconcilia payment_attempt com a venda
+		// Garante que pagamentos online assíncronos (PIX, cartão) fiquem vinculados à sales.payments
+		// e emite evento de reconciliação para o financeiro processar o recebimento.
+		eventBus.Subscribe("payments.payment.approved", func(ctx context.Context, event outbox.Event) error {
+			var payload struct {
+				PaymentAttemptID uuid.UUID  `json:"paymentAttemptId"`
+				SaleID           *uuid.UUID `json:"saleId"`
+				Amount           float64    `json:"amount"`
+				PaymentMethod    string     `json:"paymentMethod"`
+				ExternalReference *string   `json:"externalReference"`
+			}
+			if err := json.Unmarshal(event.Payload, &payload); err != nil {
+				slog.Error("falha ao desserializar payments.payment.approved", "error", err)
+				return err
+			}
+			if payload.SaleID == nil {
+				slog.Warn("payments.payment.approved sem saleId — nenhuma acao de reconciliacao", "attemptId", payload.PaymentAttemptID)
+				return nil
+			}
+			// Registrar recebimento no ledger financeiro (mesmo método que cash, mas via payment_attempt)
+			// Reutiliza ProcessSaleCompletedEvent parcialmente: apenas o crédito de recebíveis.
+			if finService != nil {
+				if err := finService.RecordOnlinePaymentReceipt(ctx, event.TenantID, *payload.SaleID,
+					payload.PaymentAttemptID, payload.Amount, payload.PaymentMethod); err != nil {
+					slog.Error("falha ao registrar recebimento de pagamento online no ledger",
+						"saleId", payload.SaleID, "attemptId", payload.PaymentAttemptID, "error", err)
+					return err
+				}
+			}
+			slog.Info("pagamento online reconciliado com a venda",
+				"saleId", payload.SaleID, "attemptId", payload.PaymentAttemptID,
+				"method", payload.PaymentMethod, "amount", payload.Amount)
 			return nil
 		})
 	}
@@ -268,7 +411,7 @@ func main() {
 	r.Get("/api/v1/info", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"app":"Frame-24 ERP","version":"2.4.0","arch":"Modular Monolith (Go)","phase":"Phase 5 - Finance, Blind Close & Inventory"}`))
+		_, _ = w.Write([]byte(`{"app":"Frame-24 ERP","version":"2.5.0","arch":"Modular Monolith (Go)","phase":"Phase 4 - Payments, TEF & Dual Fiscal"}`))
 	})
 
 	// Montar rotas dos Bounded Contexts
@@ -289,6 +432,12 @@ func main() {
 	}
 	if financeHandler != nil {
 		financeHttp.RegisterRoutes(r, financeHandler, tokenManager)
+	}
+	if paymentsHandler != nil {
+		paymentsHttp.RegisterRoutes(r, paymentsHandler, tokenManager)
+	}
+	if fiscalHandler != nil {
+		fiscalHttp.RegisterRoutes(r, fiscalHandler, tokenManager)
 	}
 
 	srv := &http.Server{

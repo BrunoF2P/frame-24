@@ -455,6 +455,17 @@ func (s *Service) CreateSale(ctx context.Context, cmd CreateSaleCommand) (*domai
 			})
 		}
 
+		var ticketsPayload []map[string]any
+		for _, tk := range domainTickets {
+			ticketsPayload = append(ticketsPayload, map[string]any{
+				"ticketId":   tk.ID,
+				"showtimeId": tk.ShowtimeID,
+				"seatId":     tk.SeatID,
+				"ticketType": string(tk.TicketType),
+				"price":      tk.Price,
+			})
+		}
+
 		return outbox.InsertEvent(ctx, tx, cmd.TenantID, "sales.sale.completed", sale.ID, map[string]any{
 			"saleId":             sale.ID,
 			"complexId":          sale.ComplexID,
@@ -468,6 +479,7 @@ func (s *Service) CreateSale(ctx context.Context, cmd CreateSaleCommand) (*domai
 			"itemCount":          len(domainItems),
 			"payments":           paymentsPayload,
 			"items":              itemsPayload,
+			"tickets":            ticketsPayload,
 		})
 	})
 

@@ -9,9 +9,11 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	catalogDomain "frame-24/internal/catalog/domain"
 	financeDomain "frame-24/internal/finance/domain"
+	fiscalDomain "frame-24/internal/fiscal/domain"
 	identityDomain "frame-24/internal/identity/domain"
 	inventoryDomain "frame-24/internal/inventory/domain"
 	opsDomain "frame-24/internal/operations/domain"
+	paymentsDomain "frame-24/internal/payments/domain"
 	salesDomain "frame-24/internal/sales/domain"
 )
 
@@ -179,6 +181,44 @@ func MapDomainError(err error) (status int, code string) {
 		return http.StatusUnprocessableEntity, "INVALID_AMOUNT"
 	case errors.Is(err, financeDomain.ErrInvalidCashMovementType):
 		return http.StatusUnprocessableEntity, "INVALID_CASH_MOVEMENT_TYPE"
+
+	// Bounded Context: Payments
+	case errors.Is(err, paymentsDomain.ErrPaymentNotFound):
+		return http.StatusNotFound, "PAYMENT_NOT_FOUND"
+	case errors.Is(err, paymentsDomain.ErrTefTransactionNotFound):
+		return http.StatusNotFound, "TEF_TRANSACTION_NOT_FOUND"
+	case errors.Is(err, paymentsDomain.ErrDuplicateIdempotencyKey):
+		return http.StatusConflict, "DUPLICATE_IDEMPOTENCY_KEY"
+	case errors.Is(err, paymentsDomain.ErrTefAlreadyConfirmed):
+		return http.StatusConflict, "TEF_ALREADY_CONFIRMED"
+	case errors.Is(err, paymentsDomain.ErrTefAlreadyReversed):
+		return http.StatusConflict, "TEF_ALREADY_REVERSED"
+	case errors.Is(err, paymentsDomain.ErrPaymentAlreadyFinalized):
+		return http.StatusGone, "PAYMENT_ALREADY_FINALIZED"
+	case errors.Is(err, paymentsDomain.ErrInvalidPaymentMethod):
+		return http.StatusUnprocessableEntity, "INVALID_PAYMENT_METHOD"
+	case errors.Is(err, paymentsDomain.ErrInvalidAmount):
+		return http.StatusUnprocessableEntity, "INVALID_AMOUNT"
+	case errors.Is(err, paymentsDomain.ErrInvalidWebhookSignature):
+		return http.StatusUnauthorized, "INVALID_WEBHOOK_SIGNATURE"
+	case errors.Is(err, paymentsDomain.ErrWebhookPayloadMalformed):
+		return http.StatusBadRequest, "WEBHOOK_PAYLOAD_MALFORMED"
+
+	// Bounded Context: Fiscal
+	case errors.Is(err, fiscalDomain.ErrFiscalProfileNotFound):
+		return http.StatusNotFound, "FISCAL_PROFILE_NOT_FOUND"
+	case errors.Is(err, fiscalDomain.ErrFiscalDocumentNotFound):
+		return http.StatusNotFound, "FISCAL_DOCUMENT_NOT_FOUND"
+	case errors.Is(err, fiscalDomain.ErrFiscalDocumentAlreadyEmitted):
+		return http.StatusConflict, "FISCAL_DOCUMENT_ALREADY_EMITTED"
+	case errors.Is(err, fiscalDomain.ErrFiscalDocumentCancelled):
+		return http.StatusGone, "FISCAL_DOCUMENT_CANCELLED"
+	case errors.Is(err, fiscalDomain.ErrCancellationWindowExceeded):
+		return http.StatusUnprocessableEntity, "CANCELLATION_WINDOW_EXCEEDED"
+	case errors.Is(err, fiscalDomain.ErrInvalidTaxRegime):
+		return http.StatusUnprocessableEntity, "INVALID_TAX_REGIME"
+	case errors.Is(err, fiscalDomain.ErrFiscalItemsEmpty):
+		return http.StatusUnprocessableEntity, "FISCAL_ITEMS_EMPTY"
 
 	default:
 		return http.StatusInternalServerError, "INTERNAL_SERVER_ERROR"

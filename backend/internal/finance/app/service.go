@@ -469,3 +469,52 @@ func (s *Service) ProcessSaleCompletedEvent(
 
 	return nil
 }
+
+// RecordOnlinePaymentReceipt liquida o recebível (PIX/cartão) em Bancos quando o gateway confirma
+// o pagamento via payment_attempt (partidas dobradas idempotentes — retry não duplica o lançamento)
+func (s *Service) RecordOnlinePaymentReceipt(
+	ctx context.Context,
+	tenantID, saleID, paymentAttemptID uuid.UUID,
+	amount float64,
+	paymentMethod string,
+) error {
+	amount = math.Round(amount*100) / 100
+	if amount <= 0 {
+		return nil
+	}
+	_ = s.EnsureStandardAccounts(ctx, tenantID)
+
+	var receivableCode string
+	switch paymentMethod {
+	case "pix":
+		receivableCode = domain.CodeRecebiveisPIX
+	case "credit_card", "debit_card":
+		receivableCode = domain.CodeAdquirentesCartao
+	default:
+		return nil // métodos não online (cash/voucher) não têm recebível a liquidar aqui
+	}
+
+	desc := fmt.Sprintf("Recebimento online - venda #%s (tentativa #%s)", saleID.String()[:8], paymentAttemptID.String()[:8])
+	t := domain.NewTransaction(tenantID, time.Now(), desc, "payment", &paymentAttemptID)
+
+	bankAcc, err := s.repo.GetAccountByCode(ctx, tenantID, domain.CodeBancosContaMovimento)
+	if err != nil {
+		return fmt.Errorf("conta de bancos nao encontrada: %w", err)
+	}
+	receivableAcc, err := s.repo.GetAccountByCode(ctx, tenantID, receivableCode)
+	if err != nil {
+		return fmt.Errorf("conta de recebiveis (%s) nao encontrada: %w", receivableCode, err)
+	}
+	if err := t.AddEntry(bankAcc.ID, "debit", amount); err != nil {
+		return err
+	}
+	if err := t.AddEntry(receivableAcc.ID, "credit", amount); err != nil {
+		return err
+	}
+	if err := t.Validate(); err != nil {
+		return fmt.Errorf("transacao de recebimento online desbalanceada: %w", err)
+	}
+	return db.RunInTenantTx(ctx, s.pool, tenantID, func(tx pgx.Tx) error {
+		return s.repo.RecordTransaction(ctx, tx, t)
+	})
+}

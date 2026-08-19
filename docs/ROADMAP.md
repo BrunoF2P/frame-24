@@ -145,24 +145,24 @@ frame-24/
 
 ---
 
-### Fase 4: Pagamentos, TEF e Emissão Fiscal Dual
+### Fase 4: Pagamentos, TEF e Emissão Fiscal Dual (Concluída ✅)
 *Objetivo: Pagamentos online e presenciais via TEF, e emissão desacoplada de NFC-e (mercadoria) e NFS-e (ingresso).*
 
-- [ ] **4.1 Bounded Context `payments` (Gateways & TEF):**
-  - [ ] Migration `payments.payment_attempts` com chave de idempotência estrita.
-  - [ ] Integração de pagamento online (PIX imediato BACEN com QR Code dinâmico + Cartão).
-  - [ ] Implementação da interface `TefAdapter` para comunicação com PinPad físico no PDV.
-  - [ ] Processamento idempotente de webhooks de confirmação de pagamento.
-- [ ] **4.2 Bounded Context `fiscal` (NFC-e, NFS-e e Reforma Tributária):**
-  - [ ] Migration `fiscal.fiscal_profiles` (Certificado digital A1 por complexo, regime tributário).
-  - [ ] Migration `fiscal.fiscal_documents` e `fiscal.fiscal_document_items`.
-  - [ ] Consumer do evento `sales.sale.completed`:
-    * Separação dual: Ingressos $\rightarrow$ **NFS-e** (ISS); Bomboniere $\rightarrow$ **NFC-e** (ICMS).
-    * Cálculo de impostos por vigência (PIS/COFINS atual vs. CBS/IBS 2026/2027).
-  - [ ] Worker de transmissão assíncrona para Gateway Fiscal (Nuvem Fiscal / SpeedFe).
-  - [ ] **Regra SEFAZ de Cancelamento:**
-    * $\le 30$ min: cancelamento direto da NFC-e.
-    * $> 30$ min: emissão automática de **NF-e de Devolução/Estorno de Entrada** (CFOP 1.202).
+- [x] **4.1 Bounded Context `payments` (Gateways & TEF):**
+  - [x] Migration `0005_combos_payments_and_fiscal.up.sql` com `payments.payment_attempts` (chave de idempotência estrita) e `payments.tef_transactions` com RLS restritivo.
+  - [x] Integração de pagamento online (PIX imediato BACEN com QR Code dinâmico + Copia e Cola EMVCo).
+  - [x] Implementação da interface `TefAdapter` para comunicação com PinPad físico no PDV (2-phase commit CNC / NCN).
+  - [x] Processamento idempotente de webhooks de confirmação de pagamento.
+- [x] **4.2 Bounded Context `fiscal` (NFC-e, NFS-e e Reforma Tributária):**
+  - [x] Migration `fiscal.fiscal_profiles` (Certificado digital A1 por complexo, regime tributário, ambiente homologação/produção, CSC token).
+  - [x] Migration `fiscal.fiscal_documents` e `fiscal.fiscal_document_items` com RLS restritivo.
+  - [x] Consumer do evento `sales.sale.completed`:
+    * Separação dual: Ingressos $\rightarrow$ **NFS-e** (ISS LC 116 12.01); Bomboniere $\rightarrow$ **NFC-e** (ICMS modelo 65).
+    * Cálculo de impostos por vigência (PIS/COFINS atual vs. destaque informativo CBS 0.90% e IBS 0.10% em 2026 / Ato Conjunto RFB/CGIBS 4/2026).
+  - [x] Geração e autorização de notas fiscais com chave de acesso SEFAZ de 44 dígitos e protocolo.
+  - [x] **Regra SEFAZ de Cancelamento:**
+    * $\le 30$ min: cancelamento direto da NFC-e (SEFAZ evento 110111).
+    * $> 30$ min: emissão automática de **NF-e de Devolução/Estorno de Entrada** (modelo 55, CFOP 1.202) com chave referenciada da NFC-e original.
 
 ---
 

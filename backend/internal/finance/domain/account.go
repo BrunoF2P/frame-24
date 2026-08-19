@@ -20,6 +20,7 @@ const (
 // Códigos do Plano de Contas Padrão
 const (
 	CodeCaixaPDV              = "1.1.1.01"
+	CodeBancosContaMovimento  = "1.1.1.02"
 	CodeAdquirentesCartao     = "1.1.2.01"
 	CodeRecebiveisPIX         = "1.1.2.02"
 	CodeEstoqueMercadorias    = "1.1.3.01"
@@ -78,6 +79,7 @@ func GetStandardAccountsTemplate(tenantID uuid.UUID) []Account {
 	now := time.Now()
 	return []Account{
 		{ID: uuid.New(), TenantID: tenantID, Code: CodeCaixaPDV, Name: "Caixa Geral de PDV", AccountType: AccountTypeAsset, IsSystem: true, CreatedAt: now},
+		{ID: uuid.New(), TenantID: tenantID, Code: CodeBancosContaMovimento, Name: "Bancos Conta Movimento", AccountType: AccountTypeAsset, IsSystem: true, CreatedAt: now},
 		{ID: uuid.New(), TenantID: tenantID, Code: CodeAdquirentesCartao, Name: "Adquirentes de Cartão a Receber", AccountType: AccountTypeAsset, IsSystem: true, CreatedAt: now},
 		{ID: uuid.New(), TenantID: tenantID, Code: CodeRecebiveisPIX, Name: "Recebíveis PIX em Conta Transitória", AccountType: AccountTypeAsset, IsSystem: true, CreatedAt: now},
 		{ID: uuid.New(), TenantID: tenantID, Code: CodeEstoqueMercadorias, Name: "Estoque de Mercadorias (Bomboniere)", AccountType: AccountTypeAsset, IsSystem: true, CreatedAt: now},
