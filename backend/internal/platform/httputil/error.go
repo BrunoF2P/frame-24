@@ -8,7 +8,9 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	catalogDomain "frame-24/internal/catalog/domain"
+	financeDomain "frame-24/internal/finance/domain"
 	identityDomain "frame-24/internal/identity/domain"
+	inventoryDomain "frame-24/internal/inventory/domain"
 	opsDomain "frame-24/internal/operations/domain"
 	salesDomain "frame-24/internal/sales/domain"
 )
@@ -141,6 +143,42 @@ func MapDomainError(err error) (status int, code string) {
 		return http.StatusUnprocessableEntity, "INVALID_TICKET_TYPE"
 	case errors.Is(err, salesDomain.ErrInvalidShowtimePrice):
 		return http.StatusUnprocessableEntity, "INVALID_SHOWTIME_PRICE"
+
+	// Bounded Context: Inventory
+	case errors.Is(err, inventoryDomain.ErrWarehouseNotFound):
+		return http.StatusNotFound, "WAREHOUSE_NOT_FOUND"
+	case errors.Is(err, inventoryDomain.ErrStockItemNotFound):
+		return http.StatusNotFound, "STOCK_ITEM_NOT_FOUND"
+	case errors.Is(err, inventoryDomain.ErrWarehouseAlreadyExists):
+		return http.StatusConflict, "WAREHOUSE_ALREADY_EXISTS"
+	case errors.Is(err, inventoryDomain.ErrInsufficientStock):
+		return http.StatusUnprocessableEntity, "INSUFFICIENT_STOCK"
+	case errors.Is(err, inventoryDomain.ErrInvalidQuantity):
+		return http.StatusUnprocessableEntity, "INVALID_QUANTITY"
+	case errors.Is(err, inventoryDomain.ErrInvalidMovementType):
+		return http.StatusUnprocessableEntity, "INVALID_MOVEMENT_TYPE"
+
+	// Bounded Context: Finance
+	case errors.Is(err, financeDomain.ErrAccountNotFound):
+		return http.StatusNotFound, "ACCOUNT_NOT_FOUND"
+	case errors.Is(err, financeDomain.ErrCashSessionNotFound):
+		return http.StatusNotFound, "CASH_SESSION_NOT_FOUND"
+	case errors.Is(err, financeDomain.ErrAccountAlreadyExists):
+		return http.StatusConflict, "ACCOUNT_ALREADY_EXISTS"
+	case errors.Is(err, financeDomain.ErrCashSessionAlreadyOpen):
+		return http.StatusConflict, "CASH_SESSION_ALREADY_OPEN"
+	case errors.Is(err, financeDomain.ErrCashSessionClosed):
+		return http.StatusGone, "CASH_SESSION_CLOSED"
+	case errors.Is(err, financeDomain.ErrUnbalancedTransaction):
+		return http.StatusUnprocessableEntity, "UNBALANCED_TRANSACTION"
+	case errors.Is(err, financeDomain.ErrEmptyTransaction):
+		return http.StatusUnprocessableEntity, "EMPTY_TRANSACTION"
+	case errors.Is(err, financeDomain.ErrInvalidAccountType):
+		return http.StatusUnprocessableEntity, "INVALID_ACCOUNT_TYPE"
+	case errors.Is(err, financeDomain.ErrInvalidAmount):
+		return http.StatusUnprocessableEntity, "INVALID_AMOUNT"
+	case errors.Is(err, financeDomain.ErrInvalidCashMovementType):
+		return http.StatusUnprocessableEntity, "INVALID_CASH_MOVEMENT_TYPE"
 
 	default:
 		return http.StatusInternalServerError, "INTERNAL_SERVER_ERROR"

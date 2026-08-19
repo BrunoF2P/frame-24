@@ -256,11 +256,17 @@ func (h *Handler) CheckoutSale(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	callerID, _ := auth.GetUserID(r.Context())
+	var operatorID *uuid.UUID
+	if callerID != uuid.Nil {
+		operatorID = &callerID
+	}
+
 	sale, err := h.svc.CreateSale(r.Context(), app.CreateSaleCommand{
 		TenantID:        tenantID,
 		ComplexID:       complexID,
 		POSTerminalID:   req.POSTerminalID,
-		OperatorID:      nil,
+		OperatorID:      operatorID,
 		CustomerID:      customerUUID,
 		LockSessionID:   req.LockSessionID,
 		Tickets:         tickets,

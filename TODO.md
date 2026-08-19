@@ -24,11 +24,19 @@
 - [x] Script Lua atômico no Redis (`All-or-Nothing`) para lock de múltiplos assentos com TTL (5 min) e heartbeat de renovação.
 - [x] Hub WebSocket (`SeatMapHub`) de mapa de assentos para broadcast em tempo real (`SEATS_LOCKED`, `SEATS_RELEASED`, `SEATS_SOLD`).
 - [x] Migration `0003_sales_and_pos.up.sql` (`sales.sales`, `sales.sale_items`, `sales.tickets`, `sales.payments`) com RLS restritivo.
-- [x] Validação jurídica estrita da **cota de 40% de meia-entrada** por sessão (Lei Federal 12.933/2013).
+- [x] Validação jurídica estrita da **cota de 40% de meia-entrada** por sessão (Lei Federal 12.933/2013) com lock ACID `FOR UPDATE`.
+- [x] Preços autoritativos do servidor e validação estrita de ownership de lock no Redis (`VerifySeatLocks`).
 - [x] Validação de integridade contábil: $\text{Total Venda} = \sum \text{Itens de Ingresso} + \sum \text{Itens de Bomboniere} - \text{Descontos}$.
 - [x] Emissão de tickets com QR Code seguro (SHA-256) e evento transacional `sales.sale.completed` na Outbox.
 - [x] 100% dos testes unitários passando.
-- *(Nota: Interface visual do PDV Touch e frontends serão desenvolvidos na fase consolidada de frontend no fim do projeto)*
+
+### [x] Fase 5: Financeiro (Ledger Double-Entry, Fechamento Cego) e Estoque (Concluída ✅)
+- [x] Injeção de RLS Multi-Claims: `RunInTenantTx` com `app.tenant_id` e `app.user_id` em 1 query SQL + helper `platform.current_user_id()`.
+- [x] Migration `0004_finance_and_inventory.up.sql` com RLS FORCE RESTRICTIVE em 8 tabelas de estoque e financeiro.
+- [x] Bounded Context `inventory`: Almoxarifados, saldos com proteção não-negativa (`CHECK (current_quantity >= 0)`) e movimentações append-only (`purchases`, `discards`, `audits`, `sales`).
+- [x] Bounded Context `finance`: Livro-razão contábil com partidas dobradas imutáveis ($\sum \text{Débitos} = \sum \text{Créditos}$), plano de contas padrão com suporte a Split Payment CBS/IBS 2027.
+- [x] Módulo de Caixa de PDV: Abertura de sessão com suprimento, sangrias periódicas e **Fechamento Cego de Caixa (*Blind Close*)** com apuração automática de Quebras (despesa) e Sobras (receita).
+- [x] 100% dos testes unitários passando em todos os pacotes.
 
 ### [ ] Próximo Foco: Fase 4 — Pagamentos, TEF e Emissão Fiscal Dual (NFC-e / NFS-e)
 
@@ -45,6 +53,10 @@
 ### Fase 8 — Hardening Financeiro e Resiliência
 - [ ] **`float64` → `int64` (centavos):** Todos os campos monetários (`total_amount`, `unit_price`, `base_ticket_price`, etc.) devem migrar de `float64` para centavos inteiros `int64`/`BIGINT`. O epsilon `0.01` em `ValidatePayments` e `NewSale` é um workaround temporário para drift de ponto flutuante. A refatoração impacta `domain/sale.go`, `domain/ticket.go`, `domain/payment.go`, todas as migrations e a camada HTTP.
 - [ ] **Flag `SEATLOCK_REQUIRE`:** Adicionar env `SEATLOCK_REQUIRE=1` (padrão `0` em dev). Quando ativo e o Redis estiver indisponível, `VerifySeatLocks` retorna `ErrSeatLockFailed` imediatamente (fail-fast) em vez de `nil` — o `UNIQUE (showtime_id, seat_id)` impede venda dupla, mas a reserva transitória se torna inócua sem o Redis.
+- [ ] **Decomposição de Combos em Estoque (`catalog.combo_components`):** Atualmente itens tipo combo (`ProductID == nil`) não geram baixa em `inventory.movements` nem CMV no subscriber de vendas. Implementar a relação `catalog.combo_components` para decompor combos nos seus insumos físicos.
+- [ ] **Reserva/Baixa Síncrona de Estoque:** Adicionar trava/reserva síncrona no checkout (`CreateSale`) para rejeitar vendas sem estoque físico no ato da compra.
+- [ ] **Custo Histórico/FIFO no CMV:** Migrar a apuração de CMV do subscriber para custo histórico congelado no ato da venda (`sale_items.unit_cost`) ou custeio médio/FIFO.
+
 
 ---
 

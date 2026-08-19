@@ -169,20 +169,20 @@ frame-24/
 ### Fase 5: Financeiro (Ledger Double-Entry, Fechamento Cego) e Estoque
 *Objetivo: Contabilidade imutável, fechamento seguro de caixas físicos e controle de estoque.*
 
-- [ ] **5.1 Bounded Context `inventory` (Estoque de Bomboniere):**
-  - [ ] Migration `inventory.movements` (Append-only: Venda, Entrada por NF, Descarte, Inventário).
-  - [ ] Baixa automática de estoque na unidade base física ao consumir `sales.sale.completed`.
-  - [ ] Constraint `CHECK (quantity >= 0)` impedindo saldo físico negativo.
-- [ ] **5.2 Bounded Context `finance` (Ledger Contábil & Caixas):**
-  - [ ] Migration `finance.accounts` e `finance.ledger_entries` (Lançamentos de débito e crédito balanceados).
-  - [ ] Lançamentos automáticos para Venda, Custo de Mercadoria Vendida (CMV) e Taxas de Cartão/MDR.
-  - [ ] Suporte a contas de retenção na fonte para **Split Payment da CBS/IBS (2027)**.
-  - [ ] **Módulo de Caixa de PDV:**
+- [x] **5.1 Bounded Context `inventory` (Estoque de Bomboniere):**
+  - [x] Migration `0004_finance_and_inventory.up.sql` (`inventory.warehouses`, `inventory.stock_levels`, `inventory.movements` com RLS restritivo).
+  - [x] Baixa automática e controle de movimentações na unidade base física com `CHECK (current_quantity >= 0)` e concorrência ACID (`FOR UPDATE`).
+  - [x] Casos de uso: entrada por compra, descarte por avaria, balanço/inventário físico e baixa por venda.
+- [x] **5.2 Bounded Context `finance` (Ledger Contábil & Caixas):**
+  - [x] Migration `0004_finance_and_inventory.up.sql` (`finance.accounts`, `finance.transactions`, `finance.ledger_entries`, `finance.cash_sessions`, `finance.cash_movements`).
+  - [x] Lançamentos automáticos balanceados de partidas dobradas ($\sum \text{Débitos} = \sum \text{Créditos}$) para Vendas, CMV, Quebras e Sobras.
+  - [x] Suporte nativo a contas de retenção na fonte para **Split Payment da CBS/IBS (2027)** (`2.1.2.01` e `2.1.2.02`).
+  - [x] **Módulo de Caixa de PDV:**
     * Abertura de Caixa com Suprimento (Troco inicial);
-    * Registro de Sangrias periódicas com impressão de recibo;
-    * **Fechamento Cego de Caixa (*Blind Close*):** Operador digita valores contados sem ver o saldo esperado; o sistema gera borderô de conferência e lançamentos de ajuste contábil.
-- [ ] **5.3 Evolução do RLS de Plataforma (Multi-Claims):**
-  - [ ] Injetar `app.user_id` em conjunto com `app.tenant_id` em `RunInTenantTx` (`SELECT set_config('app.tenant_id', $1, true), set_config('app.user_id', $2, true)`) para políticas de auditoria e ownership por usuário.
+    * Registro de Sangrias periódicas com autorizador;
+    * **Fechamento Cego de Caixa (*Blind Close*):** Operador digita valores contados sem ver o saldo esperado; o sistema gera borderô de conferência e lança automaticamente a Quebra (despesa) ou Sobra (receita) no Ledger.
+- [x] **5.3 Evolução do RLS de Plataforma (Multi-Claims):**
+  - [x] Injetar `app.user_id` em conjunto com `app.tenant_id` em `RunInTenantTx` (`SELECT set_config('app.tenant_id', $1, true), set_config('app.user_id', $2, true)`) e função PostgreSQL `platform.current_user_id()`.
 
 ---
 
@@ -243,3 +243,9 @@ frame-24/
 - [ ] **8.6 Arquivamento Final do Legado:**
   - [ ] Validação de que 100% das regras do legado foram absorvidas.
   - [ ] Atualização do `README.md` principal com as instruções de execução do novo ecossistema Go.
+- [ ] **8.7 Débitos Técnicos & Resiliência de Estoque/Financeiro:**
+  - [ ] **Decomposição de Combos em Estoque (`catalog.combo_components`):** Atualmente `ProductID == nil` em itens tipo combo não gera baixa em `inventory.movements` nem CMV no subscriber de vendas. Implementar a tabela `catalog.combo_components` para decompor combos nos seus produtos e insumos base (ex: 1 Pipoca + 1 Refri) e computar a baixa física e CMV correspondentes.
+  - [ ] **Reserva/Baixa Síncrona de Estoque:** No momento, a baixa de estoque ocorre assincronamente pelo evento `sales.sale.completed` (logando `Warn` se falhar). Implementar pré-baixa/reserva síncrona no `CreateSale` para que vendas sem estoque físico sejam rejeitadas imediatamente (`ErrInsufficientStock`), mantendo o evento assíncrono para a contabilização no Ledger.
+  - [ ] **Custo Histórico/FIFO no Cálculo de CMV:** O subscriber do evento de venda lê o `CostPrice` atual do produto no momento da execução. Migrar para custo histórico registrado na foto da venda (`sale_items.unit_cost`) ou custeio médio/FIFO.
+  - [ ] **Lock de Caixa em Operações Concorrentes:** Reforçar lock transacional na sessão de caixa para impedir sangrias/suprimentos no instante em que o Fechamento Cego estiver apurando o saldo esperado.
+

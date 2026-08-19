@@ -432,15 +432,42 @@ func (s *Service) CreateSale(ctx context.Context, cmd CreateSaleCommand) (*domai
 
 		sale = createdSale
 
+		// Serializar breakdown de pagamentos e itens de bomboniere para automação de estoque e financeiro
+		var paymentsPayload []map[string]any
+		for _, pm := range domainPayments {
+			paymentsPayload = append(paymentsPayload, map[string]any{
+				"paymentMethod": pm.PaymentMethod,
+				"amount":        pm.Amount,
+			})
+		}
+
+		var itemsPayload []map[string]any
+		for _, it := range domainItems {
+			itemsPayload = append(itemsPayload, map[string]any{
+				"itemId":     it.ID,
+				"itemType":   it.ItemType,
+				"productId":  it.ProductID,
+				"comboId":    it.ComboID,
+				"unitId":     it.UnitID,
+				"quantity":   it.Quantity,
+				"unitPrice":  it.UnitPrice,
+				"totalPrice": it.TotalPrice,
+			})
+		}
+
 		return outbox.InsertEvent(ctx, tx, cmd.TenantID, "sales.sale.completed", sale.ID, map[string]any{
 			"saleId":             sale.ID,
 			"complexId":          sale.ComplexID,
 			"posTerminalId":      sale.POSTerminalID,
+			"operatorId":         sale.OperatorID,
 			"totalAmount":        sale.TotalAmount,
 			"subtotalTickets":    sale.SubtotalTickets,
 			"subtotalConcession": sale.SubtotalConcession,
+			"discountAmount":     sale.DiscountAmount,
 			"ticketCount":        len(domainTickets),
 			"itemCount":          len(domainItems),
+			"payments":           paymentsPayload,
+			"items":              itemsPayload,
 		})
 	})
 

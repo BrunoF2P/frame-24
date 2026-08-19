@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"frame-24/internal/platform/auth"
 )
 
 // Config contém as opções de configuração do pool PostgreSQL
@@ -68,7 +69,8 @@ func NewPool(ctx context.Context, cfg Config) (*pgxpool.Pool, error) {
 }
 
 // RunInTenantTx executa uma função atômica sob o escopo estrito de um Tenant no PostgreSQL RLS.
-// Usa 'SET LOCAL app.tenant_id' para garantir que conexões reutilizadas no pool nunca vazem dados.
+// Usa 'SET LOCAL app.tenant_id' e 'SET LOCAL app.user_id' para isolamento e auditoria multi-claims,
+// garantindo que conexões reutilizadas no pool nunca vazem dados para outros tenants ou usuários.
 func RunInTenantTx(ctx context.Context, pool *pgxpool.Pool, tenantID uuid.UUID, fn func(tx pgx.Tx) error) error {
 	if tenantID == uuid.Nil {
 		return fmt.Errorf("tenant_id invalido para execucao transacional")
@@ -86,8 +88,20 @@ func RunInTenantTx(ctx context.Context, pool *pgxpool.Pool, tenantID uuid.UUID, 
 		_ = tx.Rollback(ctx)
 	}()
 
-	// Injeta o tenant_id estritamente nesta transação (SET LOCAL)
-	_, err = tx.Exec(ctx, "SELECT set_config('app.tenant_id', $1, true)", tenantID.String())
+	// Injeta o tenant_id e user_id (se presente no contexto) estritamente nesta transação (SET LOCAL)
+	var query string
+	var args []any
+
+	userID, hasUser := auth.GetUserID(ctx)
+	if hasUser && userID != uuid.Nil {
+		query = "SELECT set_config('app.tenant_id', $1, true), set_config('app.user_id', $2, true)"
+		args = []any{tenantID.String(), userID.String()}
+	} else {
+		query = "SELECT set_config('app.tenant_id', $1, true), set_config('app.user_id', '', true)"
+		args = []any{tenantID.String()}
+	}
+
+	_, err = tx.Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("falha ao definir contexto de tenant RLS: %w", err)
 	}
