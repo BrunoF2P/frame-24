@@ -1,41 +1,41 @@
 package domain
 
 import (
-	"math"
 	"time"
 
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 )
 
 type SaleItem struct {
-	ID         uuid.UUID  `json:"id"`
-	TenantID   uuid.UUID  `json:"tenantId"`
-	SaleID     uuid.UUID  `json:"saleId"`
-	ItemType   string     `json:"itemType"` // product | combo
-	ProductID  *uuid.UUID `json:"productId,omitempty"`
-	ComboID    *uuid.UUID `json:"comboId,omitempty"`
-	UnitID     uuid.UUID  `json:"unitId"`
-	Quantity   float64    `json:"quantity"`
-	UnitPrice  float64    `json:"unitPrice"`
-	TotalPrice float64    `json:"totalPrice"`
-	CreatedAt  time.Time  `json:"createdAt"`
+	ID         uuid.UUID   `json:"id"`
+	TenantID   uuid.UUID   `json:"tenantId"`
+	SaleID     uuid.UUID   `json:"saleId"`
+	ItemType   string      `json:"itemType"` // product | combo
+	ProductID  *uuid.UUID  `json:"productId,omitempty"`
+	ComboID    *uuid.UUID  `json:"comboId,omitempty"`
+	UnitID     uuid.UUID   `json:"unitId"`
+	Quantity   float64     `json:"quantity"`
+	UnitPrice  money.Cents `json:"unitPrice"`
+	TotalPrice money.Cents `json:"totalPrice"`
+	CreatedAt  time.Time   `json:"createdAt"`
 }
 
 type Sale struct {
-	ID                 uuid.UUID  `json:"id"`
-	TenantID           uuid.UUID  `json:"tenantId"`
-	ComplexID          uuid.UUID  `json:"complexId"`
-	POSTerminalID      *string    `json:"posTerminalId,omitempty"`
-	OperatorID         *uuid.UUID `json:"operatorId,omitempty"`
-	CustomerID         *uuid.UUID `json:"customerId,omitempty"`
-	Status             string     `json:"status"` // pending | completed | canceled | refunded
-	SubtotalTickets    float64    `json:"subtotalTickets"`
-	SubtotalConcession float64    `json:"subtotalConcession"`
-	DiscountAmount     float64    `json:"discountAmount"`
-	TotalAmount        float64    `json:"totalAmount"`
-	Notes              *string    `json:"notes,omitempty"`
-	CreatedAt          time.Time  `json:"createdAt"`
-	UpdatedAt          time.Time  `json:"updatedAt"`
+	ID                 uuid.UUID   `json:"id"`
+	TenantID           uuid.UUID   `json:"tenantId"`
+	ComplexID          uuid.UUID   `json:"complexId"`
+	POSTerminalID      *string     `json:"posTerminalId,omitempty"`
+	OperatorID         *uuid.UUID  `json:"operatorId,omitempty"`
+	CustomerID         *uuid.UUID  `json:"customerId,omitempty"`
+	Status             string      `json:"status"` // pending | completed | canceled | refunded
+	SubtotalTickets    money.Cents `json:"subtotalTickets"`
+	SubtotalConcession money.Cents `json:"subtotalConcession"`
+	DiscountAmount     money.Cents `json:"discountAmount"`
+	TotalAmount        money.Cents `json:"totalAmount"`
+	Notes              *string     `json:"notes,omitempty"`
+	CreatedAt          time.Time   `json:"createdAt"`
+	UpdatedAt          time.Time   `json:"updatedAt"`
 
 	// Relacionamentos agregados
 	Tickets  []Ticket   `json:"tickets,omitempty"`
@@ -47,14 +47,13 @@ func NewSale(
 	tenantID, complexID uuid.UUID,
 	posTerminalID *string,
 	operatorID, customerID *uuid.UUID,
-	subtotalTickets, subtotalConcession, discountAmount, totalAmount float64,
+	subtotalTickets, subtotalConcession, discountAmount, totalAmount money.Cents,
 	notes *string,
 ) (*Sale, error) {
 	now := time.Now()
 
-	// Validação de cálculo: Total == SubtotalTickets + SubtotalConcession - DiscountAmount
-	expectedTotal := (subtotalTickets + subtotalConcession) - discountAmount
-	if math.Abs(totalAmount-expectedTotal) > 0.01 {
+	// Validação de cálculo exata em centavos: Total == SubtotalTickets + SubtotalConcession - DiscountAmount
+	if subtotalTickets+subtotalConcession-discountAmount != totalAmount {
 		return nil, ErrInvalidSaleTotal
 	}
 
@@ -76,13 +75,13 @@ func NewSale(
 	}, nil
 }
 
-// ValidatePayments verifica se a soma das formas de pagamento cobre com precisão o total da venda
+// ValidatePayments verifica se a soma das formas de pagamento cobre com precisão (em centavos) o total da venda
 func (s *Sale) ValidatePayments(payments []Payment) error {
-	var sum float64
+	var sum money.Cents
 	for _, p := range payments {
 		sum += p.Amount
 	}
-	if math.Abs(sum-s.TotalAmount) > 0.01 {
+	if sum != s.TotalAmount {
 		return ErrInvalidPaymentAmount
 	}
 	return nil

@@ -5,24 +5,25 @@ import (
 	"strings"
 	"time"
 
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 )
 
 type Showtime struct {
-	ID              uuid.UUID `json:"id"`
-	TenantID        uuid.UUID `json:"tenantId"`
-	ComplexID       uuid.UUID `json:"complexId"`
-	RoomID          uuid.UUID `json:"roomId"`
-	MovieID         uuid.UUID `json:"movieId"`
-	AudioType       string    `json:"audioType"`       // DUB | LEG | ORIG | NAC
-	ProjectionType  string    `json:"projectionType"`  // 2D | 3D | IMAX | 4DX
-	StartTime       time.Time `json:"startTime"`
-	EndTime         time.Time `json:"endTime"`
-	CleaningMinutes int       `json:"cleaningMinutes"`
-	BaseTicketPrice float64   `json:"baseTicketPrice"`
-	Status          string    `json:"status"`          // scheduled | open_for_sale | in_progress | finished | canceled
-	CreatedAt       time.Time `json:"createdAt"`
-	UpdatedAt       time.Time `json:"updatedAt"`
+	ID              uuid.UUID   `json:"id"`
+	TenantID        uuid.UUID   `json:"tenantId"`
+	ComplexID       uuid.UUID   `json:"complexId"`
+	RoomID          uuid.UUID   `json:"roomId"`
+	MovieID         uuid.UUID   `json:"movieId"`
+	AudioType       string      `json:"audioType"`      // DUB | LEG | ORIG | NAC
+	ProjectionType  string      `json:"projectionType"` // 2D | 3D | IMAX | 4DX
+	StartTime       time.Time   `json:"startTime"`
+	EndTime         time.Time   `json:"endTime"`
+	CleaningMinutes int         `json:"cleaningMinutes"`
+	BaseTicketPrice money.Cents `json:"baseTicketPrice"`
+	Status          string      `json:"status"` // scheduled | open_for_sale | in_progress | finished | canceled
+	CreatedAt       time.Time   `json:"createdAt"`
+	UpdatedAt       time.Time   `json:"updatedAt"`
 }
 
 // NewShowtime calcula o horário final com base na duração do filme + margem de limpeza
@@ -32,7 +33,7 @@ func NewShowtime(
 	startTime time.Time,
 	movieDurationMinutes int,
 	cleaningMinutes int,
-	baseTicketPrice float64,
+	baseTicketPrice money.Cents,
 ) (*Showtime, error) {
 	if startTime.IsZero() {
 		return nil, ErrInvalidShowtimeRange

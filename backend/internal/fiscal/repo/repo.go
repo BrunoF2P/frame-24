@@ -3,9 +3,9 @@ package repo
 import (
 	"context"
 
+	"frame-24/internal/fiscal/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"frame-24/internal/fiscal/domain"
 )
 
 type Repository interface {

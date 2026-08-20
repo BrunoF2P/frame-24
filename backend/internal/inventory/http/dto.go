@@ -1,6 +1,9 @@
 package http
 
-import "github.com/google/uuid"
+import (
+	"frame-24/internal/platform/money"
+	"github.com/google/uuid"
+)
 
 type CreateWarehouseRequest struct {
 	ComplexID uuid.UUID `json:"complexId"`
@@ -10,13 +13,13 @@ type CreateWarehouseRequest struct {
 }
 
 type RecordPurchaseRequest struct {
-	WarehouseID uuid.UUID  `json:"warehouseId"`
-	ProductID   uuid.UUID  `json:"productId"`
-	UnitID      uuid.UUID  `json:"unitId"`
-	Quantity    float64    `json:"quantity"`
-	UnitCost    float64    `json:"unitCost"`
-	InvoiceID   *uuid.UUID `json:"invoiceId,omitempty"`
-	Notes       *string    `json:"notes,omitempty"`
+	WarehouseID uuid.UUID     `json:"warehouseId"`
+	ProductID   uuid.UUID     `json:"productId"`
+	UnitID      uuid.UUID     `json:"unitId"`
+	Quantity    float64       `json:"quantity"`
+	UnitCost    money.Subcent `json:"unitCost"`
+	InvoiceID   *uuid.UUID    `json:"invoiceId,omitempty"`
+	Notes       *string       `json:"notes,omitempty"`
 }
 
 type RecordDiscardRequest struct {

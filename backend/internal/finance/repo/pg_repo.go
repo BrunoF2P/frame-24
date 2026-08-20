@@ -4,13 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
+	"frame-24/internal/finance/domain"
+	"frame-24/internal/platform/db"
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"frame-24/internal/finance/domain"
-	"frame-24/internal/platform/db"
 )
 
 type PostgresRepository struct {
@@ -149,7 +151,7 @@ func (r *PostgresRepository) RecordTransaction(ctx context.Context, tx pgx.Tx, t
 	`
 	batch := &pgx.Batch{}
 	for _, entry := range t.Entries {
-		batch.Queue(entryQuery, entry.ID, entry.TenantID, entry.TransactionID, entry.AccountID, string(entry.EntryType), entry.Amount, entry.CreatedAt)
+		batch.Queue(entryQuery, entry.ID, entry.TenantID, entry.TransactionID, entry.AccountID, string(entry.EntryType), int64(entry.Amount), entry.CreatedAt)
 	}
 
 	br := tx.SendBatch(ctx, batch)
@@ -164,9 +166,12 @@ func (r *PostgresRepository) RecordTransaction(ctx context.Context, tx pgx.Tx, t
 	return nil
 }
 
-func (r *PostgresRepository) ListTransactions(ctx context.Context, tenantID uuid.UUID, limit int) ([]domain.Transaction, error) {
-	if limit <= 0 || limit > 100 {
-		limit = 50
+func (r *PostgresRepository) ListTransactions(ctx context.Context, tenantID uuid.UUID, limit int, beforeTS *time.Time, beforeID *uuid.UUID) ([]domain.Transaction, error) {
+	if limit <= 0 {
+		limit = 51
+	}
+	if limit > 101 {
+		limit = 101
 	}
 
 	var list []domain.Transaction
@@ -174,10 +179,11 @@ func (r *PostgresRepository) ListTransactions(ctx context.Context, tenantID uuid
 		query := `
 			SELECT id, tenant_id, transaction_date, description, reference_type, reference_id, created_at
 			FROM finance.transactions
-			ORDER BY transaction_date DESC
+			WHERE ($2::timestamptz IS NULL OR (transaction_date, id) < ($2, $3))
+			ORDER BY transaction_date DESC, id DESC
 			LIMIT $1
 		`
-		rows, err := tx.Query(ctx, query, limit)
+		rows, err := tx.Query(ctx, query, limit, beforeTS, beforeID)
 		if err != nil {
 			return err
 		}
@@ -211,14 +217,14 @@ func (r *PostgresRepository) CreateCashSession(ctx context.Context, tx pgx.Tx, s
 		_, err = tx.Exec(
 			ctx, query,
 			s.ID, s.TenantID, s.ComplexID, s.POSTerminalID, s.OperatorID,
-			s.Status, s.OpenedAt, s.OpeningBalance, s.CreatedAt, s.UpdatedAt,
+			s.Status, s.OpenedAt, int64(s.OpeningBalance), s.CreatedAt, s.UpdatedAt,
 		)
 	} else {
 		err = db.RunInTenantTx(ctx, r.pool, s.TenantID, func(t pgx.Tx) error {
 			_, e := t.Exec(
 				ctx, query,
 				s.ID, s.TenantID, s.ComplexID, s.POSTerminalID, s.OperatorID,
-				s.Status, s.OpenedAt, s.OpeningBalance, s.CreatedAt, s.UpdatedAt,
+				s.Status, s.OpenedAt, int64(s.OpeningBalance), s.CreatedAt, s.UpdatedAt,
 			)
 			return e
 		})
@@ -245,11 +251,23 @@ func (r *PostgresRepository) GetOpenCashSession(ctx context.Context, tenantID, c
 			WHERE complex_id = $1 AND pos_terminal_id = $2 AND operator_id = $3 AND status = 'open'
 			LIMIT 1
 		`
-		return tx.QueryRow(ctx, query, complexID, posTerminalID, operatorID).Scan(
+		var openingBalance int64
+		var closingCashCounted, closingCardCounted, closingPixCounted *int64
+		var expectedCashBalance, differenceAmount *int64
+		if err := tx.QueryRow(ctx, query, complexID, posTerminalID, operatorID).Scan(
 			&s.ID, &s.TenantID, &s.ComplexID, &s.POSTerminalID, &s.OperatorID, &s.Status, &s.OpenedAt, &s.ClosedAt,
-			&s.OpeningBalance, &s.ClosingCashCounted, &s.ClosingCardCounted, &s.ClosingPixCounted,
-			&s.ExpectedCashBalance, &s.DifferenceAmount, &s.Notes, &s.CreatedAt, &s.UpdatedAt,
-		)
+			&openingBalance, &closingCashCounted, &closingCardCounted, &closingPixCounted,
+			&expectedCashBalance, &differenceAmount, &s.Notes, &s.CreatedAt, &s.UpdatedAt,
+		); err != nil {
+			return err
+		}
+		s.OpeningBalance = money.Cents(openingBalance)
+		s.ClosingCashCounted = centsPtr(closingCashCounted)
+		s.ClosingCardCounted = centsPtr(closingCardCounted)
+		s.ClosingPixCounted = centsPtr(closingPixCounted)
+		s.ExpectedCashBalance = centsPtr(expectedCashBalance)
+		s.DifferenceAmount = centsPtr(differenceAmount)
+		return nil
 	})
 
 	if err != nil {
@@ -271,11 +289,23 @@ func (r *PostgresRepository) GetCashSessionByID(ctx context.Context, tenantID, s
 			FROM finance.cash_sessions
 			WHERE id = $1
 		`
-		return tx.QueryRow(ctx, query, sessionID).Scan(
+		var openingBalance int64
+		var closingCashCounted, closingCardCounted, closingPixCounted *int64
+		var expectedCashBalance, differenceAmount *int64
+		if err := tx.QueryRow(ctx, query, sessionID).Scan(
 			&s.ID, &s.TenantID, &s.ComplexID, &s.POSTerminalID, &s.OperatorID, &s.Status, &s.OpenedAt, &s.ClosedAt,
-			&s.OpeningBalance, &s.ClosingCashCounted, &s.ClosingCardCounted, &s.ClosingPixCounted,
-			&s.ExpectedCashBalance, &s.DifferenceAmount, &s.Notes, &s.CreatedAt, &s.UpdatedAt,
-		)
+			&openingBalance, &closingCashCounted, &closingCardCounted, &closingPixCounted,
+			&expectedCashBalance, &differenceAmount, &s.Notes, &s.CreatedAt, &s.UpdatedAt,
+		); err != nil {
+			return err
+		}
+		s.OpeningBalance = money.Cents(openingBalance)
+		s.ClosingCashCounted = centsPtr(closingCashCounted)
+		s.ClosingCardCounted = centsPtr(closingCardCounted)
+		s.ClosingPixCounted = centsPtr(closingPixCounted)
+		s.ExpectedCashBalance = centsPtr(expectedCashBalance)
+		s.DifferenceAmount = centsPtr(differenceAmount)
+		return nil
 	})
 
 	if err != nil {
@@ -297,17 +327,25 @@ func (r *PostgresRepository) GetCashSessionByIDForUpdate(ctx context.Context, tx
 		WHERE id = $1
 		FOR UPDATE
 	`
-	err := tx.QueryRow(ctx, query, sessionID).Scan(
+	var openingBalance int64
+	var closingCashCounted, closingCardCounted, closingPixCounted *int64
+	var expectedCashBalance, differenceAmount *int64
+	if err := tx.QueryRow(ctx, query, sessionID).Scan(
 		&s.ID, &s.TenantID, &s.ComplexID, &s.POSTerminalID, &s.OperatorID, &s.Status, &s.OpenedAt, &s.ClosedAt,
-		&s.OpeningBalance, &s.ClosingCashCounted, &s.ClosingCardCounted, &s.ClosingPixCounted,
-		&s.ExpectedCashBalance, &s.DifferenceAmount, &s.Notes, &s.CreatedAt, &s.UpdatedAt,
-	)
-	if err != nil {
+		&openingBalance, &closingCashCounted, &closingCardCounted, &closingPixCounted,
+		&expectedCashBalance, &differenceAmount, &s.Notes, &s.CreatedAt, &s.UpdatedAt,
+	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrCashSessionNotFound
 		}
 		return nil, fmt.Errorf("falha ao adquirir lock exclusivo na sessao de caixa: %w", err)
 	}
+	s.OpeningBalance = money.Cents(openingBalance)
+	s.ClosingCashCounted = centsPtr(closingCashCounted)
+	s.ClosingCardCounted = centsPtr(closingCardCounted)
+	s.ClosingPixCounted = centsPtr(closingPixCounted)
+	s.ExpectedCashBalance = centsPtr(expectedCashBalance)
+	s.DifferenceAmount = centsPtr(differenceAmount)
 	return &s, nil
 }
 
@@ -343,12 +381,12 @@ func (r *PostgresRepository) RecordCashMovement(ctx context.Context, tx pgx.Tx, 
 	`
 	if tx != nil {
 		_, err = tx.Exec(ctx, query,
-			m.ID, m.TenantID, m.SessionID, string(m.MovementType), m.Amount, m.Reason,
+			m.ID, m.TenantID, m.SessionID, string(m.MovementType), int64(m.Amount), m.Reason,
 			m.AuthorizedByID, m.ReferenceType, m.ReferenceID, m.CreatedAt)
 	} else {
 		err = db.RunInTenantTx(ctx, r.pool, m.TenantID, func(t pgx.Tx) error {
 			_, e := t.Exec(ctx, query,
-				m.ID, m.TenantID, m.SessionID, string(m.MovementType), m.Amount, m.Reason,
+				m.ID, m.TenantID, m.SessionID, string(m.MovementType), int64(m.Amount), m.Reason,
 				m.AuthorizedByID, m.ReferenceType, m.ReferenceID, m.CreatedAt)
 			return e
 		})
@@ -360,8 +398,8 @@ func (r *PostgresRepository) RecordCashMovement(ctx context.Context, tx pgx.Tx, 
 	return nil
 }
 
-func (r *PostgresRepository) GetCashMovementsTotals(ctx context.Context, tenantID, sessionID uuid.UUID) (float64, float64, float64, error) {
-	var cashSales, deposits, bleeds float64
+func (r *PostgresRepository) GetCashMovementsTotals(ctx context.Context, tenantID, sessionID uuid.UUID) (money.Cents, money.Cents, money.Cents, error) {
+	var cashSales, deposits, bleeds int64
 	err := db.RunInTenantTx(ctx, r.pool, tenantID, func(tx pgx.Tx) error {
 		query := `
 			SELECT
@@ -377,7 +415,7 @@ func (r *PostgresRepository) GetCashMovementsTotals(ctx context.Context, tenantI
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("falha ao apurar totais de movimentacao de caixa: %w", err)
 	}
-	return cashSales, deposits, bleeds, nil
+	return money.Cents(cashSales), money.Cents(deposits), money.Cents(bleeds), nil
 }
 
 func (r *PostgresRepository) CloseCashSession(ctx context.Context, tx pgx.Tx, s *domain.CashSession) error {
@@ -391,12 +429,30 @@ func (r *PostgresRepository) CloseCashSession(ctx context.Context, tx pgx.Tx, s 
 	_, err := tx.Exec(
 		ctx, query,
 		s.Status, s.ClosedAt,
-		s.ClosingCashCounted, s.ClosingCardCounted, s.ClosingPixCounted,
-		s.ExpectedCashBalance, s.DifferenceAmount, s.Notes, s.UpdatedAt,
+		int64Ptr(s.ClosingCashCounted), int64Ptr(s.ClosingCardCounted), int64Ptr(s.ClosingPixCounted),
+		int64Ptr(s.ExpectedCashBalance), int64Ptr(s.DifferenceAmount), s.Notes, s.UpdatedAt,
 		s.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("falha ao atualizar status de fechamento de caixa: %w", err)
 	}
 	return nil
+}
+
+// centsPtr converte *int64 (scan de coluna BIGINT) em *money.Cents.
+func centsPtr(p *int64) *money.Cents {
+	if p == nil {
+		return nil
+	}
+	v := money.Cents(*p)
+	return &v
+}
+
+// int64Ptr converte *money.Cents em *int64 (encode para coluna BIGINT).
+func int64Ptr(p *money.Cents) *int64 {
+	if p == nil {
+		return nil
+	}
+	v := int64(*p)
+	return &v
 }

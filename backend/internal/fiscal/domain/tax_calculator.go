@@ -3,17 +3,19 @@ package domain
 import (
 	"math"
 	"time"
+
+	"frame-24/internal/platform/money"
 )
 
 type TaxCalculationResult struct {
-	ICMSAmount   float64
-	ISSAmount    float64
-	PISAmount    float64
-	COFINSAmount float64
+	ICMSAmount   money.Cents
+	ISSAmount    money.Cents
+	PISAmount    money.Cents
+	COFINSAmount money.Cents
 	CBSRate      float64
-	CBSAmount    float64
+	CBSAmount    money.Cents
 	IBSRate      float64
-	IBSAmount    float64
+	IBSAmount    money.Cents
 	CFOP         string
 	CSTICMS      string
 	CSTPISCOFINS string
@@ -23,7 +25,7 @@ type TaxCalculationResult struct {
 // CalculateItemTaxes calcula a tributação do item dependendo do tipo (Ingresso vs Mercadoria) e vigência legal
 func CalculateItemTaxes(
 	itemType string, // ticket, product, combo_item
-	totalPrice float64,
+	totalPrice money.Cents,
 	regime TaxRegime,
 	referenceDate time.Time,
 	issRate float64,
@@ -35,9 +37,9 @@ func CalculateItemTaxes(
 	if referenceDate.After(time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)) {
 		res.CBSRate = 0.90
 		res.IBSRate = 0.10
-		res.CBSAmount = math.Round((totalPrice*(res.CBSRate/100.0))*100) / 100
-		res.IBSAmount = math.Round((totalPrice*(res.IBSRate/100.0))*100) / 100
-		res.CSTCBSIBS = "01" // Tributado integralmente
+		res.CBSAmount = totalPrice.Percentage(90) // 0.90%
+		res.IBSAmount = totalPrice.Percentage(10) // 0.10%
+		res.CSTCBSIBS = "01"                      // Tributado integralmente
 	}
 
 	// 2. Tributos Clássicos
@@ -47,18 +49,18 @@ func CalculateItemTaxes(
 		if issRate <= 0 {
 			issRate = 5.00
 		}
-		res.ISSAmount = math.Round((totalPrice*(issRate/100.0))*100) / 100
+		res.ISSAmount = totalPrice.Percentage(int64(math.Round(issRate * 100)))
 
 		switch regime {
 		case TaxRegimeSimplesNacional:
 			res.CSTPISCOFINS = "49" // Outras Operações de Saída
 		case TaxRegimeLucroPresumido:
-			res.PISAmount = math.Round((totalPrice*(0.65/100.0))*100) / 100
-			res.COFINSAmount = math.Round((totalPrice*(3.00/100.0))*100) / 100
+			res.PISAmount = totalPrice.Percentage(65)     // 0.65%
+			res.COFINSAmount = totalPrice.Percentage(300) // 3.00%
 			res.CSTPISCOFINS = "01"
 		case TaxRegimeLucroReal:
-			res.PISAmount = math.Round((totalPrice*(1.65/100.0))*100) / 100
-			res.COFINSAmount = math.Round((totalPrice*(7.60/100.0))*100) / 100
+			res.PISAmount = totalPrice.Percentage(165)    // 1.65%
+			res.COFINSAmount = totalPrice.Percentage(760) // 7.60%
 			res.CSTPISCOFINS = "01"
 		}
 	} else {
@@ -71,14 +73,14 @@ func CalculateItemTaxes(
 			res.CSTICMS = "102"
 			res.CSTPISCOFINS = "49"
 		case TaxRegimeLucroPresumido:
-			res.ICMSAmount = math.Round((totalPrice*(18.00/100.0))*100) / 100
-			res.PISAmount = math.Round((totalPrice*(0.65/100.0))*100) / 100
-			res.COFINSAmount = math.Round((totalPrice*(3.00/100.0))*100) / 100
+			res.ICMSAmount = totalPrice.Percentage(1800)  // 18.00%
+			res.PISAmount = totalPrice.Percentage(65)     // 0.65%
+			res.COFINSAmount = totalPrice.Percentage(300) // 3.00%
 			res.CSTPISCOFINS = "01"
 		case TaxRegimeLucroReal:
-			res.ICMSAmount = math.Round((totalPrice*(18.00/100.0))*100) / 100
-			res.PISAmount = math.Round((totalPrice*(1.65/100.0))*100) / 100
-			res.COFINSAmount = math.Round((totalPrice*(7.60/100.0))*100) / 100
+			res.ICMSAmount = totalPrice.Percentage(1800)  // 18.00%
+			res.PISAmount = totalPrice.Percentage(165)    // 1.65%
+			res.COFINSAmount = totalPrice.Percentage(760) // 7.60%
 			res.CSTPISCOFINS = "01"
 		}
 	}

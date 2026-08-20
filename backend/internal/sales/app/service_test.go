@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"testing"
 
+	catalogDomain "frame-24/internal/catalog/domain"
+	operationsDomain "frame-24/internal/operations/domain"
+	"frame-24/internal/platform/money"
+	"frame-24/internal/platform/seatlock"
+	"frame-24/internal/sales/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	catalogDomain "frame-24/internal/catalog/domain"
-	operationsDomain "frame-24/internal/operations/domain"
-	"frame-24/internal/platform/seatlock"
-	"frame-24/internal/sales/domain"
 )
 
 // FakeSalesRepo implementa repo.Repository em memória
@@ -88,7 +89,7 @@ func (f *FakeSalesRepo) CountSoldTicketsByShowtime(ctx context.Context, tenantID
 	return total, half, nil
 }
 
-func (f *FakeSalesRepo) LockShowtimeAndCountHalfTickets(ctx context.Context, tx pgx.Tx, tenantID, showtimeID uuid.UUID) (int, float64, int, error) {
+func (f *FakeSalesRepo) LockShowtimeAndCountHalfTickets(ctx context.Context, tx pgx.Tx, tenantID, showtimeID uuid.UUID) (int, money.Cents, int, error) {
 	// Retorna erro proposital para forçar o fallback do opsProvider no modo teste (pool == nil)
 	return 0, 0, 0, fmt.Errorf("fake repo: sem conexao postgresql ativa (modo teste unitario)")
 }
@@ -189,7 +190,7 @@ func TestSalesService_HalfPriceQuota40Percent(t *testing.T) {
 	fakeOps.showtimes[showtimeID] = &operationsDomain.Showtime{
 		ID:              showtimeID,
 		RoomID:          roomID,
-		BaseTicketPrice: 40.00,
+		BaseTicketPrice: money.FromFloat64(40.00),
 	}
 
 	// 1. Venda de 30 ingressos de meia-estudante -> Permitida (30 <= 40). Preço calculado pelo servidor: R$ 20 cada = R$ 600
@@ -206,11 +207,11 @@ func TestSalesService_HalfPriceQuota40Percent(t *testing.T) {
 		ComplexID: complexID,
 		Tickets:   tickets30,
 		Payments: []PaymentInput{
-			{PaymentMethod: "credit_card", Amount: 600.00},
+			{PaymentMethod: "credit_card", Amount: money.FromFloat64(600.00)},
 		},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, 600.00, sale1.TotalAmount)
+	assert.Equal(t, money.FromFloat64(600.00), sale1.TotalAmount)
 
 	// 2. Tentativa de vender mais 15 ingressos de meia-idoso -> Total seria 45 > 40 -> Bloqueio por cota legal
 	var tickets15 []TicketInput
@@ -226,7 +227,7 @@ func TestSalesService_HalfPriceQuota40Percent(t *testing.T) {
 		ComplexID: complexID,
 		Tickets:   tickets15,
 		Payments: []PaymentInput{
-			{PaymentMethod: "pix", Amount: 300.00},
+			{PaymentMethod: "pix", Amount: money.FromFloat64(300.00)},
 		},
 	})
 	assert.ErrorIs(t, err, domain.ErrHalfPriceLimitExceeded)
@@ -245,11 +246,11 @@ func TestSalesService_HalfPriceQuota40Percent(t *testing.T) {
 		ComplexID: complexID,
 		Tickets:   tickets10,
 		Payments: []PaymentInput{
-			{PaymentMethod: "cash", Amount: 200.00},
+			{PaymentMethod: "cash", Amount: money.FromFloat64(200.00)},
 		},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, 200.00, sale2.TotalAmount)
+	assert.Equal(t, money.FromFloat64(200.00), sale2.TotalAmount)
 
 	// 4. Com a cota de 40% esgotada, ingressos INTEIRA ainda podem ser vendidos normalmente
 	sale3, err := svc.CreateSale(ctx, CreateSaleCommand{
@@ -259,11 +260,11 @@ func TestSalesService_HalfPriceQuota40Percent(t *testing.T) {
 			{ShowtimeID: showtimeID, SeatID: uuid.New(), TicketType: "inteira"},
 		},
 		Payments: []PaymentInput{
-			{PaymentMethod: "debit_card", Amount: 40.00},
+			{PaymentMethod: "debit_card", Amount: money.FromFloat64(40.00)},
 		},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, 40.00, sale3.TotalAmount)
+	assert.Equal(t, money.FromFloat64(40.00), sale3.TotalAmount)
 }
 
 func TestSalesService_InvalidShowtimePriceAndCortesia(t *testing.T) {
@@ -281,17 +282,17 @@ func TestSalesService_InvalidShowtimePriceAndCortesia(t *testing.T) {
 
 	// Sessão sem preço configurado (base_ticket_price = 0)
 	fakeOps.rooms[roomID] = &operationsDomain.Room{ID: roomID, Capacity: 100}
-	fakeOps.showtimes[showtimeID] = &operationsDomain.Showtime{ID: showtimeID, RoomID: roomID, BaseTicketPrice: 0.00}
+	fakeOps.showtimes[showtimeID] = &operationsDomain.Showtime{ID: showtimeID, RoomID: roomID, BaseTicketPrice: money.FromFloat64(0.00)}
 
 	// 1. Tentativa de vender ingresso INTEIRA com sessão sem preço → deve rejeitar
 	_, err := svc.CreateSale(ctx, CreateSaleCommand{
 		TenantID:  tenantID,
 		ComplexID: complexID,
 		Tickets: []TicketInput{
-			{ShowtimeID: showtimeID, SeatID: uuid.New(), TicketType: "inteira", Price: 50.00}, // preço do cliente deve ser ignorado
+			{ShowtimeID: showtimeID, SeatID: uuid.New(), TicketType: "inteira", Price: money.FromFloat64(50.00)}, // preço do cliente deve ser ignorado
 		},
 		Payments: []PaymentInput{
-			{PaymentMethod: "cash", Amount: 50.00},
+			{PaymentMethod: "cash", Amount: money.FromFloat64(50.00)},
 		},
 	})
 	assert.ErrorIs(t, err, domain.ErrInvalidShowtimePrice, "ingresso inteira em sessão sem preço deve retornar ErrInvalidShowtimePrice")
@@ -306,8 +307,8 @@ func TestSalesService_InvalidShowtimePriceAndCortesia(t *testing.T) {
 		// Nenhum pagamento necessário — total da venda é R$ 0,00
 	})
 	require.NoError(t, err)
-	assert.Equal(t, 0.00, sale.TotalAmount)
-	assert.Equal(t, 0.00, sale.Tickets[0].Price)
+	assert.Equal(t, money.FromFloat64(0.00), sale.TotalAmount)
+	assert.Equal(t, money.FromFloat64(0.00), sale.Tickets[0].Price)
 }
 
 func TestSalesService_FinancialIntegrityAndAuthoritativePrices(t *testing.T) {
@@ -326,17 +327,17 @@ func TestSalesService_FinancialIntegrityAndAuthoritativePrices(t *testing.T) {
 	ctx := context.Background()
 
 	fakeOps.rooms[roomID] = &operationsDomain.Room{ID: roomID, Capacity: 50}
-	fakeOps.showtimes[showtimeID] = &operationsDomain.Showtime{ID: showtimeID, RoomID: roomID, BaseTicketPrice: 35.00}
+	fakeOps.showtimes[showtimeID] = &operationsDomain.Showtime{ID: showtimeID, RoomID: roomID, BaseTicketPrice: money.FromFloat64(35.00)}
 
 	// Preço do catálogo: R$ 25,00 por pipoca
-	fakeCat.products[productID] = &catalogDomain.Product{ID: productID, SalePrice: 25.00}
+	fakeCat.products[productID] = &catalogDomain.Product{ID: productID, SalePrice: money.FromFloat64(25.00)}
 
 	// 1 Ticket Inteira (R$ 35,00) + 2 Pipocas Grandes (2 x R$ 25,00 = R$ 50,00) - Desconto (R$ 5,00) = R$ 80,00
 	tickets := []TicketInput{
-		{ShowtimeID: showtimeID, SeatID: uuid.New(), TicketType: "inteira", Price: 0.01}, // Tentativa de fraude de preço é ignorada
+		{ShowtimeID: showtimeID, SeatID: uuid.New(), TicketType: "inteira", Price: money.FromFloat64(0.01)}, // Tentativa de fraude de preço é ignorada
 	}
 	items := []ConcessionItemInput{
-		{ItemType: "product", ProductID: &productID, UnitID: unitID, Quantity: 2, UnitPrice: 0.01}, // Tentativa de fraude é ignorada
+		{ItemType: "product", ProductID: &productID, UnitID: unitID, Quantity: 2, UnitPrice: money.FromFloat64(0.01)}, // Tentativa de fraude é ignorada
 	}
 
 	// 1. Pagamento insuficiente (R$ 70,00 em vez do total calculado pelo servidor R$ 80,00) -> Falha de integridade
@@ -345,9 +346,9 @@ func TestSalesService_FinancialIntegrityAndAuthoritativePrices(t *testing.T) {
 		ComplexID:       complexID,
 		Tickets:         tickets,
 		ConcessionItems: items,
-		DiscountAmount:  5.00,
+		DiscountAmount:  money.FromFloat64(5.00),
 		Payments: []PaymentInput{
-			{PaymentMethod: "cash", Amount: 70.00},
+			{PaymentMethod: "cash", Amount: money.FromFloat64(70.00)},
 		},
 	})
 	assert.ErrorIs(t, err, domain.ErrInvalidPaymentAmount)
@@ -358,21 +359,21 @@ func TestSalesService_FinancialIntegrityAndAuthoritativePrices(t *testing.T) {
 		ComplexID:       complexID,
 		Tickets:         tickets,
 		ConcessionItems: items,
-		DiscountAmount:  5.00,
+		DiscountAmount:  money.FromFloat64(5.00),
 		Payments: []PaymentInput{
-			{PaymentMethod: "credit_card", Amount: 50.00},
-			{PaymentMethod: "pix", Amount: 30.00},
+			{PaymentMethod: "credit_card", Amount: money.FromFloat64(50.00)},
+			{PaymentMethod: "pix", Amount: money.FromFloat64(30.00)},
 		},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, 80.00, sale.TotalAmount)
-	assert.Equal(t, 35.00, sale.SubtotalTickets)
-	assert.Equal(t, 50.00, sale.SubtotalConcession)
-	assert.Equal(t, 5.00, sale.DiscountAmount)
+	assert.Equal(t, money.FromFloat64(80.00), sale.TotalAmount)
+	assert.Equal(t, money.FromFloat64(35.00), sale.SubtotalTickets)
+	assert.Equal(t, money.FromFloat64(50.00), sale.SubtotalConcession)
+	assert.Equal(t, money.FromFloat64(5.00), sale.DiscountAmount)
 	assert.Len(t, sale.Tickets, 1)
-	assert.Equal(t, 35.00, sale.Tickets[0].Price) // Servidor aplicou o preço oficial de R$ 35,00
+	assert.Equal(t, money.FromFloat64(35.00), sale.Tickets[0].Price) // Servidor aplicou o preço oficial de R$ 35,00
 	assert.NotEmpty(t, sale.Tickets[0].QRCodeHash)
 	assert.Len(t, sale.Items, 1)
-	assert.Equal(t, 25.00, sale.Items[0].UnitPrice) // Servidor aplicou o preço do catálogo de R$ 25,00
+	assert.Equal(t, money.FromFloat64(25.00), sale.Items[0].UnitPrice) // Servidor aplicou o preço do catálogo de R$ 25,00
 	assert.Len(t, sale.Payments, 2)
 }

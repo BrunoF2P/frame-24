@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	catalogDomain "frame-24/internal/catalog/domain"
 	operationsDomain "frame-24/internal/operations/domain"
 	"frame-24/internal/platform/db"
+	"frame-24/internal/platform/money"
 	"frame-24/internal/platform/outbox"
 	"frame-24/internal/platform/seatlock"
 	"frame-24/internal/sales/domain"
 	"frame-24/internal/sales/repo"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // OperationsProvider provê dados de salas e sessões para o módulo de vendas
@@ -68,7 +69,7 @@ type TicketInput struct {
 	ShowtimeID     uuid.UUID
 	SeatID         uuid.UUID
 	TicketType     string
-	Price          float64 // Opcional no payload; calculado autoritativamente no servidor
+	Price          money.Cents // Opcional no payload; calculado autoritativamente no servidor
 	DocumentNumber *string
 }
 
@@ -78,12 +79,12 @@ type ConcessionItemInput struct {
 	ComboID   *uuid.UUID
 	UnitID    uuid.UUID
 	Quantity  float64
-	UnitPrice float64 // Opcional no payload; consultado autoritativamente no catálogo
+	UnitPrice money.Cents // Opcional no payload; consultado autoritativamente no catálogo
 }
 
 type PaymentInput struct {
 	PaymentMethod     string
-	Amount            float64
+	Amount            money.Cents
 	ExternalReference *string
 }
 
@@ -97,7 +98,7 @@ type CreateSaleCommand struct {
 	Tickets         []TicketInput
 	ConcessionItems []ConcessionItemInput
 	Payments        []PaymentInput
-	DiscountAmount  float64
+	DiscountAmount  money.Cents
 	Notes           *string
 }
 
@@ -277,7 +278,7 @@ func (s *Service) CreateSale(ctx context.Context, cmd CreateSaleCommand) (*domai
 	}
 
 	// 2. Consulta autoritativa de preços de Bomboniere no Catálogo
-	var subtotalConcession float64
+	var subtotalConcession money.Cents
 	var domainItems []domain.SaleItem
 	saleID := uuid.New()
 
@@ -297,7 +298,7 @@ func (s *Service) CreateSale(ctx context.Context, cmd CreateSaleCommand) (*domai
 			}
 		}
 
-		itemTotal := it.Quantity * unitPrice
+		itemTotal := unitPrice.MulQuantityToCents(it.Quantity)
 		subtotalConcession += itemTotal
 		domainItems = append(domainItems, domain.SaleItem{
 			ID:         uuid.New(),
@@ -321,8 +322,8 @@ func (s *Service) CreateSale(ctx context.Context, cmd CreateSaleCommand) (*domai
 	var seatIDsSold []uuid.UUID
 
 	err := db.RunInTenantTx(ctx, s.pool, cmd.TenantID, func(tx pgx.Tx) error {
-		var subtotalTickets float64
-		var baseTicketPrice float64
+		var subtotalTickets money.Cents
+		var baseTicketPrice money.Cents
 
 		if len(cmd.Tickets) > 0 {
 			// Adquire lock exclusivo FOR UPDATE na linha da sessão e conta meias atuais na mesma tx.
@@ -376,9 +377,9 @@ func (s *Service) CreateSale(ctx context.Context, cmd CreateSaleCommand) (*domai
 			for _, tk := range cmd.Tickets {
 				calculatedPrice := baseTicketPrice
 				if domain.IsHalfPriceTicket(tk.TicketType) {
-					calculatedPrice = baseTicketPrice * 0.50
+					calculatedPrice = baseTicketPrice / 2
 				} else if tk.TicketType == string(domain.TicketTypeCortesia) {
-					calculatedPrice = 0.00
+					calculatedPrice = 0
 				}
 
 				subtotalTickets += calculatedPrice

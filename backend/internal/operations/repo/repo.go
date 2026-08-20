@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
+	"frame-24/internal/operations/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"frame-24/internal/operations/domain"
 )
 
 type Repository interface {

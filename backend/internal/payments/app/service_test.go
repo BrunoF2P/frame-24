@@ -4,11 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"frame-24/internal/payments/domain"
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"frame-24/internal/payments/domain"
 )
 
 type FakePaymentsRepo struct {
@@ -89,13 +90,13 @@ func TestPaymentsService_PixCreationAndIdempotency(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. Criar tentativa de PIX
-	attempt1, err := svc.CreatePixPayment(ctx, tenantID, saleID, "idemp-pix-001", 55.50, "Venda de ingressos")
+	attempt1, err := svc.CreatePixPayment(ctx, tenantID, saleID, "idemp-pix-001", money.FromFloat64(55.50), "Venda de ingressos")
 	require.NoError(t, err)
 	assert.Equal(t, domain.PaymentStatusPending, attempt1.Status)
 	assert.NotEmpty(t, *attempt1.QRCodePix)
 
 	// 2. Chamada idempotente com a mesma chave -> Retorna o mesmo registro
-	attempt2, err := svc.CreatePixPayment(ctx, tenantID, saleID, "idemp-pix-001", 55.50, "Venda de ingressos")
+	attempt2, err := svc.CreatePixPayment(ctx, tenantID, saleID, "idemp-pix-001", money.FromFloat64(55.50), "Venda de ingressos")
 	require.NoError(t, err)
 	assert.Equal(t, attempt1.ID, attempt2.ID)
 
@@ -122,7 +123,7 @@ func TestPaymentsService_TefLifecycle2PhaseCommit(t *testing.T) {
 	// 1. Fase 1: Autorização TEF no PinPad
 	tx1, err := svc.InitiateTef(
 		ctx, tenantID, &saleID, terminalID, "001234", "AUTH9988", "Mastercard",
-		domain.TefTypeCredit, 1, 80.00, nil, nil,
+		domain.TefTypeCredit, 1, money.FromFloat64(80.00), nil, nil,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, domain.TefStatusAuthorized, tx1.Status)
@@ -139,7 +140,7 @@ func TestPaymentsService_TefLifecycle2PhaseCommit(t *testing.T) {
 	// 4. Teste de Desfazimento (NCN) quando venda é abortada
 	tx2, err := svc.InitiateTef(
 		ctx, tenantID, &saleID, terminalID, "001235", "AUTH9989", "Visa",
-		domain.TefTypeDebit, 1, 30.00, nil, nil,
+		domain.TefTypeDebit, 1, money.FromFloat64(30.00), nil, nil,
 	)
 	require.NoError(t, err)
 

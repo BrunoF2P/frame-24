@@ -3,12 +3,14 @@ package app
 import (
 	"context"
 	"testing"
+	"time"
 
+	"frame-24/internal/finance/domain"
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"frame-24/internal/finance/domain"
 )
 
 // FakeFinanceRepo em memória para testes unitários
@@ -71,7 +73,7 @@ func (f *FakeFinanceRepo) RecordTransaction(ctx context.Context, tx pgx.Tx, t *d
 	return nil
 }
 
-func (f *FakeFinanceRepo) ListTransactions(ctx context.Context, tenantID uuid.UUID, limit int) ([]domain.Transaction, error) {
+func (f *FakeFinanceRepo) ListTransactions(ctx context.Context, tenantID uuid.UUID, limit int, beforeTS *time.Time, beforeID *uuid.UUID) ([]domain.Transaction, error) {
 	var list []domain.Transaction
 	for _, t := range f.transactions {
 		list = append(list, *t)
@@ -117,8 +119,8 @@ func (f *FakeFinanceRepo) RecordCashMovement(ctx context.Context, tx pgx.Tx, m *
 	return nil
 }
 
-func (f *FakeFinanceRepo) GetCashMovementsTotals(ctx context.Context, tenantID, sessionID uuid.UUID) (float64, float64, float64, error) {
-	var cashSales, deposits, bleeds float64
+func (f *FakeFinanceRepo) GetCashMovementsTotals(ctx context.Context, tenantID, sessionID uuid.UUID) (money.Cents, money.Cents, money.Cents, error) {
+	var cashSales, deposits, bleeds money.Cents
 	for _, m := range f.movements {
 		if m.SessionID == sessionID {
 			switch m.MovementType {
@@ -147,15 +149,15 @@ func TestFinanceService_DoubleEntryLedgerBalance(t *testing.T) {
 
 	// 1. Transação Desbalanceada (Débito R$ 100 / Crédito R$ 80) -> Rejeitada
 	_, err := svc.PostLedgerTransaction(ctx, tenantID, "Venda desbalanceada", "sale", nil, []LedgerEntryInput{
-		{AccountCode: domain.CodeCaixaPDV, EntryType: "debit", Amount: 100.0},
-		{AccountCode: domain.CodeReceitaBilheteria, EntryType: "credit", Amount: 80.0},
+		{AccountCode: domain.CodeCaixaPDV, EntryType: "debit", Amount: money.FromFloat64(100.0)},
+		{AccountCode: domain.CodeReceitaBilheteria, EntryType: "credit", Amount: money.FromFloat64(80.0)},
 	})
 	assert.ErrorIs(t, err, domain.ErrUnbalancedTransaction)
 
 	// 2. Transação Balanceada (Débito R$ 100 / Crédito R$ 100) -> Sucesso
 	tx, err := svc.PostLedgerTransaction(ctx, tenantID, "Venda equilibrada", "sale", nil, []LedgerEntryInput{
-		{AccountCode: domain.CodeCaixaPDV, EntryType: "debit", Amount: 100.0},
-		{AccountCode: domain.CodeReceitaBilheteria, EntryType: "credit", Amount: 100.0},
+		{AccountCode: domain.CodeCaixaPDV, EntryType: "debit", Amount: money.FromFloat64(100.0)},
+		{AccountCode: domain.CodeReceitaBilheteria, EntryType: "credit", Amount: money.FromFloat64(100.0)},
 	})
 	require.NoError(t, err)
 	assert.Len(t, tx.Entries, 2)
@@ -171,43 +173,43 @@ func TestFinanceService_BlindCloseCashSession(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. Abertura de Caixa com Fundo de Troco R$ 200,00
-	session, err := svc.OpenCashSession(ctx, tenantID, complexID, terminalID, operatorID, 200.0)
+	session, err := svc.OpenCashSession(ctx, tenantID, complexID, terminalID, operatorID, money.FromFloat64(200.0))
 	require.NoError(t, err)
 	assert.Equal(t, "open", session.Status)
-	assert.Equal(t, 200.0, session.OpeningBalance)
+	assert.Equal(t, money.FromFloat64(200.0), session.OpeningBalance)
 
 	// 2. Tentativa de abrir segunda sessão concomitante no mesmo terminal -> Bloqueada
-	_, err = svc.OpenCashSession(ctx, tenantID, complexID, terminalID, operatorID, 100.0)
+	_, err = svc.OpenCashSession(ctx, tenantID, complexID, terminalID, operatorID, money.FromFloat64(100.0))
 	assert.ErrorIs(t, err, domain.ErrCashSessionAlreadyOpen)
 
 	// 3. Registrar Suprimento de R$ 50,00 e Venda em Dinheiro de R$ 300,00
-	err = svc.RecordCashSupply(ctx, tenantID, session.ID, 50.0, "Reforço de moedas", nil)
+	err = svc.RecordCashSupply(ctx, tenantID, session.ID, money.FromFloat64(50.0), "Reforço de moedas", nil)
 	require.NoError(t, err)
-	err = svc.RecordCashSale(ctx, tenantID, session.ID, uuid.New(), 300.0)
+	err = svc.RecordCashSale(ctx, tenantID, session.ID, uuid.New(), money.FromFloat64(300.0))
 	require.NoError(t, err)
 
 	// 4. Registrar Sangria periódica de R$ 150,00
-	err = svc.RecordCashBleed(ctx, tenantID, session.ID, 150.0, "Sangria para o cofre", nil)
+	err = svc.RecordCashBleed(ctx, tenantID, session.ID, money.FromFloat64(150.0), "Sangria para o cofre", nil)
 	require.NoError(t, err)
 
 	// Saldo esperado em dinheiro físico:
 	// Expected = Opening (200) + Supply (50) + Sales (300) - Bleed (150) = R$ 400,00
 
 	// 5. Fechamento Cego com Sobra de Caixa: Operador conta R$ 420,00 (+ R$ 20 de sobra)
-	closedSession, err := svc.CloseCashSessionBlind(ctx, tenantID, session.ID, 420.0, 1500.0, 350.0, nil)
+	closedSession, err := svc.CloseCashSessionBlind(ctx, tenantID, session.ID, money.FromFloat64(420.0), money.FromFloat64(1500.0), money.FromFloat64(350.0), nil)
 	require.NoError(t, err)
 	assert.Equal(t, "closed", closedSession.Status)
-	assert.Equal(t, 400.0, *closedSession.ExpectedCashBalance)
-	assert.Equal(t, 20.0, *closedSession.DifferenceAmount)
+	assert.Equal(t, money.FromFloat64(400.0), *closedSession.ExpectedCashBalance)
+	assert.Equal(t, money.FromFloat64(20.0), *closedSession.DifferenceAmount)
 
 	// 6. Validar que o lançamento contábil de Sobra de Caixa foi gerado no Ledger
-	txs, err := svc.ListTransactions(ctx, tenantID, 10)
+	txs, err := svc.ListTransactions(ctx, tenantID, 10, nil, nil)
 	require.NoError(t, err)
 	assert.NotEmpty(t, txs)
 	assert.Equal(t, "cash_session", txs[0].ReferenceType)
 
 	// 7. Tentativa de registrar sangria em caixa já fechado -> Rejeitada
-	err = svc.RecordCashBleed(ctx, tenantID, session.ID, 50.0, "Sangria tardia", nil)
+	err = svc.RecordCashBleed(ctx, tenantID, session.ID, money.FromFloat64(50.0), "Sangria tardia", nil)
 	assert.ErrorIs(t, err, domain.ErrCashSessionClosed)
 }
 
@@ -221,22 +223,22 @@ func TestFinanceService_SaleCompletedWithCMV(t *testing.T) {
 
 	// Venda: R$ 40 Bilheteria + R$ 30 Bomboniere (Custo da mercadoria: R$ 12) = R$ 70 Total
 	// Pagamento: R$ 50 no Cartão + R$ 20 no PIX
-	paymentsMap := map[string]float64{
-		"credit_card": 50.0,
-		"pix":         20.0,
+	paymentsMap := map[string]money.Cents{
+		"credit_card": money.FromFloat64(50.0),
+		"pix":         money.FromFloat64(20.0),
 	}
 	items := []SaleConcessionItemPayload{
-		{ProductID: &prodID, Quantity: 2, UnitCost: 6.0}, // CMV = 2 x 6 = R$ 12,00
+		{ProductID: &prodID, Quantity: 2, UnitCost: money.SubcentFromFloat64(6.0)}, // CMV = 2 x 6 = R$ 12,00
 	}
 
 	err := svc.ProcessSaleCompletedEvent(
 		ctx, tenantID, saleID,
-		40.0, 30.0, 0.0, 70.0,
+		money.FromFloat64(40.0), money.FromFloat64(30.0), money.FromFloat64(0.0), money.FromFloat64(70.0),
 		paymentsMap, items,
 	)
 	require.NoError(t, err)
 
-	txs, err := svc.ListTransactions(ctx, tenantID, 10)
+	txs, err := svc.ListTransactions(ctx, tenantID, 10, nil, nil)
 	require.NoError(t, err)
 	assert.NotEmpty(t, txs)
 	assert.Equal(t, "sale", txs[0].ReferenceType)
@@ -253,39 +255,39 @@ func TestFinanceService_RecordOnlinePaymentReceipt(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. Recebimento PIX aprovado (webhook) — liquida Recebíveis PIX → Bancos
-	err := svc.RecordOnlinePaymentReceipt(ctx, tenantID, saleID, attemptID, 20.0, "pix")
+	err := svc.RecordOnlinePaymentReceipt(ctx, tenantID, saleID, attemptID, money.FromFloat64(20.0), "pix")
 	require.NoError(t, err)
 
-	txs, err := svc.ListTransactions(ctx, tenantID, 10)
+	txs, err := svc.ListTransactions(ctx, tenantID, 10, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, txs, 1)
 	assert.Equal(t, "payment", txs[0].ReferenceType)
 	require.Len(t, txs[0].Entries, 2)
 	assert.Equal(t, domain.EntryTypeDebit, txs[0].Entries[0].EntryType)
 	assert.Equal(t, domain.EntryTypeCredit, txs[0].Entries[1].EntryType)
-	assert.Equal(t, 20.0, txs[0].Entries[0].Amount)
-	assert.Equal(t, 20.0, txs[0].Entries[1].Amount)
+	assert.Equal(t, money.FromFloat64(20.0), txs[0].Entries[0].Amount)
+	assert.Equal(t, money.FromFloat64(20.0), txs[0].Entries[1].Amount)
 
 	// 2. Recebimento de cartão — liquida Adquirentes de Cartão → Bancos
 	cardAttemptID := uuid.New()
-	err = svc.RecordOnlinePaymentReceipt(ctx, tenantID, saleID, cardAttemptID, 50.0, "credit_card")
+	err = svc.RecordOnlinePaymentReceipt(ctx, tenantID, saleID, cardAttemptID, money.FromFloat64(50.0), "credit_card")
 	require.NoError(t, err)
 
-	txs, err = svc.ListTransactions(ctx, tenantID, 10)
+	txs, err = svc.ListTransactions(ctx, tenantID, 10, nil, nil)
 	require.NoError(t, err)
 	assert.Len(t, txs, 2)
 
 	// 3. Método não online (cash/voucher) não gera lançamento de recebível
-	err = svc.RecordOnlinePaymentReceipt(ctx, tenantID, saleID, uuid.New(), 10.0, "cash")
+	err = svc.RecordOnlinePaymentReceipt(ctx, tenantID, saleID, uuid.New(), money.FromFloat64(10.0), "cash")
 	require.NoError(t, err)
-	txs, err = svc.ListTransactions(ctx, tenantID, 10)
+	txs, err = svc.ListTransactions(ctx, tenantID, 10, nil, nil)
 	require.NoError(t, err)
 	assert.Len(t, txs, 2)
 
 	// 4. Valor <= 0 é ignorado silenciosamente
-	err = svc.RecordOnlinePaymentReceipt(ctx, tenantID, saleID, uuid.New(), 0.0, "pix")
+	err = svc.RecordOnlinePaymentReceipt(ctx, tenantID, saleID, uuid.New(), money.FromFloat64(0.0), "pix")
 	require.NoError(t, err)
-	txs, err = svc.ListTransactions(ctx, tenantID, 10)
+	txs, err = svc.ListTransactions(ctx, tenantID, 10, nil, nil)
 	require.NoError(t, err)
 	assert.Len(t, txs, 2)
 }

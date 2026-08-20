@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 )
 
@@ -62,15 +63,15 @@ func (r CreateRoomRequest) Validate() (uuid.UUID, error) {
 }
 
 type ScheduleShowtimeRequest struct {
-	ComplexID            string    `json:"complexId"`
-	RoomID               string    `json:"roomId"`
-	MovieID              string    `json:"movieId"`
-	AudioType            string    `json:"audioType,omitempty"`       // DUB | LEG | ORIG | NAC
-	ProjectionType       string    `json:"projectionType,omitempty"`  // 2D | 3D | IMAX | 4DX
-	StartTime            time.Time `json:"startTime"`
-	MovieDurationMinutes int       `json:"movieDurationMinutes"`
-	CleaningMinutes      int       `json:"cleaningMinutes,omitempty"`
-	BaseTicketPrice      float64   `json:"baseTicketPrice"`
+	ComplexID            string      `json:"complexId"`
+	RoomID               string      `json:"roomId"`
+	MovieID              string      `json:"movieId"`
+	AudioType            string      `json:"audioType,omitempty"`      // DUB | LEG | ORIG | NAC
+	ProjectionType       string      `json:"projectionType,omitempty"` // 2D | 3D | IMAX | 4DX
+	StartTime            time.Time   `json:"startTime"`
+	MovieDurationMinutes int         `json:"movieDurationMinutes"`
+	CleaningMinutes      int         `json:"cleaningMinutes,omitempty"`
+	BaseTicketPrice      money.Cents `json:"baseTicketPrice"`
 }
 
 func (r ScheduleShowtimeRequest) Validate() (cID, rmID, mvID uuid.UUID, err error) {

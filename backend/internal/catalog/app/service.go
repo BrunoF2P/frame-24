@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"frame-24/internal/catalog/domain"
 	"frame-24/internal/catalog/repo"
 	"frame-24/internal/platform/db"
+	"frame-24/internal/platform/money"
 	"frame-24/internal/platform/outbox"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Service struct {
@@ -55,15 +56,15 @@ type CreateProductCommand struct {
 	BaseUnitID  uuid.UUID
 	NCM         *string
 	CEST        *string
-	CostPrice   float64
-	SalePrice   float64
+	CostPrice   money.Subcent
+	SalePrice   money.Cents
 }
 
 type CreateComboCommand struct {
 	TenantID   uuid.UUID
 	Name       string
 	BaseUnitID uuid.UUID
-	ComboPrice float64
+	ComboPrice money.Cents
 	Items      []ComboItemInput
 }
 
@@ -72,7 +73,7 @@ type ComboItemInput struct {
 	ProductID       uuid.UUID
 	UnitID          uuid.UUID
 	Quantity        float64
-	AdditionalPrice float64
+	AdditionalPrice money.Cents
 }
 
 func (s *Service) CreateMovie(ctx context.Context, cmd CreateMovieCommand) (*domain.Movie, error) {
@@ -169,7 +170,7 @@ func (s *Service) CreateCombo(ctx context.Context, cmd CreateComboCommand) (*dom
 		return nil, fmt.Errorf("baseUnitId obrigatorio para cadastro de combo")
 	}
 
-	prod, err := domain.NewProduct(cmd.TenantID, cmd.Name, "combo", cmd.BaseUnitID, nil, nil, 0, cmd.ComboPrice)
+	prod, err := domain.NewProduct(cmd.TenantID, cmd.Name, "combo", cmd.BaseUnitID, nil, nil, money.Subcent(0), cmd.ComboPrice)
 	if err != nil {
 		return nil, err
 	}

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5/middleware"
 	catalogDomain "frame-24/internal/catalog/domain"
 	financeDomain "frame-24/internal/finance/domain"
 	fiscalDomain "frame-24/internal/fiscal/domain"
@@ -15,6 +14,7 @@ import (
 	opsDomain "frame-24/internal/operations/domain"
 	paymentsDomain "frame-24/internal/payments/domain"
 	salesDomain "frame-24/internal/sales/domain"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 // ErrorResponse define o envelope canônico de erros da API para consumo seguro pelo Frontend (React/Next.js).

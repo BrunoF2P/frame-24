@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 )
 
@@ -28,17 +29,17 @@ func IsValidPaymentMethod(m string) bool {
 }
 
 type Payment struct {
-	ID                uuid.UUID `json:"id"`
-	TenantID          uuid.UUID `json:"tenantId"`
-	SaleID            uuid.UUID `json:"saleId"`
-	PaymentMethod     string    `json:"paymentMethod"`
-	Amount            float64   `json:"amount"`
-	Status            string    `json:"status"` // completed | refunded
-	ExternalReference *string   `json:"externalReference,omitempty"`
-	CreatedAt         time.Time `json:"createdAt"`
+	ID                uuid.UUID   `json:"id"`
+	TenantID          uuid.UUID   `json:"tenantId"`
+	SaleID            uuid.UUID   `json:"saleId"`
+	PaymentMethod     string      `json:"paymentMethod"`
+	Amount            money.Cents `json:"amount"`
+	Status            string      `json:"status"` // completed | refunded
+	ExternalReference *string     `json:"externalReference,omitempty"`
+	CreatedAt         time.Time   `json:"createdAt"`
 }
 
-func NewPayment(tenantID, saleID uuid.UUID, method string, amount float64, extRef *string) (*Payment, error) {
+func NewPayment(tenantID, saleID uuid.UUID, method string, amount money.Cents, extRef *string) (*Payment, error) {
 	cleanMethod := strings.ToLower(strings.TrimSpace(method))
 	if !IsValidPaymentMethod(cleanMethod) {
 		return nil, ErrInvalidPaymentMethod

@@ -19,19 +19,19 @@ const (
 
 // Códigos do Plano de Contas Padrão
 const (
-	CodeCaixaPDV              = "1.1.1.01"
-	CodeBancosContaMovimento  = "1.1.1.02"
-	CodeAdquirentesCartao     = "1.1.2.01"
-	CodeRecebiveisPIX         = "1.1.2.02"
-	CodeEstoqueMercadorias    = "1.1.3.01"
-	CodeCBSRetencaoSplit      = "2.1.2.01" // Split Payment CBS (2027)
-	CodeIBSRetencaoSplit      = "2.1.2.02" // Split Payment IBS (2027)
-	CodeReceitaBilheteria     = "4.1.1.01"
-	CodeReceitaBomboniere     = "4.1.2.01"
-	CodeReceitaSobrasCaixa    = "4.1.9.01"
-	CodeCMV                   = "5.1.1.01" // Custo das Mercadorias Vendidas
-	CodeTaxasAdquirencia      = "5.2.1.01" // Taxas de Cartão/MDR
-	CodeDespesaQuebraCaixa    = "5.2.9.01"
+	CodeCaixaPDV             = "1.1.1.01"
+	CodeBancosContaMovimento = "1.1.1.02"
+	CodeAdquirentesCartao    = "1.1.2.01"
+	CodeRecebiveisPIX        = "1.1.2.02"
+	CodeEstoqueMercadorias   = "1.1.3.01"
+	CodeCBSRetencaoSplit     = "2.1.2.01" // Split Payment CBS (2027)
+	CodeIBSRetencaoSplit     = "2.1.2.02" // Split Payment IBS (2027)
+	CodeReceitaBilheteria    = "4.1.1.01"
+	CodeReceitaBomboniere    = "4.1.2.01"
+	CodeReceitaSobrasCaixa   = "4.1.9.01"
+	CodeCMV                  = "5.1.1.01" // Custo das Mercadorias Vendidas
+	CodeTaxasAdquirencia     = "5.2.1.01" // Taxas de Cartão/MDR
+	CodeDespesaQuebraCaixa   = "5.2.9.01"
 )
 
 func IsValidAccountType(t string) bool {

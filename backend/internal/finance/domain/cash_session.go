@@ -4,16 +4,17 @@ import (
 	"strings"
 	"time"
 
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 )
 
 type CashMovementType string
 
 const (
-	CashMovementOpeningFloat          CashMovementType = "opening_float"
-	CashMovementBleedWithdrawal       CashMovementType = "bleed_withdrawal"       // Sangria
-	CashMovementDepositReinforcement  CashMovementType = "deposit_reinforcement"  // Suprimento
-	CashMovementCashSale              CashMovementType = "cash_sale"              // Venda em espécie
+	CashMovementOpeningFloat         CashMovementType = "opening_float"
+	CashMovementBleedWithdrawal      CashMovementType = "bleed_withdrawal"      // Sangria
+	CashMovementDepositReinforcement CashMovementType = "deposit_reinforcement" // Suprimento
+	CashMovementCashSale             CashMovementType = "cash_sale"             // Venda em espécie
 )
 
 func IsValidCashMovementType(m string) bool {
@@ -31,7 +32,7 @@ type CashMovement struct {
 	TenantID       uuid.UUID        `json:"tenantId"`
 	SessionID      uuid.UUID        `json:"sessionId"`
 	MovementType   CashMovementType `json:"movementType"`
-	Amount         float64          `json:"amount"`
+	Amount         money.Cents      `json:"amount"`
 	Reason         *string          `json:"reason,omitempty"`
 	AuthorizedByID *uuid.UUID       `json:"authorizedById,omitempty"`
 	// Campos de referência para idempotência (retry do Outbox dispatcher)
@@ -41,30 +42,30 @@ type CashMovement struct {
 }
 
 type CashSession struct {
-	ID                  uuid.UUID  `json:"id"`
-	TenantID            uuid.UUID  `json:"tenantId"`
-	ComplexID           uuid.UUID  `json:"complexId"`
-	POSTerminalID       string     `json:"posTerminalId"`
-	OperatorID          uuid.UUID  `json:"operatorId"`
-	Status              string     `json:"status"` // open | closed
-	OpenedAt            time.Time  `json:"openedAt"`
-	ClosedAt            *time.Time `json:"closedAt,omitempty"`
-	OpeningBalance      float64    `json:"openingBalance"`
-	ClosingCashCounted  *float64   `json:"closingCashCounted,omitempty"`
-	ClosingCardCounted  *float64   `json:"closingCardCounted,omitempty"`
-	ClosingPixCounted   *float64   `json:"closingPixCounted,omitempty"`
-	ExpectedCashBalance *float64   `json:"expectedCashBalance,omitempty"`
-	DifferenceAmount    *float64   `json:"differenceAmount,omitempty"` // Positivo: Sobra / Negativo: Quebra
-	Notes               *string    `json:"notes,omitempty"`
-	CreatedAt           time.Time  `json:"createdAt"`
-	UpdatedAt           time.Time  `json:"updatedAt"`
+	ID                  uuid.UUID    `json:"id"`
+	TenantID            uuid.UUID    `json:"tenantId"`
+	ComplexID           uuid.UUID    `json:"complexId"`
+	POSTerminalID       string       `json:"posTerminalId"`
+	OperatorID          uuid.UUID    `json:"operatorId"`
+	Status              string       `json:"status"` // open | closed
+	OpenedAt            time.Time    `json:"openedAt"`
+	ClosedAt            *time.Time   `json:"closedAt,omitempty"`
+	OpeningBalance      money.Cents  `json:"openingBalance"`
+	ClosingCashCounted  *money.Cents `json:"closingCashCounted,omitempty"`
+	ClosingCardCounted  *money.Cents `json:"closingCardCounted,omitempty"`
+	ClosingPixCounted   *money.Cents `json:"closingPixCounted,omitempty"`
+	ExpectedCashBalance *money.Cents `json:"expectedCashBalance,omitempty"`
+	DifferenceAmount    *money.Cents `json:"differenceAmount,omitempty"` // Positivo: Sobra / Negativo: Quebra
+	Notes               *string      `json:"notes,omitempty"`
+	CreatedAt           time.Time    `json:"createdAt"`
+	UpdatedAt           time.Time    `json:"updatedAt"`
 }
 
 func NewCashSession(
 	tenantID, complexID uuid.UUID,
 	posTerminalID string,
 	operatorID uuid.UUID,
-	openingFloat float64,
+	openingFloat money.Cents,
 ) (*CashSession, error) {
 	cleanTerminal := strings.TrimSpace(posTerminalID)
 	if cleanTerminal == "" {
@@ -91,10 +92,10 @@ func NewCashSession(
 
 // CloseBlind executa o cálculo de auditoria do Fechamento Cego de Caixa
 func (s *CashSession) CloseBlind(
-	cashCounted, cardCounted, pixCounted float64,
-	totalCashSales, totalDeposits, totalBleeds float64,
+	cashCounted, cardCounted, pixCounted money.Cents,
+	totalCashSales, totalDeposits, totalBleeds money.Cents,
 	notes *string,
-) (float64, error) {
+) (money.Cents, error) {
 	if s.Status == "closed" {
 		return 0, ErrCashSessionClosed
 	}

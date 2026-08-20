@@ -1,10 +1,10 @@
 package domain
 
 import (
-	"math"
 	"strings"
 	"time"
 
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 )
 
@@ -16,13 +16,13 @@ const (
 )
 
 type LedgerEntry struct {
-	ID            uuid.UUID `json:"id"`
-	TenantID      uuid.UUID `json:"tenantId"`
-	TransactionID uuid.UUID `json:"transactionId"`
-	AccountID     uuid.UUID `json:"accountId"`
-	EntryType     EntryType `json:"entryType"`
-	Amount        float64   `json:"amount"`
-	CreatedAt     time.Time `json:"createdAt"`
+	ID            uuid.UUID   `json:"id"`
+	TenantID      uuid.UUID   `json:"tenantId"`
+	TransactionID uuid.UUID   `json:"transactionId"`
+	AccountID     uuid.UUID   `json:"accountId"`
+	EntryType     EntryType   `json:"entryType"`
+	Amount        money.Cents `json:"amount"`
+	CreatedAt     time.Time   `json:"createdAt"`
 }
 
 type Transaction struct {
@@ -78,7 +78,7 @@ func NewTransaction(
 }
 
 // AddEntry adiciona uma perna (débito ou crédito) à transação contábil
-func (t *Transaction) AddEntry(accountID uuid.UUID, entryType string, amount float64) error {
+func (t *Transaction) AddEntry(accountID uuid.UUID, entryType string, amount money.Cents) error {
 	cleanType := strings.ToLower(strings.TrimSpace(entryType))
 	if cleanType != string(EntryTypeDebit) && cleanType != string(EntryTypeCredit) {
 		return ErrInvalidAccountType
@@ -105,7 +105,7 @@ func (t *Transaction) Validate() error {
 		return ErrEmptyTransaction
 	}
 
-	var sumDebit, sumCredit float64
+	var sumDebit, sumCredit money.Cents
 	for _, entry := range t.Entries {
 		switch entry.EntryType {
 		case EntryTypeDebit:
@@ -115,7 +115,7 @@ func (t *Transaction) Validate() error {
 		}
 	}
 
-	if math.Abs(sumDebit-sumCredit) > 0.009 {
+	if sumDebit != sumCredit {
 		return ErrUnbalancedTransaction
 	}
 

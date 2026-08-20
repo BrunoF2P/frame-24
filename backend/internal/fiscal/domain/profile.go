@@ -80,23 +80,23 @@ func NewFiscalProfile(
 
 	now := time.Now()
 	return &FiscalProfile{
-		ID:                     uuid.New(),
-		TenantID:               tenantID,
-		ComplexID:              complexID,
-		Environment:            environment,
-		TaxRegime:              regime,
-		NFCeSeries:             nfceSeries,
-		NFCeLastNumber:         0,
-		NFCeCSCID:              cleanCscID,
-		NFCeCSCToken:           cscToken,
-		NFSeSeries:             strings.TrimSpace(nfseSeries),
-		NFSeLastNumber:         0,
-		NFeDevolutionSeries:    1,
+		ID:                      uuid.New(),
+		TenantID:                tenantID,
+		ComplexID:               complexID,
+		Environment:             environment,
+		TaxRegime:               regime,
+		NFCeSeries:              nfceSeries,
+		NFCeLastNumber:          0,
+		NFCeCSCID:               cleanCscID,
+		NFCeCSCToken:            cscToken,
+		NFSeSeries:              strings.TrimSpace(nfseSeries),
+		NFSeLastNumber:          0,
+		NFeDevolutionSeries:     1,
 		NFeDevolutionLastNumber: 0,
-		CNAE:                   cleanCnae,
-		AliquotaISS:            issRate,
-		CreatedAt:              now,
-		UpdatedAt:              now,
+		CNAE:                    cleanCnae,
+		AliquotaISS:             issRate,
+		CreatedAt:               now,
+		UpdatedAt:               now,
 	}, nil
 }
 
@@ -117,4 +117,3 @@ func (p *FiscalProfile) NextNFeDevolutionNumber() int64 {
 	p.UpdatedAt = time.Now()
 	return p.NFeDevolutionLastNumber
 }
-

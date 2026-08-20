@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"frame-24/internal/operations/app"
 	"frame-24/internal/platform/auth"
 	"frame-24/internal/platform/httputil"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 type Handler struct {

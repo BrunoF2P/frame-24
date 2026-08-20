@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"time"
 
+	"frame-24/internal/inventory/domain"
+	"frame-24/internal/platform/db"
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"frame-24/internal/inventory/domain"
-	"frame-24/internal/platform/db"
 )
 
 type PostgresRepository struct {
@@ -286,7 +287,7 @@ func (r *PostgresRepository) RecordMovement(ctx context.Context, tx pgx.Tx, m *d
 	if _, err := tx.Exec(
 		ctx, insertMovementQuery,
 		m.ID, m.TenantID, m.WarehouseID, m.ProductID, m.UnitID,
-		string(m.MovementType), m.Quantity, m.UnitCost, m.TotalCost,
+		string(m.MovementType), m.Quantity, int64(m.UnitCost), int64(m.TotalCost),
 		m.ReferenceType, m.ReferenceID, m.OperatorID, m.Notes, m.CreatedAt,
 	); err != nil {
 		return nil, fmt.Errorf("falha ao inserir registro append-only de movimentacao: %w", err)
@@ -304,9 +305,12 @@ func (r *PostgresRepository) RecordMovement(ctx context.Context, tx pgx.Tx, m *d
 	}, nil
 }
 
-func (r *PostgresRepository) ListMovements(ctx context.Context, tenantID, warehouseID uuid.UUID, limit int) ([]domain.Movement, error) {
-	if limit <= 0 || limit > 100 {
-		limit = 50
+func (r *PostgresRepository) ListMovements(ctx context.Context, tenantID, warehouseID uuid.UUID, limit int, beforeTS *time.Time, beforeID *uuid.UUID) ([]domain.Movement, error) {
+	if limit <= 0 {
+		limit = 51
+	}
+	if limit > 101 {
+		limit = 101
 	}
 
 	var list []domain.Movement
@@ -315,10 +319,11 @@ func (r *PostgresRepository) ListMovements(ctx context.Context, tenantID, wareho
 			SELECT id, tenant_id, warehouse_id, product_id, unit_id, movement_type, quantity, unit_cost, total_cost, reference_type, reference_id, operator_id, notes, created_at
 			FROM inventory.movements
 			WHERE warehouse_id = $1
-			ORDER BY created_at DESC
+			  AND ($3::timestamptz IS NULL OR (created_at, id) < ($3, $4))
+			ORDER BY created_at DESC, id DESC
 			LIMIT $2
 		`
-		rows, err := tx.Query(ctx, query, warehouseID, limit)
+		rows, err := tx.Query(ctx, query, warehouseID, limit, beforeTS, beforeID)
 		if err != nil {
 			return err
 		}
@@ -327,14 +332,18 @@ func (r *PostgresRepository) ListMovements(ctx context.Context, tenantID, wareho
 		for rows.Next() {
 			var m domain.Movement
 			var mType string
+			var unitCost int64
+			var totalCost int64
 			if err := rows.Scan(
 				&m.ID, &m.TenantID, &m.WarehouseID, &m.ProductID, &m.UnitID,
-				&mType, &m.Quantity, &m.UnitCost, &m.TotalCost,
+				&mType, &m.Quantity, &unitCost, &totalCost,
 				&m.ReferenceType, &m.ReferenceID, &m.OperatorID, &m.Notes, &m.CreatedAt,
 			); err != nil {
 				return err
 			}
 			m.MovementType = domain.MovementType(mType)
+			m.UnitCost = money.Subcent(unitCost)
+			m.TotalCost = money.Cents(totalCost)
 			list = append(list, m)
 		}
 		return rows.Err()

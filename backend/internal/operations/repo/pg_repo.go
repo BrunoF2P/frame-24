@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"time"
 
+	"frame-24/internal/operations/domain"
+	"frame-24/internal/platform/db"
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"frame-24/internal/operations/domain"
-	"frame-24/internal/platform/db"
 )
 
 type PostgresRepository struct {
@@ -294,12 +295,12 @@ func (r *PostgresRepository) CreateShowtime(ctx context.Context, tx pgx.Tx, s *d
 	if tx != nil {
 		_, err = tx.Exec(ctx, query,
 			s.ID, s.TenantID, s.ComplexID, s.RoomID, s.MovieID, s.AudioType, s.ProjectionType,
-			s.StartTime, s.EndTime, s.CleaningMinutes, s.BaseTicketPrice, s.Status, s.CreatedAt, s.UpdatedAt,
+			s.StartTime, s.EndTime, s.CleaningMinutes, int64(s.BaseTicketPrice), s.Status, s.CreatedAt, s.UpdatedAt,
 		)
 	} else {
 		_, err = r.pool.Exec(ctx, query,
 			s.ID, s.TenantID, s.ComplexID, s.RoomID, s.MovieID, s.AudioType, s.ProjectionType,
-			s.StartTime, s.EndTime, s.CleaningMinutes, s.BaseTicketPrice, s.Status, s.CreatedAt, s.UpdatedAt,
+			s.StartTime, s.EndTime, s.CleaningMinutes, int64(s.BaseTicketPrice), s.Status, s.CreatedAt, s.UpdatedAt,
 		)
 	}
 
@@ -328,10 +329,15 @@ func (r *PostgresRepository) GetShowtimeByID(ctx context.Context, tenantID, id u
 		} else {
 			exec = r.pool.QueryRow(ctx, query, id)
 		}
-		return exec.Scan(
+		var baseTicketPrice int64
+		if err := exec.Scan(
 			&s.ID, &s.TenantID, &s.ComplexID, &s.RoomID, &s.MovieID, &s.AudioType, &s.ProjectionType,
-			&s.StartTime, &s.EndTime, &s.CleaningMinutes, &s.BaseTicketPrice, &s.Status, &s.CreatedAt, &s.UpdatedAt,
-		)
+			&s.StartTime, &s.EndTime, &s.CleaningMinutes, &baseTicketPrice, &s.Status, &s.CreatedAt, &s.UpdatedAt,
+		); err != nil {
+			return err
+		}
+		s.BaseTicketPrice = money.Cents(baseTicketPrice)
+		return nil
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -366,13 +372,15 @@ func (r *PostgresRepository) ListShowtimesByRoom(ctx context.Context, tenantID, 
 
 		for rows.Next() {
 			var s domain.Showtime
+			var baseTicketPrice int64
 			err := rows.Scan(
 				&s.ID, &s.TenantID, &s.ComplexID, &s.RoomID, &s.MovieID, &s.AudioType, &s.ProjectionType,
-				&s.StartTime, &s.EndTime, &s.CleaningMinutes, &s.BaseTicketPrice, &s.Status, &s.CreatedAt, &s.UpdatedAt,
+				&s.StartTime, &s.EndTime, &s.CleaningMinutes, &baseTicketPrice, &s.Status, &s.CreatedAt, &s.UpdatedAt,
 			)
 			if err != nil {
 				return err
 			}
+			s.BaseTicketPrice = money.Cents(baseTicketPrice)
 			list = append(list, s)
 		}
 		return nil
@@ -407,13 +415,15 @@ func (r *PostgresRepository) ListShowtimesByComplex(ctx context.Context, tenantI
 
 		for rows.Next() {
 			var s domain.Showtime
+			var baseTicketPrice int64
 			err := rows.Scan(
 				&s.ID, &s.TenantID, &s.ComplexID, &s.RoomID, &s.MovieID, &s.AudioType, &s.ProjectionType,
-				&s.StartTime, &s.EndTime, &s.CleaningMinutes, &s.BaseTicketPrice, &s.Status, &s.CreatedAt, &s.UpdatedAt,
+				&s.StartTime, &s.EndTime, &s.CleaningMinutes, &baseTicketPrice, &s.Status, &s.CreatedAt, &s.UpdatedAt,
 			)
 			if err != nil {
 				return err
 			}
+			s.BaseTicketPrice = money.Cents(baseTicketPrice)
 			list = append(list, s)
 		}
 		return nil

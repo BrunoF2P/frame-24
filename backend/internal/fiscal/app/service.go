@@ -7,19 +7,20 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"frame-24/internal/fiscal/domain"
 	"frame-24/internal/fiscal/repo"
 	"frame-24/internal/platform/db"
+	"frame-24/internal/platform/money"
 	"frame-24/internal/platform/outbox"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type SaleTicketInput struct {
 	TicketID    uuid.UUID
 	Description string
-	UnitPrice   float64
+	UnitPrice   money.Cents
 	Quantity    float64
 }
 
@@ -29,7 +30,7 @@ type SaleConcessionInput struct {
 	Description string
 	NCM         *string
 	CEST        *string
-	UnitPrice   float64
+	UnitPrice   money.Cents
 	Quantity    float64
 }
 
@@ -120,12 +121,12 @@ func (s *Service) ProcessSaleCompleted(
 
 		// 1. Emissão de NFS-e para Ingressos de Cinema (ISS LC 116 12.01)
 		// Ignora emissão caso a soma de ingressos seja R$ 0,00 (cortesia integral - prefeituras rejeitam RPS zero)
-		totalTicketAmount := 0.0
+		totalTicketAmount := money.Cents(0)
 		for _, tk := range tickets {
-			totalTicketAmount += tk.UnitPrice * tk.Quantity
+			totalTicketAmount += tk.UnitPrice.MulQuantityToCents(tk.Quantity)
 		}
 
-		if len(tickets) > 0 && totalTicketAmount > 0.009 {
+		if len(tickets) > 0 && totalTicketAmount > 0 {
 			nfseNumber := profile.NextNFSeNumber()
 			doc, err := domain.NewFiscalDocument(tenantID, complexID, saleID, domain.DocTypeNFSe, profile.NFSeSeries, nfseNumber)
 			if err != nil {
@@ -133,7 +134,7 @@ func (s *Service) ProcessSaleCompleted(
 			}
 
 			for _, tk := range tickets {
-				totalItemPrice := tk.UnitPrice * tk.Quantity
+				totalItemPrice := tk.UnitPrice.MulQuantityToCents(tk.Quantity)
 				taxRes := domain.CalculateItemTaxes("ticket", totalItemPrice, profile.TaxRegime, now, profile.AliquotaISS)
 
 				doc.ISSAmount += taxRes.ISSAmount
@@ -168,7 +169,7 @@ func (s *Service) ProcessSaleCompleted(
 
 			// Simular autorização de NFS-e (em produção via Gateway Fiscal)
 			protocol := fmt.Sprintf("PROTO-NFSE-%d", nfseNumber)
-			xml := fmt.Sprintf("<nfse><numero>%d</numero><valor>%.2f</valor></nfse>", nfseNumber, doc.TotalAmount)
+			xml := fmt.Sprintf("<nfse><numero>%d</numero><valor>%s</valor></nfse>", nfseNumber, doc.TotalAmount.String())
 			pdfURL := fmt.Sprintf("https://fiscal.frame24.internal/nfse/%s.pdf", doc.ID.String())
 			doc.Authorize("", protocol, xml, pdfURL, "")
 
@@ -187,7 +188,7 @@ func (s *Service) ProcessSaleCompleted(
 			}
 
 			for _, it := range concessionItems {
-				totalItemPrice := it.UnitPrice * it.Quantity
+				totalItemPrice := it.UnitPrice.MulQuantityToCents(it.Quantity)
 				taxRes := domain.CalculateItemTaxes(it.ItemType, totalItemPrice, profile.TaxRegime, now, profile.AliquotaISS)
 
 				doc.ICMSAmount += taxRes.ICMSAmount
@@ -225,7 +226,7 @@ func (s *Service) ProcessSaleCompleted(
 			// Chave de Acesso de 44 dígitos da NFC-e (modelo 65)
 			accessKey := generateAccessKey("35", now, "65", profile.NFCeSeries, nfceNumber)
 			protocol := fmt.Sprintf("PROTO-NFCE-%d", nfceNumber)
-			xml := fmt.Sprintf("<nfeProc><chNFe>%s</chNFe><vNF>%.2f</vNF></nfeProc>", accessKey, doc.TotalAmount)
+			xml := fmt.Sprintf("<nfeProc><chNFe>%s</chNFe><vNF>%s</vNF></nfeProc>", accessKey, doc.TotalAmount.String())
 			pdfURL := fmt.Sprintf("https://fiscal.frame24.internal/danfe/%s.pdf", accessKey)
 			qrCodeURL := fmt.Sprintf("https://sefaz.sp.gov.br/nfce/qrcode?p=%s", accessKey)
 			doc.Authorize(accessKey, protocol, xml, pdfURL, qrCodeURL)

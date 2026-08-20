@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 
+	"frame-24/internal/fiscal/domain"
+	"frame-24/internal/platform/db"
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"frame-24/internal/fiscal/domain"
-	"frame-24/internal/platform/db"
 )
 
 type PostgresRepository struct {
@@ -169,8 +170,8 @@ func (r *PostgresRepository) CreateFiscalDocument(ctx context.Context, tx pgx.Tx
 	tag, err := tx.Exec(ctx, docQuery,
 		d.ID, d.TenantID, d.ComplexID, d.SaleID, string(d.DocType), string(d.Status), d.Series, d.Number,
 		d.AccessKey, d.ProtocolNumber, d.ReferencedAccessKey, d.XMLContent, d.PDFDanfeURL, d.QRCodeURL,
-		d.TotalAmount, d.ICMSAmount, d.ISSAmount, d.PISAmount, d.COFINSAmount,
-		d.CBSAliquot, d.CBSAmount, d.IBSAliquot, d.IBSAmount, d.RejectionReason, d.EmittedAt, d.CancelledAt, d.CreatedAt, d.UpdatedAt,
+		int64(d.TotalAmount), int64(d.ICMSAmount), int64(d.ISSAmount), int64(d.PISAmount), int64(d.COFINSAmount),
+		d.CBSAliquot, int64(d.CBSAmount), d.IBSAliquot, int64(d.IBSAmount), d.RejectionReason, d.EmittedAt, d.CancelledAt, d.CreatedAt, d.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("falha ao inserir documento fiscal: %w", err)
@@ -190,8 +191,8 @@ func (r *PostgresRepository) CreateFiscalDocument(ctx context.Context, tx pgx.Tx
 	for _, it := range d.Items {
 		batch.Queue(itemQuery,
 			it.ID, it.TenantID, d.ID, it.ItemType, it.ReferenceID, it.Description,
-			it.NCM, it.CEST, it.CFOP, it.Unit, it.Quantity, it.UnitPrice, it.TotalPrice,
-			it.CSTICMS, it.CSTPISCOFINS, it.CSTCBSIBS, it.CBSRate, it.CBSAmount, it.IBSRate, it.IBSAmount, it.CreatedAt,
+			it.NCM, it.CEST, it.CFOP, it.Unit, it.Quantity, int64(it.UnitPrice), int64(it.TotalPrice),
+			it.CSTICMS, it.CSTPISCOFINS, it.CSTCBSIBS, it.CBSRate, int64(it.CBSAmount), it.IBSRate, int64(it.IBSAmount), it.CreatedAt,
 		)
 	}
 	br := tx.SendBatch(ctx, batch)
@@ -218,12 +219,23 @@ func (r *PostgresRepository) GetFiscalDocumentByID(ctx context.Context, tenantID
 			FROM fiscal.fiscal_documents
 			WHERE id = $1
 		`
-		return tx.QueryRow(ctx, query, id).Scan(
+		var totalAmount, icmsAmount, issAmount, pisAmount, cofinsAmount, cbsAmount, ibsAmount int64
+		if err := tx.QueryRow(ctx, query, id).Scan(
 			&d.ID, &d.TenantID, &d.ComplexID, &d.SaleID, &docType, &status, &d.Series, &d.Number,
 			&d.AccessKey, &d.ProtocolNumber, &d.ReferencedAccessKey, &d.XMLContent, &d.PDFDanfeURL, &d.QRCodeURL,
-			&d.TotalAmount, &d.ICMSAmount, &d.ISSAmount, &d.PISAmount, &d.COFINSAmount,
-			&d.CBSAliquot, &d.CBSAmount, &d.IBSAliquot, &d.IBSAmount, &d.RejectionReason, &d.EmittedAt, &d.CancelledAt, &d.CreatedAt, &d.UpdatedAt,
-		)
+			&totalAmount, &icmsAmount, &issAmount, &pisAmount, &cofinsAmount,
+			&d.CBSAliquot, &cbsAmount, &d.IBSAliquot, &ibsAmount, &d.RejectionReason, &d.EmittedAt, &d.CancelledAt, &d.CreatedAt, &d.UpdatedAt,
+		); err != nil {
+			return err
+		}
+		d.TotalAmount = money.Cents(totalAmount)
+		d.ICMSAmount = money.Cents(icmsAmount)
+		d.ISSAmount = money.Cents(issAmount)
+		d.PISAmount = money.Cents(pisAmount)
+		d.COFINSAmount = money.Cents(cofinsAmount)
+		d.CBSAmount = money.Cents(cbsAmount)
+		d.IBSAmount = money.Cents(ibsAmount)
+		return nil
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -248,12 +260,23 @@ func (r *PostgresRepository) GetFiscalDocumentBySaleAndType(ctx context.Context,
 			FROM fiscal.fiscal_documents
 			WHERE sale_id = $1 AND doc_type = $2
 		`
-		return tx.QueryRow(ctx, query, saleID, string(docType)).Scan(
+		var totalAmount, icmsAmount, issAmount, pisAmount, cofinsAmount, cbsAmount, ibsAmount int64
+		if err := tx.QueryRow(ctx, query, saleID, string(docType)).Scan(
 			&d.ID, &d.TenantID, &d.ComplexID, &d.SaleID, &docTypeStr, &status, &d.Series, &d.Number,
 			&d.AccessKey, &d.ProtocolNumber, &d.ReferencedAccessKey, &d.XMLContent, &d.PDFDanfeURL, &d.QRCodeURL,
-			&d.TotalAmount, &d.ICMSAmount, &d.ISSAmount, &d.PISAmount, &d.COFINSAmount,
-			&d.CBSAliquot, &d.CBSAmount, &d.IBSAliquot, &d.IBSAmount, &d.RejectionReason, &d.EmittedAt, &d.CancelledAt, &d.CreatedAt, &d.UpdatedAt,
-		)
+			&totalAmount, &icmsAmount, &issAmount, &pisAmount, &cofinsAmount,
+			&d.CBSAliquot, &cbsAmount, &d.IBSAliquot, &ibsAmount, &d.RejectionReason, &d.EmittedAt, &d.CancelledAt, &d.CreatedAt, &d.UpdatedAt,
+		); err != nil {
+			return err
+		}
+		d.TotalAmount = money.Cents(totalAmount)
+		d.ICMSAmount = money.Cents(icmsAmount)
+		d.ISSAmount = money.Cents(issAmount)
+		d.PISAmount = money.Cents(pisAmount)
+		d.COFINSAmount = money.Cents(cofinsAmount)
+		d.CBSAmount = money.Cents(cbsAmount)
+		d.IBSAmount = money.Cents(ibsAmount)
+		return nil
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -287,15 +310,23 @@ func (r *PostgresRepository) ListFiscalDocumentsBySale(ctx context.Context, tena
 		for rows.Next() {
 			var d domain.FiscalDocument
 			var dt, st string
+			var totalAmount, icmsAmount, issAmount, pisAmount, cofinsAmount, cbsAmount, ibsAmount int64
 			err := rows.Scan(
 				&d.ID, &d.TenantID, &d.ComplexID, &d.SaleID, &dt, &st, &d.Series, &d.Number,
 				&d.AccessKey, &d.ProtocolNumber, &d.ReferencedAccessKey, &d.XMLContent, &d.PDFDanfeURL, &d.QRCodeURL,
-				&d.TotalAmount, &d.ICMSAmount, &d.ISSAmount, &d.PISAmount, &d.COFINSAmount,
-				&d.CBSAliquot, &d.CBSAmount, &d.IBSAliquot, &d.IBSAmount, &d.RejectionReason, &d.EmittedAt, &d.CancelledAt, &d.CreatedAt, &d.UpdatedAt,
+				&totalAmount, &icmsAmount, &issAmount, &pisAmount, &cofinsAmount,
+				&d.CBSAliquot, &cbsAmount, &d.IBSAliquot, &ibsAmount, &d.RejectionReason, &d.EmittedAt, &d.CancelledAt, &d.CreatedAt, &d.UpdatedAt,
 			)
 			if err != nil {
 				return err
 			}
+			d.TotalAmount = money.Cents(totalAmount)
+			d.ICMSAmount = money.Cents(icmsAmount)
+			d.ISSAmount = money.Cents(issAmount)
+			d.PISAmount = money.Cents(pisAmount)
+			d.COFINSAmount = money.Cents(cofinsAmount)
+			d.CBSAmount = money.Cents(cbsAmount)
+			d.IBSAmount = money.Cents(ibsAmount)
 			d.DocType = domain.DocumentType(dt)
 			d.Status = domain.DocumentStatus(st)
 			list = append(list, d)

@@ -2,10 +2,11 @@ package repo
 
 import (
 	"context"
+	"time"
 
+	"frame-24/internal/inventory/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"frame-24/internal/inventory/domain"
 )
 
 type Repository interface {
@@ -16,5 +17,5 @@ type Repository interface {
 	GetStockLevel(ctx context.Context, tenantID, warehouseID, productID, unitID uuid.UUID) (*domain.StockLevel, error)
 	ListStockLevels(ctx context.Context, tenantID, warehouseID uuid.UUID) ([]domain.StockLevel, error)
 	RecordMovement(ctx context.Context, tx pgx.Tx, m *domain.Movement) (*domain.StockLevel, error)
-	ListMovements(ctx context.Context, tenantID, warehouseID uuid.UUID, limit int) ([]domain.Movement, error)
+	ListMovements(ctx context.Context, tenantID, warehouseID uuid.UUID, limit int, beforeTS *time.Time, beforeID *uuid.UUID) ([]domain.Movement, error)
 }

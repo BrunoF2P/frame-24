@@ -5,12 +5,13 @@ import (
 	"errors"
 	"fmt"
 
+	"frame-24/internal/catalog/domain"
+	"frame-24/internal/platform/db"
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"frame-24/internal/catalog/domain"
-	"frame-24/internal/platform/db"
 )
 
 type PostgresRepository struct {
@@ -214,12 +215,12 @@ func (r *PostgresRepository) CreateProduct(ctx context.Context, tx pgx.Tx, p *do
 	if tx != nil {
 		_, err = tx.Exec(ctx, query,
 			p.ID, p.TenantID, p.Name, p.Description, p.Category, p.BaseUnitID, p.NCM, p.CEST,
-			p.CostPrice, p.SalePrice, p.IsActive, p.IsCombo, p.CreatedAt, p.UpdatedAt,
+			int64(p.CostPrice), int64(p.SalePrice), p.IsActive, p.IsCombo, p.CreatedAt, p.UpdatedAt,
 		)
 	} else {
 		_, err = r.pool.Exec(ctx, query,
 			p.ID, p.TenantID, p.Name, p.Description, p.Category, p.BaseUnitID, p.NCM, p.CEST,
-			p.CostPrice, p.SalePrice, p.IsActive, p.IsCombo, p.CreatedAt, p.UpdatedAt,
+			int64(p.CostPrice), int64(p.SalePrice), p.IsActive, p.IsCombo, p.CreatedAt, p.UpdatedAt,
 		)
 	}
 	if err != nil {
@@ -242,10 +243,16 @@ func (r *PostgresRepository) GetProductByID(ctx context.Context, tenantID, id uu
 		} else {
 			exec = r.pool.QueryRow(ctx, query, id)
 		}
-		return exec.Scan(
+		var costPrice, salePrice int64
+		if err := exec.Scan(
 			&p.ID, &p.TenantID, &p.Name, &p.Description, &p.Category, &p.BaseUnitID, &p.NCM, &p.CEST,
-			&p.CostPrice, &p.SalePrice, &p.IsActive, &p.IsCombo, &p.CreatedAt, &p.UpdatedAt,
-		)
+			&costPrice, &salePrice, &p.IsActive, &p.IsCombo, &p.CreatedAt, &p.UpdatedAt,
+		); err != nil {
+			return err
+		}
+		p.CostPrice = money.Subcent(costPrice)
+		p.SalePrice = money.Cents(salePrice)
+		return nil
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -279,13 +286,16 @@ func (r *PostgresRepository) ListProducts(ctx context.Context, tenantID uuid.UUI
 
 		for rows.Next() {
 			var p domain.Product
+			var costPrice, salePrice int64
 			err := rows.Scan(
 				&p.ID, &p.TenantID, &p.Name, &p.Description, &p.Category, &p.BaseUnitID, &p.NCM, &p.CEST,
-				&p.CostPrice, &p.SalePrice, &p.IsActive, &p.IsCombo, &p.CreatedAt, &p.UpdatedAt,
+				&costPrice, &salePrice, &p.IsActive, &p.IsCombo, &p.CreatedAt, &p.UpdatedAt,
 			)
 			if err != nil {
 				return err
 			}
+			p.CostPrice = money.Subcent(costPrice)
+			p.SalePrice = money.Cents(salePrice)
 			list = append(list, p)
 		}
 		return nil
@@ -335,10 +345,16 @@ func (r *PostgresRepository) GetProductByBarcode(ctx context.Context, tenantID u
 		} else {
 			exec = r.pool.QueryRow(ctx, query, barcode)
 		}
-		return exec.Scan(
-			&p.ID, &p.TenantID, &p.Name, &p.Description, &p.Category, &p.BaseUnitID, &p.NCM, &p.CEST, &p.CostPrice, &p.SalePrice, &p.IsActive, &p.IsCombo, &p.CreatedAt, &p.UpdatedAt,
+		var costPrice, salePrice int64
+		if err := exec.Scan(
+			&p.ID, &p.TenantID, &p.Name, &p.Description, &p.Category, &p.BaseUnitID, &p.NCM, &p.CEST, &costPrice, &salePrice, &p.IsActive, &p.IsCombo, &p.CreatedAt, &p.UpdatedAt,
 			&u.ID, &u.TenantID, &u.Name, &u.Acronym, &u.IsBaseUnit, &u.BaseUnitID, &u.ConversionFactor, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
-		)
+		); err != nil {
+			return err
+		}
+		p.CostPrice = money.Subcent(costPrice)
+		p.SalePrice = money.Cents(salePrice)
+		return nil
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -356,9 +372,9 @@ func (r *PostgresRepository) CreateCombo(ctx context.Context, tx pgx.Tx, c *doma
 	`
 	var err error
 	if tx != nil {
-		_, err = tx.Exec(ctx, queryCombo, c.ID, c.TenantID, c.ProductID, c.Name, c.ComboPrice, c.IsActive, c.CreatedAt, c.UpdatedAt)
+		_, err = tx.Exec(ctx, queryCombo, c.ID, c.TenantID, c.ProductID, c.Name, int64(c.ComboPrice), c.IsActive, c.CreatedAt, c.UpdatedAt)
 	} else {
-		_, err = r.pool.Exec(ctx, queryCombo, c.ID, c.TenantID, c.ProductID, c.Name, c.ComboPrice, c.IsActive, c.CreatedAt, c.UpdatedAt)
+		_, err = r.pool.Exec(ctx, queryCombo, c.ID, c.TenantID, c.ProductID, c.Name, int64(c.ComboPrice), c.IsActive, c.CreatedAt, c.UpdatedAt)
 	}
 	if err != nil {
 		return fmt.Errorf("falha ao cadastrar combo: %w", err)
@@ -370,9 +386,9 @@ func (r *PostgresRepository) CreateCombo(ctx context.Context, tx pgx.Tx, c *doma
 	`
 	for _, item := range items {
 		if tx != nil {
-			_, err = tx.Exec(ctx, queryItem, item.ID, item.TenantID, c.ID, item.GroupName, item.ProductID, item.UnitID, item.Quantity, item.AdditionalPrice)
+			_, err = tx.Exec(ctx, queryItem, item.ID, item.TenantID, c.ID, item.GroupName, item.ProductID, item.UnitID, item.Quantity, int64(item.AdditionalPrice))
 		} else {
-			_, err = r.pool.Exec(ctx, queryItem, item.ID, item.TenantID, c.ID, item.GroupName, item.ProductID, item.UnitID, item.Quantity, item.AdditionalPrice)
+			_, err = r.pool.Exec(ctx, queryItem, item.ID, item.TenantID, c.ID, item.GroupName, item.ProductID, item.UnitID, item.Quantity, int64(item.AdditionalPrice))
 		}
 		if err != nil {
 			return fmt.Errorf("falha ao inserir item do combo: %w", err)
@@ -395,12 +411,14 @@ func (r *PostgresRepository) GetComboByID(ctx context.Context, tenantID, id uuid
 		} else {
 			exec = r.pool.QueryRow(ctx, queryCombo, id)
 		}
+		var comboPrice int64
 		err := exec.Scan(
-			&c.ID, &c.TenantID, &c.ProductID, &c.Name, &c.ComboPrice, &c.IsActive, &c.CreatedAt, &c.UpdatedAt,
+			&c.ID, &c.TenantID, &c.ProductID, &c.Name, &comboPrice, &c.IsActive, &c.CreatedAt, &c.UpdatedAt,
 		)
 		if err != nil {
 			return err
 		}
+		c.ComboPrice = money.Cents(comboPrice)
 
 		queryItems := `
 			SELECT id, tenant_id, combo_id, group_name, product_id, unit_id, quantity, additional_price
@@ -420,10 +438,12 @@ func (r *PostgresRepository) GetComboByID(ctx context.Context, tenantID, id uuid
 
 		for rows.Next() {
 			var item domain.ComboItem
-			err := rows.Scan(&item.ID, &item.TenantID, &item.ComboID, &item.GroupName, &item.ProductID, &item.UnitID, &item.Quantity, &item.AdditionalPrice)
+			var additionalPrice int64
+			err := rows.Scan(&item.ID, &item.TenantID, &item.ComboID, &item.GroupName, &item.ProductID, &item.UnitID, &item.Quantity, &additionalPrice)
 			if err != nil {
 				return err
 			}
+			item.AdditionalPrice = money.Cents(additionalPrice)
 			c.Items = append(c.Items, item)
 		}
 		return nil
@@ -460,10 +480,12 @@ func (r *PostgresRepository) ListCombos(ctx context.Context, tenantID uuid.UUID)
 
 		for rows.Next() {
 			var c domain.Combo
-			err := rows.Scan(&c.ID, &c.TenantID, &c.ProductID, &c.Name, &c.ComboPrice, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
+			var comboPrice int64
+			err := rows.Scan(&c.ID, &c.TenantID, &c.ProductID, &c.Name, &comboPrice, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
 			if err != nil {
 				return err
 			}
+			c.ComboPrice = money.Cents(comboPrice)
 			list = append(list, c)
 		}
 		return nil

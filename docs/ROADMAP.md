@@ -225,10 +225,11 @@ frame-24/
 
 - [ ] **8.1 Otimização de Throughput RLS com `pgx.Batch`:**
   - [ ] Consolidar `set_config` e queries em lote via `pgx.Batch` nas rotas mais críticas (Checkout PDV, Ingressos em lote, Leitura de catálogo) para atingir **1 único round-trip TCP**.
-- [ ] **8.2 Hardening Financeiro — Migração de `float64` para centavos inteiros (`int64`):**
-  - [ ] Substituir todos os campos de valor monetário (`total_amount`, `unit_price`, `subtotal_tickets`, etc.) de `float64` para representação em centavos inteiros (`int64` no domínio Go / `BIGINT` no PostgreSQL).
-  - [ ] O epsilon `0.01` em `ValidatePayments` e `NewSale` é um workaround temporário para drift de ponto flutuante; com `int64` a comparação passa a ser exata (`sum == s.TotalAmountCents`).
-  - [ ] Esta refatoração impacta: `domain/sale.go`, `domain/ticket.go`, `domain/payment.go`, todas as migrations e os handlers HTTP (serialização/deserialização de centavos ↔ reais).
+- [x] **8.2 Hardening Financeiro — Migração de `float64` para centavos inteiros (`int64`):**
+  - [x] Substituir todos os campos de valor monetário (`total_amount`, `unit_price`, `subtotal_tickets`, etc.) de `float64` para representação em centavos inteiros (`int64` no domínio Go / `BIGINT` no PostgreSQL).
+  - [x] O epsilon `0.01` em `ValidatePayments` e `NewSale` é um workaround temporário para drift de ponto flutuante; com `int64` a comparação passa a ser exata (`sum == s.TotalAmountCents`).
+  - [x] Esta refatoração impacta: `domain/sale.go`, `domain/ticket.go`, `domain/payment.go`, todas as migrations e os handlers HTTP (serialização/deserialização de centavos ↔ reais).
+  - [x] **Implementado (migration `0007`):** tipo `money.Cents` (int64, scale 2) para preços/totais/valores e `money.Subcent` (int64, scale 4) para custos unitários; colunas migradas para `BIGINT` (`×100`/`×10000`); contrato JSON preserva decimal via `MarshalJSON`; validações contábeis passam a ser exatas (sem epsilon). Contextos migrados: catalog, operations, sales, inventory, finance, payments, fiscal e subscribers em `internal/app/app.go`. Percentuais/alíquotas (ISS, CBS/IBS, PIS/COFINS, ICMS) e `conversion_factor` permanecem `float64`.
 - [ ] **8.3 Hardening de Resiliência — Flag `SEATLOCK_REQUIRE` (fail-fast em produção):**
   - [ ] Adicionar variável de ambiente `SEATLOCK_REQUIRE=1` (padrão `0` em dev, `1` em prod).
   - [ ] Quando `SEATLOCK_REQUIRE=1` e o Redis estiver indisponível, `VerifySeatLocks` deve retornar `ErrSeatLockFailed` imediatamente em vez de `nil` — o `UNIQUE (showtime_id, seat_id)` ainda impede venda dupla, mas a reserva transitória deixa de ser inócua em caso de queda do Redis.

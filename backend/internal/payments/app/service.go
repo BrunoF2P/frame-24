@@ -3,16 +3,16 @@ package app
 import (
 	"context"
 	"fmt"
-	"math"
 	"strings"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"frame-24/internal/payments/domain"
 	"frame-24/internal/payments/repo"
 	"frame-24/internal/platform/db"
+	"frame-24/internal/platform/money"
 	"frame-24/internal/platform/outbox"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Service struct {
@@ -41,7 +41,7 @@ func (s *Service) CreatePixPayment(
 	ctx context.Context,
 	tenantID, saleID uuid.UUID,
 	idempotencyKey string,
-	amount float64,
+	amount money.Cents,
 	description string,
 ) (*domain.PaymentAttempt, error) {
 	// Validação de entrada
@@ -71,7 +71,7 @@ func (s *Service) CreatePixPayment(
 		attempt.ExternalReference = &pixResp.TxID
 	} else {
 		// Mock local EMVCo para ambiente de dev / teste
-		payload := fmt.Sprintf("00020126580014br.gov.bcb.pix0136%s520400005303986540%0.2f5802BR5913CINEMA_SaaS6009SAO_PAULO62070503***6304ABCD", attempt.ID.String(), amount)
+		payload := fmt.Sprintf("00020126580014br.gov.bcb.pix0136%s520400005303986540%s5802BR5913CINEMA_SaaS6009SAO_PAULO62070503***6304ABCD", attempt.ID.String(), amount.String())
 		url := fmt.Sprintf("https://pix.frame24.internal/qr/%s", attempt.ID.String())
 		txID := fmt.Sprintf("TX-PIX-%s", attempt.ID.String()[:8])
 		attempt.QRCodePix = &payload
@@ -113,7 +113,7 @@ func (s *Service) ProcessWebhook(
 	idempotencyKey string,
 	externalRef string,
 	status string,
-	amount *float64,
+	amount *money.Cents,
 	errorMessage *string,
 ) (*domain.PaymentAttempt, error) {
 	// Validação de payload mínimo
@@ -139,7 +139,7 @@ func (s *Service) ProcessWebhook(
 
 	// Validar divergência de valor se enviado pelo gateway
 	if amount != nil && *amount > 0 {
-		if math.Abs(*amount-attempt.Amount) > 0.01 {
+		if *amount != attempt.Amount {
 			return nil, domain.ErrInvalidAmount
 		}
 	}
@@ -190,7 +190,7 @@ func (s *Service) InitiateTef(
 	posTerminalID, nsu, authCode, cardBrand string,
 	txType domain.TefTransactionType,
 	installments int,
-	amount float64,
+	amount money.Cents,
 	receiptMerchant, receiptCustomer *string,
 ) (*domain.TefTransaction, error) {
 	// 1. Verificar se este NSU já foi registrado neste terminal (idempotência pré-insert)

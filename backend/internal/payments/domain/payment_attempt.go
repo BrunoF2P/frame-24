@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 )
 
@@ -34,7 +35,7 @@ type PaymentAttempt struct {
 	IdempotencyKey    string        `json:"idempotencyKey"`
 	PaymentMethod     PaymentMethod `json:"paymentMethod"`
 	Provider          string        `json:"provider"`
-	Amount            float64       `json:"amount"`
+	Amount            money.Cents   `json:"amount"`
 	Status            PaymentStatus `json:"status"`
 	ExternalReference *string       `json:"externalReference,omitempty"`
 	QRCodePix         *string       `json:"qrCodePix,omitempty"`
@@ -49,7 +50,7 @@ func NewPaymentAttempt(
 	idempotencyKey string,
 	method PaymentMethod,
 	provider string,
-	amount float64,
+	amount money.Cents,
 ) (*PaymentAttempt, error) {
 	cleanKey := strings.TrimSpace(idempotencyKey)
 	if cleanKey == "" {

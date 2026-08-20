@@ -3,9 +3,9 @@ package repo
 import (
 	"context"
 
+	"frame-24/internal/identity/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"frame-24/internal/identity/domain"
 )
 
 // Repository define os métodos de persistência de identidade

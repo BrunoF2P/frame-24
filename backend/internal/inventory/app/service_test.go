@@ -3,12 +3,13 @@ package app
 import (
 	"context"
 	"testing"
+	"time"
 
+	"frame-24/internal/inventory/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"frame-24/internal/inventory/domain"
 )
 
 // FakeInventoryRepo em memória para testes unitários
@@ -126,7 +127,7 @@ func (f *FakeInventoryRepo) RecordMovement(ctx context.Context, tx pgx.Tx, m *do
 	return sl, nil
 }
 
-func (f *FakeInventoryRepo) ListMovements(ctx context.Context, tenantID, warehouseID uuid.UUID, limit int) ([]domain.Movement, error) {
+func (f *FakeInventoryRepo) ListMovements(ctx context.Context, tenantID, warehouseID uuid.UUID, limit int, beforeTS *time.Time, beforeID *uuid.UUID) ([]domain.Movement, error) {
 	var list []domain.Movement
 	for _, m := range f.movements {
 		if m.WarehouseID == warehouseID {

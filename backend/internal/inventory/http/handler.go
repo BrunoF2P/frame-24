@@ -3,13 +3,13 @@ package http
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
+	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"frame-24/internal/inventory/app"
 	"frame-24/internal/platform/auth"
 	"frame-24/internal/platform/httputil"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 type Handler struct {
@@ -196,18 +196,36 @@ func (h *Handler) ListMovements(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit := 50
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
-			limit = parsedLimit
+	limit := httputil.ParseLimit(r, 50, 100)
+
+	var beforeTS *time.Time
+	var beforeID *uuid.UUID
+	if raw := r.URL.Query().Get("before"); raw != "" {
+		ts, id, err := httputil.DecodeCursor(raw)
+		if err != nil {
+			httputil.RespondError(w, r, http.StatusBadRequest, "INVALID_CURSOR", "Cursor de paginacao invalido", nil)
+			return
 		}
+		beforeTS = &ts
+		beforeID = &id
 	}
 
-	list, err := h.svc.ListMovements(r.Context(), tenantID, warehouseID, limit)
+	list, err := h.svc.ListMovements(r.Context(), tenantID, warehouseID, limit+1, beforeTS, beforeID)
 	if err != nil {
 		httputil.RespondDomainError(w, r, err)
 		return
 	}
 
-	httputil.RespondJSON(w, http.StatusOK, list)
+	hasMore := len(list) > limit
+	if hasMore {
+		list = list[:limit]
+	}
+
+	var nextCursor *string
+	if hasMore && len(list) > 0 {
+		last := list[len(list)-1]
+		nextCursor = httputil.NextCursor(last.CreatedAt, last.ID)
+	}
+
+	httputil.RespondJSON(w, http.StatusOK, httputil.Page{Items: list, NextCursor: nextCursor})
 }

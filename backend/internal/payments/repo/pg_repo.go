@@ -5,12 +5,13 @@ import (
 	"errors"
 	"fmt"
 
+	"frame-24/internal/payments/domain"
+	"frame-24/internal/platform/db"
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"frame-24/internal/payments/domain"
-	"frame-24/internal/platform/db"
 )
 
 type PostgresRepository struct {
@@ -32,13 +33,13 @@ func (r *PostgresRepository) CreatePaymentAttempt(ctx context.Context, tx pgx.Tx
 	if tx != nil {
 		_, err = tx.Exec(ctx, query,
 			p.ID, p.TenantID, p.SaleID, p.IdempotencyKey, string(p.PaymentMethod), p.Provider,
-			p.Amount, string(p.Status), p.ExternalReference, p.QRCodePix, p.QRCodeURL, p.ErrorMessage, p.CreatedAt, p.UpdatedAt,
+			int64(p.Amount), string(p.Status), p.ExternalReference, p.QRCodePix, p.QRCodeURL, p.ErrorMessage, p.CreatedAt, p.UpdatedAt,
 		)
 	} else {
 		err = db.RunInTenantTx(ctx, r.pool, p.TenantID, func(t pgx.Tx) error {
 			_, e := t.Exec(ctx, query,
 				p.ID, p.TenantID, p.SaleID, p.IdempotencyKey, string(p.PaymentMethod), p.Provider,
-				p.Amount, string(p.Status), p.ExternalReference, p.QRCodePix, p.QRCodeURL, p.ErrorMessage, p.CreatedAt, p.UpdatedAt,
+				int64(p.Amount), string(p.Status), p.ExternalReference, p.QRCodePix, p.QRCodeURL, p.ErrorMessage, p.CreatedAt, p.UpdatedAt,
 			)
 			return e
 		})
@@ -57,6 +58,7 @@ func (r *PostgresRepository) CreatePaymentAttempt(ctx context.Context, tx pgx.Tx
 func (r *PostgresRepository) GetPaymentAttemptByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.PaymentAttempt, error) {
 	var p domain.PaymentAttempt
 	var method, status string
+	var amount int64
 	err := db.RunInTenantTx(ctx, r.pool, tenantID, func(tx pgx.Tx) error {
 		query := `
 			SELECT id, tenant_id, sale_id, idempotency_key, payment_method, provider,
@@ -66,7 +68,7 @@ func (r *PostgresRepository) GetPaymentAttemptByID(ctx context.Context, tenantID
 		`
 		return tx.QueryRow(ctx, query, id).Scan(
 			&p.ID, &p.TenantID, &p.SaleID, &p.IdempotencyKey, &method, &p.Provider,
-			&p.Amount, &status, &p.ExternalReference, &p.QRCodePix, &p.QRCodeURL, &p.ErrorMessage, &p.CreatedAt, &p.UpdatedAt,
+			&amount, &status, &p.ExternalReference, &p.QRCodePix, &p.QRCodeURL, &p.ErrorMessage, &p.CreatedAt, &p.UpdatedAt,
 		)
 	})
 
@@ -78,12 +80,14 @@ func (r *PostgresRepository) GetPaymentAttemptByID(ctx context.Context, tenantID
 	}
 	p.PaymentMethod = domain.PaymentMethod(method)
 	p.Status = domain.PaymentStatus(status)
+	p.Amount = money.Cents(amount)
 	return &p, nil
 }
 
 func (r *PostgresRepository) GetPaymentAttemptByIdempotencyKey(ctx context.Context, tenantID uuid.UUID, key string) (*domain.PaymentAttempt, error) {
 	var p domain.PaymentAttempt
 	var method, status string
+	var amount int64
 	err := db.RunInTenantTx(ctx, r.pool, tenantID, func(tx pgx.Tx) error {
 		query := `
 			SELECT id, tenant_id, sale_id, idempotency_key, payment_method, provider,
@@ -93,7 +97,7 @@ func (r *PostgresRepository) GetPaymentAttemptByIdempotencyKey(ctx context.Conte
 		`
 		return tx.QueryRow(ctx, query, key).Scan(
 			&p.ID, &p.TenantID, &p.SaleID, &p.IdempotencyKey, &method, &p.Provider,
-			&p.Amount, &status, &p.ExternalReference, &p.QRCodePix, &p.QRCodeURL, &p.ErrorMessage, &p.CreatedAt, &p.UpdatedAt,
+			&amount, &status, &p.ExternalReference, &p.QRCodePix, &p.QRCodeURL, &p.ErrorMessage, &p.CreatedAt, &p.UpdatedAt,
 		)
 	})
 
@@ -105,6 +109,7 @@ func (r *PostgresRepository) GetPaymentAttemptByIdempotencyKey(ctx context.Conte
 	}
 	p.PaymentMethod = domain.PaymentMethod(method)
 	p.Status = domain.PaymentStatus(status)
+	p.Amount = money.Cents(amount)
 	return &p, nil
 }
 
@@ -141,14 +146,14 @@ func (r *PostgresRepository) CreateTefTransaction(ctx context.Context, tx pgx.Tx
 	if tx != nil {
 		_, err = tx.Exec(ctx, query,
 			t.ID, t.TenantID, t.SaleID, t.POSTerminalID, t.NSU, t.AuthorizationCode, t.CardBrand,
-			string(t.TransactionType), t.Installments, t.Amount, string(t.Status), t.TerminalMAC,
+			string(t.TransactionType), t.Installments, int64(t.Amount), string(t.Status), t.TerminalMAC,
 			t.ReceiptMerchant, t.ReceiptCustomer, t.CreatedAt, t.UpdatedAt,
 		)
 	} else {
 		err = db.RunInTenantTx(ctx, r.pool, t.TenantID, func(txx pgx.Tx) error {
 			_, e := txx.Exec(ctx, query,
 				t.ID, t.TenantID, t.SaleID, t.POSTerminalID, t.NSU, t.AuthorizationCode, t.CardBrand,
-				string(t.TransactionType), t.Installments, t.Amount, string(t.Status), t.TerminalMAC,
+				string(t.TransactionType), t.Installments, int64(t.Amount), string(t.Status), t.TerminalMAC,
 				t.ReceiptMerchant, t.ReceiptCustomer, t.CreatedAt, t.UpdatedAt,
 			)
 			return e
@@ -165,6 +170,7 @@ func (r *PostgresRepository) CreateTefTransaction(ctx context.Context, tx pgx.Tx
 func (r *PostgresRepository) GetTefTransactionByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.TefTransaction, error) {
 	var t domain.TefTransaction
 	var txType, status string
+	var amount int64
 	err := db.RunInTenantTx(ctx, r.pool, tenantID, func(tx pgx.Tx) error {
 		query := `
 			SELECT id, tenant_id, sale_id, pos_terminal_id, nsu, authorization_code, card_brand,
@@ -174,7 +180,7 @@ func (r *PostgresRepository) GetTefTransactionByID(ctx context.Context, tenantID
 		`
 		return tx.QueryRow(ctx, query, id).Scan(
 			&t.ID, &t.TenantID, &t.SaleID, &t.POSTerminalID, &t.NSU, &t.AuthorizationCode, &t.CardBrand,
-			&txType, &t.Installments, &t.Amount, &status, &t.TerminalMAC, &t.ReceiptMerchant, &t.ReceiptCustomer, &t.CreatedAt, &t.UpdatedAt,
+			&txType, &t.Installments, &amount, &status, &t.TerminalMAC, &t.ReceiptMerchant, &t.ReceiptCustomer, &t.CreatedAt, &t.UpdatedAt,
 		)
 	})
 	if err != nil {
@@ -185,12 +191,14 @@ func (r *PostgresRepository) GetTefTransactionByID(ctx context.Context, tenantID
 	}
 	t.TransactionType = domain.TefTransactionType(txType)
 	t.Status = domain.TefStatus(status)
+	t.Amount = money.Cents(amount)
 	return &t, nil
 }
 
 func (r *PostgresRepository) GetTefTransactionByNSU(ctx context.Context, tenantID uuid.UUID, terminalID, nsu string) (*domain.TefTransaction, error) {
 	var t domain.TefTransaction
 	var txType, status string
+	var amount int64
 	err := db.RunInTenantTx(ctx, r.pool, tenantID, func(tx pgx.Tx) error {
 		query := `
 			SELECT id, tenant_id, sale_id, pos_terminal_id, nsu, authorization_code, card_brand,
@@ -200,7 +208,7 @@ func (r *PostgresRepository) GetTefTransactionByNSU(ctx context.Context, tenantI
 		`
 		return tx.QueryRow(ctx, query, terminalID, nsu).Scan(
 			&t.ID, &t.TenantID, &t.SaleID, &t.POSTerminalID, &t.NSU, &t.AuthorizationCode, &t.CardBrand,
-			&txType, &t.Installments, &t.Amount, &status, &t.TerminalMAC, &t.ReceiptMerchant, &t.ReceiptCustomer, &t.CreatedAt, &t.UpdatedAt,
+			&txType, &t.Installments, &amount, &status, &t.TerminalMAC, &t.ReceiptMerchant, &t.ReceiptCustomer, &t.CreatedAt, &t.UpdatedAt,
 		)
 	})
 	if err != nil {
@@ -211,6 +219,7 @@ func (r *PostgresRepository) GetTefTransactionByNSU(ctx context.Context, tenantI
 	}
 	t.TransactionType = domain.TefTransactionType(txType)
 	t.Status = domain.TefStatus(status)
+	t.Amount = money.Cents(amount)
 	return &t, nil
 }
 

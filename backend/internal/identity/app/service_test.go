@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"frame-24/internal/identity/domain"
+	"frame-24/internal/platform/auth"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"frame-24/internal/identity/domain"
-	"frame-24/internal/platform/auth"
 )
 
 // FakeRepository simula o banco de dados em memória para testes unitários do Service

@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"frame-24/internal/fiscal/domain"
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"frame-24/internal/fiscal/domain"
 )
 
 type FakeFiscalRepo struct {
@@ -104,11 +105,11 @@ func TestFiscalService_DualEmissionWithTaxReform(t *testing.T) {
 	ncm := "1904.10.00"
 
 	tickets := []SaleTicketInput{
-		{TicketID: ticketID1, Description: "Ingresso Inteira", UnitPrice: 30.0, Quantity: 1},
-		{TicketID: ticketID2, Description: "Ingresso Meia", UnitPrice: 30.0, Quantity: 1},
+		{TicketID: ticketID1, Description: "Ingresso Inteira", UnitPrice: money.FromFloat64(30.0), Quantity: 1},
+		{TicketID: ticketID2, Description: "Ingresso Meia", UnitPrice: money.FromFloat64(30.0), Quantity: 1},
 	}
 	concessionItems := []SaleConcessionInput{
-		{ItemID: concessionID, ItemType: "product", Description: "Pipoca Grande Salgada", NCM: &ncm, UnitPrice: 25.0, Quantity: 1},
+		{ItemID: concessionID, ItemType: "product", Description: "Pipoca Grande Salgada", NCM: &ncm, UnitPrice: money.FromFloat64(25.0), Quantity: 1},
 	}
 
 	docs, err := svc.ProcessSaleCompleted(ctx, tenantID, complexID, saleID, tickets, concessionItems)
@@ -130,13 +131,13 @@ func TestFiscalService_DualEmissionWithTaxReform(t *testing.T) {
 	require.NotNil(t, nfceDoc, "NFC-e de bomboniere deve ser gerada")
 
 	// Validar NFS-e (Ingressos)
-	assert.Equal(t, 60.00, nfseDoc.TotalAmount)
-	assert.Equal(t, 3.00, nfseDoc.ISSAmount) // 5% de R$ 60,00
+	assert.Equal(t, money.FromFloat64(60.00), nfseDoc.TotalAmount)
+	assert.Equal(t, money.FromFloat64(3.00), nfseDoc.ISSAmount) // 5% de R$ 60,00
 	assert.Equal(t, domain.DocStatusAuthorized, nfseDoc.Status)
 
 	// Validar NFC-e (Bomboniere)
-	assert.Equal(t, 25.00, nfceDoc.TotalAmount)
-	assert.Equal(t, 4.50, nfceDoc.ICMSAmount) // 18% de R$ 25,00
+	assert.Equal(t, money.FromFloat64(25.00), nfceDoc.TotalAmount)
+	assert.Equal(t, money.FromFloat64(4.50), nfceDoc.ICMSAmount) // 18% de R$ 25,00
 	assert.NotEmpty(t, *nfceDoc.AccessKey)
 	assert.Len(t, *nfceDoc.AccessKey, 44) // Chave SEFAZ 44 dígitos
 }
@@ -157,7 +158,7 @@ func TestFiscalService_SefazCancellationRules(t *testing.T) {
 	// Caso A: Cancelamento dentro da janela de 30 minutos (Cancelamento Direto)
 	saleA := uuid.New()
 	concessionA := []SaleConcessionInput{
-		{ItemID: uuid.New(), ItemType: "product", Description: "Refrigerante", UnitPrice: 10.0, Quantity: 1},
+		{ItemID: uuid.New(), ItemType: "product", Description: "Refrigerante", UnitPrice: money.FromFloat64(10.0), Quantity: 1},
 	}
 	docsA, err := svc.ProcessSaleCompleted(ctx, tenantID, complexID, saleA, nil, concessionA)
 	require.NoError(t, err)
@@ -172,7 +173,7 @@ func TestFiscalService_SefazCancellationRules(t *testing.T) {
 	// Caso B: Cancelamento extemporâneo após 30 minutos (> 30 min)
 	saleB := uuid.New()
 	concessionB := []SaleConcessionInput{
-		{ItemID: uuid.New(), ItemType: "product", Description: "Pipoca", UnitPrice: 20.0, Quantity: 1},
+		{ItemID: uuid.New(), ItemType: "product", Description: "Pipoca", UnitPrice: money.FromFloat64(20.0), Quantity: 1},
 	}
 	docsB, err := svc.ProcessSaleCompleted(ctx, tenantID, complexID, saleB, nil, concessionB)
 	require.NoError(t, err)

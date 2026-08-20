@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"frame-24/internal/identity/app"
+	"frame-24/internal/identity/domain"
+	"frame-24/internal/platform/auth"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"frame-24/internal/identity/app"
-	"frame-24/internal/identity/domain"
-	"frame-24/internal/platform/auth"
 )
 
 type memoryRepo struct {

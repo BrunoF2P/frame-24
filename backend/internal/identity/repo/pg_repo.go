@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 
+	"frame-24/internal/identity/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"frame-24/internal/identity/domain"
 )
 
 type PostgresRepository struct {

@@ -5,12 +5,13 @@ import (
 	"testing"
 	"time"
 
+	catalogDomain "frame-24/internal/catalog/domain"
+	"frame-24/internal/operations/domain"
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	catalogDomain "frame-24/internal/catalog/domain"
-	"frame-24/internal/operations/domain"
 )
 
 // FakeOperationsRepo implementa repo.Repository com tenantID nas leituras
@@ -162,10 +163,10 @@ func TestOperationsService_ComplexRoomAndSeats(t *testing.T) {
 
 	// 1. Criar Complexo com Fuso de Manaus
 	complex, err := svc.CreateComplex(ctx, CreateComplexCommand{
-		TenantID: tenantID,
-		Name:     "Cinesystem Manaus Millennium",
+		TenantID:   tenantID,
+		Name:       "Cinesystem Manaus Millennium",
 		CNPJFilial: "12345678000195",
-		Timezone: "America/Manaus",
+		Timezone:   "America/Manaus",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "America/Manaus", complex.Timezone)
@@ -210,7 +211,7 @@ func TestOperationsService_ComplexRoomAndSeats(t *testing.T) {
 		StartTime:            startTime,
 		MovieDurationMinutes: 0, // Ignorado; duração vem do MovieGetter (192 min)
 		CleaningMinutes:      15,
-		BaseTicketPrice:      49.90,
+		BaseTicketPrice:      money.FromFloat64(49.90),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, 192.0, st.EndTime.Sub(st.StartTime).Minutes())
@@ -226,7 +227,7 @@ func TestOperationsService_ComplexRoomAndSeats(t *testing.T) {
 		StartTime:            startTime.Add(30 * time.Minute), // Dentro do intervalo da sessão anterior
 		MovieDurationMinutes: 0,
 		CleaningMinutes:      15,
-		BaseTicketPrice:      49.90,
+		BaseTicketPrice:      money.FromFloat64(49.90),
 	})
 	assert.ErrorIs(t, err, domain.ErrShowtimeOverlap)
 
@@ -234,6 +235,6 @@ func TestOperationsService_ComplexRoomAndSeats(t *testing.T) {
 	_, err = catalogDomain.NewMovie(tenantID, "Test", 100, "INVALID")
 	assert.Error(t, err)
 
-	_, err = domain.NewShowtime(tenantID, complex.ID, room.ID, movieID, "INVALID", "2D", startTime, 100, 15, 30.0)
+	_, err = domain.NewShowtime(tenantID, complex.ID, room.ID, movieID, "INVALID", "2D", startTime, 100, 15, money.FromFloat64(30.00))
 	assert.Error(t, err)
 }

@@ -4,11 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"frame-24/internal/catalog/domain"
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"frame-24/internal/catalog/domain"
 )
 
 type FakeCatalogRepo struct {
@@ -166,8 +167,8 @@ func TestCatalogService_UnitsProductsAndCombos(t *testing.T) {
 		Category:   "popcorn",
 		BaseUnitID: unitUN.ID,
 		NCM:        &ncm,
-		CostPrice:  3.50,
-		SalePrice:  25.00,
+		CostPrice:  money.SubcentFromFloat64(3.50),
+		SalePrice:  money.FromFloat64(25.00),
 	})
 	require.NoError(t, err)
 
@@ -176,8 +177,8 @@ func TestCatalogService_UnitsProductsAndCombos(t *testing.T) {
 		Name:       "Refrigerante 700ml",
 		Category:   "beverage",
 		BaseUnitID: unitUN.ID,
-		CostPrice:  2.00,
-		SalePrice:  14.00,
+		CostPrice:  money.SubcentFromFloat64(2.00),
+		SalePrice:  money.FromFloat64(14.00),
 	})
 	require.NoError(t, err)
 
@@ -197,14 +198,14 @@ func TestCatalogService_UnitsProductsAndCombos(t *testing.T) {
 		TenantID:   tenantID,
 		Name:       "Combo Individual",
 		BaseUnitID: unitUN.ID,
-		ComboPrice: 32.00,
+		ComboPrice: money.FromFloat64(32.00),
 		Items: []ComboItemInput{
-			{GroupName: "Pipoca", ProductID: pipoca.ID, UnitID: unitUN.ID, Quantity: 1, AdditionalPrice: 0},
-			{GroupName: "Bebida", ProductID: refri.ID, UnitID: unitUN.ID, Quantity: 1, AdditionalPrice: 0},
+			{GroupName: "Pipoca", ProductID: pipoca.ID, UnitID: unitUN.ID, Quantity: 1, AdditionalPrice: money.Cents(0)},
+			{GroupName: "Bebida", ProductID: refri.ID, UnitID: unitUN.ID, Quantity: 1, AdditionalPrice: money.Cents(0)},
 		},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, 32.00, combo.ComboPrice)
+	assert.Equal(t, money.FromFloat64(32.00), combo.ComboPrice)
 	assert.Len(t, combo.Items, 2)
 
 	// 5. Criar Combo sem BaseUnitID deve falhar
@@ -212,7 +213,7 @@ func TestCatalogService_UnitsProductsAndCombos(t *testing.T) {
 		TenantID:   tenantID,
 		Name:       "Combo Sem Unidade",
 		BaseUnitID: uuid.Nil, // Inválido
-		ComboPrice: 10.00,
+		ComboPrice: money.FromFloat64(10.00),
 	})
 	assert.Error(t, err)
 
@@ -221,6 +222,6 @@ func TestCatalogService_UnitsProductsAndCombos(t *testing.T) {
 	assert.Error(t, err)
 
 	// 7. Category inválida deve falhar no domínio
-	_, err = domain.NewProduct(tenantID, "Teste", "INVALID_CATEGORY", unitUN.ID, nil, nil, 0, 10)
+	_, err = domain.NewProduct(tenantID, "Teste", "INVALID_CATEGORY", unitUN.ID, nil, nil, money.Subcent(0), money.FromFloat64(10.00))
 	assert.Error(t, err)
 }

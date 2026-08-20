@@ -4,21 +4,21 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"frame-24/internal/identity/domain"
 	"frame-24/internal/identity/repo"
 	"frame-24/internal/platform/auth"
 	"frame-24/internal/platform/db"
 	"frame-24/internal/platform/outbox"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Service orquestra as regras de negócio do Bounded Context de Identidade
 type Service struct {
-	pool    *pgxpool.Pool
-	repo    repo.Repository
-	tokens  *auth.TokenManager
+	pool   *pgxpool.Pool
+	repo   repo.Repository
+	tokens *auth.TokenManager
 }
 
 // NewService cria uma nova instância de Service
@@ -53,15 +53,15 @@ type CreateTenantCommand struct {
 
 // AuthResult resultado da autenticação com suporte ao Tenant Switcher
 type AuthResult struct {
-	User        *domain.User                  `json:"user"`
-	Memberships []domain.TenantMembershipView `json:"memberships"`
-	ActiveToken *string                       `json:"accessToken,omitempty"`
-	ActiveTenant *uuid.UUID                   `json:"activeTenantId,omitempty"`
+	User         *domain.User                  `json:"user"`
+	Memberships  []domain.TenantMembershipView `json:"memberships"`
+	ActiveToken  *string                       `json:"accessToken,omitempty"`
+	ActiveTenant *uuid.UUID                    `json:"activeTenantId,omitempty"`
 }
 
 // SwitchTenantResult resultado da troca de empresa ativa
 type SwitchTenantResult struct {
-	AccessToken string                      `json:"accessToken"`
+	AccessToken string                       `json:"accessToken"`
 	Tenant      *domain.TenantMembershipView `json:"tenant"`
 }
 

@@ -4,14 +4,15 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	catalogDomain "frame-24/internal/catalog/domain"
 	"frame-24/internal/operations/domain"
 	"frame-24/internal/operations/repo"
 	"frame-24/internal/platform/db"
+	"frame-24/internal/platform/money"
 	"frame-24/internal/platform/outbox"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type MovieGetter interface {
@@ -65,7 +66,7 @@ type ScheduleShowtimeCommand struct {
 	StartTime            time.Time
 	MovieDurationMinutes int
 	CleaningMinutes      int
-	BaseTicketPrice      float64
+	BaseTicketPrice      money.Cents
 }
 
 func (s *Service) CreateComplex(ctx context.Context, cmd CreateComplexCommand) (*domain.CinemaComplex, error) {

@@ -3,22 +3,22 @@ package app
 import (
 	"context"
 	"fmt"
-	"math"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"frame-24/internal/finance/domain"
 	"frame-24/internal/finance/repo"
 	"frame-24/internal/platform/db"
+	"frame-24/internal/platform/money"
 	"frame-24/internal/platform/outbox"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type LedgerEntryInput struct {
 	AccountCode string
 	EntryType   string // debit | credit
-	Amount      float64
+	Amount      money.Cents
 }
 
 type Service struct {
@@ -98,8 +98,8 @@ func (s *Service) PostLedgerTransaction(
 	return txEntity, nil
 }
 
-func (s *Service) ListTransactions(ctx context.Context, tenantID uuid.UUID, limit int) ([]domain.Transaction, error) {
-	return s.repo.ListTransactions(ctx, tenantID, limit)
+func (s *Service) ListTransactions(ctx context.Context, tenantID uuid.UUID, limit int, beforeTS *time.Time, beforeID *uuid.UUID) ([]domain.Transaction, error) {
+	return s.repo.ListTransactions(ctx, tenantID, limit, beforeTS, beforeID)
 }
 
 // ---------------------------------------------------------------------
@@ -111,7 +111,7 @@ func (s *Service) OpenCashSession(
 	tenantID, complexID uuid.UUID,
 	posTerminalID string,
 	operatorID uuid.UUID,
-	openingFloat float64,
+	openingFloat money.Cents,
 ) (*domain.CashSession, error) {
 	existing, err := s.repo.GetOpenCashSession(ctx, tenantID, complexID, posTerminalID, operatorID)
 	if err == nil && existing != nil {
@@ -166,7 +166,7 @@ func (s *Service) GetOpenCashSession(ctx context.Context, tenantID, complexID uu
 func (s *Service) RecordCashBleed(
 	ctx context.Context,
 	tenantID, sessionID uuid.UUID,
-	amount float64,
+	amount money.Cents,
 	reason string,
 	authorizedByID *uuid.UUID,
 ) error {
@@ -200,7 +200,7 @@ func (s *Service) RecordCashBleed(
 func (s *Service) RecordCashSupply(
 	ctx context.Context,
 	tenantID, sessionID uuid.UUID,
-	amount float64,
+	amount money.Cents,
 	reason string,
 	authorizedByID *uuid.UUID,
 ) error {
@@ -231,7 +231,7 @@ func (s *Service) RecordCashSupply(
 	})
 }
 
-func (s *Service) RecordCashSale(ctx context.Context, tenantID, sessionID, saleID uuid.UUID, amount float64) error {
+func (s *Service) RecordCashSale(ctx context.Context, tenantID, sessionID, saleID uuid.UUID, amount money.Cents) error {
 	if amount <= 0 {
 		return nil
 	}
@@ -257,14 +257,14 @@ func (s *Service) RecordCashSale(ctx context.Context, tenantID, sessionID, saleI
 type SaleConcessionItemPayload struct {
 	ProductID *uuid.UUID
 	Quantity  float64
-	UnitCost  float64
+	UnitCost  money.Subcent
 }
 
 // CloseCashSessionBlind realiza o Fechamento Cego de Caixa e apura quebra/sobra com partidas dobradas
 func (s *Service) CloseCashSessionBlind(
 	ctx context.Context,
 	tenantID, sessionID uuid.UUID,
-	cashCounted, cardCounted, pixCounted float64,
+	cashCounted, cardCounted, pixCounted money.Cents,
 	notes *string,
 ) (*domain.CashSession, error) {
 	var closedSession *domain.CashSession
@@ -306,7 +306,7 @@ func (s *Service) CloseCashSessionBlind(
 		}
 
 		// 2. Se houver diferença de caixa (Sobra ou Quebra), registra lançamento de ajuste no Ledger
-		if math.Abs(diff) > 0.009 {
+		if diff != 0 {
 			_ = s.repo.CreateStandardAccountsIfMissing(ctx, tx, tenantID)
 
 			caixaAcc, err1 := s.repo.GetAccountByCode(ctx, tenantID, domain.CodeCaixaPDV)
@@ -327,7 +327,7 @@ func (s *Service) CloseCashSessionBlind(
 				_ = t.AddEntry(sobraAcc.ID, "credit", diff)
 			} else {
 				// Quebra de Caixa (Falta): Débito em Despesa de Quebra (Despesa) / Crédito em Caixa PDV (Ativo diminui)
-				absDiff := math.Abs(diff)
+				absDiff := diff.Abs()
 				quebraAcc, err2 := s.repo.GetAccountByCode(ctx, tenantID, domain.CodeDespesaQuebraCaixa)
 				if err2 != nil {
 					return err2
@@ -365,8 +365,8 @@ func (s *Service) CloseCashSessionBlind(
 func (s *Service) ProcessSaleCompletedEvent(
 	ctx context.Context,
 	tenantID, saleID uuid.UUID,
-	subtotalTickets, subtotalConcession, discountAmount, totalAmount float64,
-	paymentsMap map[string]float64,
+	subtotalTickets, subtotalConcession, discountAmount, totalAmount money.Cents,
+	paymentsMap map[string]money.Cents,
 	concessionItems []SaleConcessionItemPayload,
 ) error {
 	_ = s.EnsureStandardAccounts(ctx, tenantID)
@@ -375,9 +375,8 @@ func (s *Service) ProcessSaleCompletedEvent(
 	t := domain.NewTransaction(tenantID, time.Now(), desc, "sale", &saleID)
 
 	// 1. Débitos (Entrada de Recursos por Meio de Pagamento)
-	var totalDebits float64
-	for method, rawAmount := range paymentsMap {
-		amount := math.Round(rawAmount*100) / 100
+	var totalDebits money.Cents
+	for method, amount := range paymentsMap {
 		if amount <= 0 {
 			continue
 		}
@@ -405,15 +404,17 @@ func (s *Service) ProcessSaleCompletedEvent(
 
 	// 2. Créditos (Receitas Reconhecidas com rateio estrito do total)
 	if totalDebits > 0 {
-		var ticketPortion, concessionPortion float64
+		var ticketPortion, concessionPortion money.Cents
 		grossTotal := subtotalTickets + subtotalConcession
 		if grossTotal > 0 {
-			ticketRatio := subtotalTickets / grossTotal
-			ticketPortion = math.Round((subtotalTickets-(discountAmount*ticketRatio))*100) / 100
+			// Rateio do desconto proporcional entre ingressos e bomboniere, com
+			// arredondamento half-up no valor do desconto alocado aos ingressos.
+			discountTickets := (discountAmount.Mul(int64(subtotalTickets)) + grossTotal/2) / grossTotal
+			ticketPortion = subtotalTickets - discountTickets
 			if ticketPortion < 0 {
 				ticketPortion = 0
 			}
-			concessionPortion = math.Round((totalDebits-ticketPortion)*100) / 100
+			concessionPortion = totalDebits - ticketPortion
 			if concessionPortion < 0 {
 				concessionPortion = 0
 			}
@@ -441,10 +442,10 @@ func (s *Service) ProcessSaleCompletedEvent(
 	}
 
 	// 3. Lançamento de Custo das Mercadorias Vendidas (CMV)
-	var totalCMV float64
+	var totalCMV money.Cents
 	for _, it := range concessionItems {
 		if it.UnitCost > 0 && it.Quantity > 0 {
-			totalCMV += math.Round((it.Quantity*it.UnitCost)*100) / 100
+			totalCMV += it.UnitCost.MulQuantityToCents(it.Quantity)
 		}
 	}
 
@@ -475,10 +476,9 @@ func (s *Service) ProcessSaleCompletedEvent(
 func (s *Service) RecordOnlinePaymentReceipt(
 	ctx context.Context,
 	tenantID, saleID, paymentAttemptID uuid.UUID,
-	amount float64,
+	amount money.Cents,
 	paymentMethod string,
 ) error {
-	amount = math.Round(amount*100) / 100
 	if amount <= 0 {
 		return nil
 	}

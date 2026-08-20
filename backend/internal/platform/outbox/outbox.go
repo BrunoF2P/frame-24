@@ -13,19 +13,19 @@ import (
 
 // Event representa um evento de domínio gravado na tabela outbox
 type Event struct {
-	ID           uuid.UUID       `json:"id"`
-	TenantID     uuid.UUID       `json:"tenantId"`
-	EventType    string          `json:"eventType"`
-	AggregateID  uuid.UUID       `json:"aggregateId"`
-	Payload      jsonbRaw        `json:"payload"`
-	Headers      map[string]any  `json:"headers,omitempty"`
-	Status       string          `json:"status"`
-	RetryCount   int             `json:"retryCount"`
-	MaxRetries   int             `json:"maxRetries"`
-	LastError    *string         `json:"lastError,omitempty"`
-	ScheduledFor time.Time       `json:"scheduledFor"`
-	CreatedAt    time.Time       `json:"createdAt"`
-	ProcessedAt  *time.Time      `json:"processedAt,omitempty"`
+	ID           uuid.UUID      `json:"id"`
+	TenantID     uuid.UUID      `json:"tenantId"`
+	EventType    string         `json:"eventType"`
+	AggregateID  uuid.UUID      `json:"aggregateId"`
+	Payload      jsonbRaw       `json:"payload"`
+	Headers      map[string]any `json:"headers,omitempty"`
+	Status       string         `json:"status"`
+	RetryCount   int            `json:"retryCount"`
+	MaxRetries   int            `json:"maxRetries"`
+	LastError    *string        `json:"lastError,omitempty"`
+	ScheduledFor time.Time      `json:"scheduledFor"`
+	CreatedAt    time.Time      `json:"createdAt"`
+	ProcessedAt  *time.Time     `json:"processedAt,omitempty"`
 }
 
 type jsonbRaw []byte

@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 )
 
@@ -13,7 +14,7 @@ type PixQRCodeResponse struct {
 }
 
 type PixGateway interface {
-	GenerateDynamicPix(ctx context.Context, tenantID, saleID uuid.UUID, amount float64, description string) (*PixQRCodeResponse, error)
+	GenerateDynamicPix(ctx context.Context, tenantID, saleID uuid.UUID, amount money.Cents, description string) (*PixQRCodeResponse, error)
 	CheckPixStatus(ctx context.Context, tenantID uuid.UUID, txID string) (PaymentStatus, error)
 }
 

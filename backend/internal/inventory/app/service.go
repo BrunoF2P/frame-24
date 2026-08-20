@@ -3,14 +3,16 @@ package app
 import (
 	"context"
 	"fmt"
+	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"frame-24/internal/inventory/domain"
 	"frame-24/internal/inventory/repo"
 	"frame-24/internal/platform/db"
+	"frame-24/internal/platform/money"
 	"frame-24/internal/platform/outbox"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Service struct {
@@ -60,7 +62,7 @@ func (s *Service) GetStockLevels(ctx context.Context, tenantID, warehouseID uuid
 func (s *Service) RecordPurchase(
 	ctx context.Context,
 	tenantID, warehouseID, productID, unitID uuid.UUID,
-	quantity, unitCost float64,
+	quantity float64, unitCost money.Subcent,
 	invoiceID, operatorID *uuid.UUID,
 	notes *string,
 ) (*domain.StockLevel, error) {
@@ -109,7 +111,7 @@ func (s *Service) RecordDiscard(
 	m, err := domain.NewMovement(
 		tenantID, warehouseID, productID, unitID,
 		string(domain.MovementTypeDiscardOut),
-		quantity, 0,
+		quantity, money.Subcent(0),
 		&refType, nil, operatorID, &reason,
 	)
 	if err != nil {
@@ -155,7 +157,7 @@ func (s *Service) AuditAdjustment(
 	m, err := domain.NewMovement(
 		tenantID, warehouseID, productID, unitID,
 		string(domain.MovementTypeAuditAdjustment),
-		countedQuantity, 0,
+		countedQuantity, money.Subcent(0),
 		&refType, nil, operatorID, notes,
 	)
 	if err != nil {
@@ -213,6 +215,6 @@ func (s *Service) DeductSaleItem(
 	})
 }
 
-func (s *Service) ListMovements(ctx context.Context, tenantID, warehouseID uuid.UUID, limit int) ([]domain.Movement, error) {
-	return s.repo.ListMovements(ctx, tenantID, warehouseID, limit)
+func (s *Service) ListMovements(ctx context.Context, tenantID, warehouseID uuid.UUID, limit int, beforeTS *time.Time, beforeID *uuid.UUID) ([]domain.Movement, error) {
+	return s.repo.ListMovements(ctx, tenantID, warehouseID, limit, beforeTS, beforeID)
 }

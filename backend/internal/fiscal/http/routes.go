@@ -1,8 +1,8 @@
 package http
 
 import (
-	"github.com/go-chi/chi/v5"
 	"frame-24/internal/platform/auth"
+	"github.com/go-chi/chi/v5"
 )
 
 func RegisterRoutes(r chi.Router, h *Handler, tm *auth.TokenManager) {

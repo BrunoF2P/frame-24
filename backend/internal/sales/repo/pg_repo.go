@@ -5,12 +5,13 @@ import (
 	"errors"
 	"fmt"
 
+	"frame-24/internal/platform/db"
+	"frame-24/internal/platform/money"
+	"frame-24/internal/sales/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"frame-24/internal/platform/db"
-	"frame-24/internal/sales/domain"
 )
 
 type PostgresRepository struct {
@@ -38,7 +39,7 @@ func (r *PostgresRepository) CreateSale(
 	`
 	_, err := tx.Exec(ctx, querySale,
 		sale.ID, sale.TenantID, sale.ComplexID, sale.POSTerminalID, sale.OperatorID, sale.CustomerID,
-		sale.Status, sale.SubtotalTickets, sale.SubtotalConcession, sale.DiscountAmount, sale.TotalAmount,
+		sale.Status, int64(sale.SubtotalTickets), int64(sale.SubtotalConcession), int64(sale.DiscountAmount), int64(sale.TotalAmount),
 		sale.Notes, sale.CreatedAt, sale.UpdatedAt,
 	)
 	if err != nil {
@@ -56,7 +57,7 @@ func (r *PostgresRepository) CreateSale(
 		for _, item := range items {
 			batch.Queue(queryItem,
 				item.ID, item.TenantID, sale.ID, item.ItemType, item.ProductID, item.ComboID,
-				item.UnitID, item.Quantity, item.UnitPrice, item.TotalPrice, item.CreatedAt,
+				item.UnitID, item.Quantity, int64(item.UnitPrice), int64(item.TotalPrice), item.CreatedAt,
 			)
 		}
 		br := tx.SendBatch(ctx, batch)
@@ -80,7 +81,7 @@ func (r *PostgresRepository) CreateSale(
 		for _, ticket := range tickets {
 			batch.Queue(queryTicket,
 				ticket.ID, ticket.TenantID, sale.ID, ticket.ShowtimeID, ticket.SeatID,
-				ticket.TicketType, ticket.Price, ticket.DocumentNumber, ticket.QRCodeHash,
+				ticket.TicketType, int64(ticket.Price), ticket.DocumentNumber, ticket.QRCodeHash,
 				ticket.Status, ticket.CreatedAt, ticket.UpdatedAt,
 			)
 		}
@@ -109,7 +110,7 @@ func (r *PostgresRepository) CreateSale(
 		for _, payment := range payments {
 			batch.Queue(queryPayment,
 				payment.ID, payment.TenantID, sale.ID, payment.PaymentMethod,
-				payment.Amount, payment.Status, payment.ExternalReference, payment.CreatedAt,
+				int64(payment.Amount), payment.Status, payment.ExternalReference, payment.CreatedAt,
 			)
 		}
 		br := tx.SendBatch(ctx, batch)
@@ -140,14 +141,19 @@ func (r *PostgresRepository) GetSaleByID(ctx context.Context, tenantID, saleID u
 		} else {
 			exec = r.pool.QueryRow(ctx, querySale, saleID)
 		}
+		var subtotalTickets, subtotalConcession, discountAmount, totalAmount int64
 		err := exec.Scan(
 			&s.ID, &s.TenantID, &s.ComplexID, &s.POSTerminalID, &s.OperatorID, &s.CustomerID,
-			&s.Status, &s.SubtotalTickets, &s.SubtotalConcession, &s.DiscountAmount, &s.TotalAmount,
+			&s.Status, &subtotalTickets, &subtotalConcession, &discountAmount, &totalAmount,
 			&s.Notes, &s.CreatedAt, &s.UpdatedAt,
 		)
 		if err != nil {
 			return err
 		}
+		s.SubtotalTickets = money.Cents(subtotalTickets)
+		s.SubtotalConcession = money.Cents(subtotalConcession)
+		s.DiscountAmount = money.Cents(discountAmount)
+		s.TotalAmount = money.Cents(totalAmount)
 
 		// Carregar itens
 		queryItems := `
@@ -167,9 +173,12 @@ func (r *PostgresRepository) GetSaleByID(ctx context.Context, tenantID, saleID u
 		defer itemRows.Close()
 		for itemRows.Next() {
 			var it domain.SaleItem
-			if err := itemRows.Scan(&it.ID, &it.TenantID, &it.SaleID, &it.ItemType, &it.ProductID, &it.ComboID, &it.UnitID, &it.Quantity, &it.UnitPrice, &it.TotalPrice, &it.CreatedAt); err != nil {
+			var unitPrice, totalPrice int64
+			if err := itemRows.Scan(&it.ID, &it.TenantID, &it.SaleID, &it.ItemType, &it.ProductID, &it.ComboID, &it.UnitID, &it.Quantity, &unitPrice, &totalPrice, &it.CreatedAt); err != nil {
 				return err
 			}
+			it.UnitPrice = money.Cents(unitPrice)
+			it.TotalPrice = money.Cents(totalPrice)
 			s.Items = append(s.Items, it)
 		}
 
@@ -191,9 +200,11 @@ func (r *PostgresRepository) GetSaleByID(ctx context.Context, tenantID, saleID u
 		defer ticketRows.Close()
 		for ticketRows.Next() {
 			var tk domain.Ticket
-			if err := ticketRows.Scan(&tk.ID, &tk.TenantID, &tk.SaleID, &tk.ShowtimeID, &tk.SeatID, &tk.TicketType, &tk.Price, &tk.DocumentNumber, &tk.QRCodeHash, &tk.Status, &tk.UsedAt, &tk.CreatedAt, &tk.UpdatedAt); err != nil {
+			var price int64
+			if err := ticketRows.Scan(&tk.ID, &tk.TenantID, &tk.SaleID, &tk.ShowtimeID, &tk.SeatID, &tk.TicketType, &price, &tk.DocumentNumber, &tk.QRCodeHash, &tk.Status, &tk.UsedAt, &tk.CreatedAt, &tk.UpdatedAt); err != nil {
 				return err
 			}
+			tk.Price = money.Cents(price)
 			s.Tickets = append(s.Tickets, tk)
 		}
 
@@ -215,9 +226,11 @@ func (r *PostgresRepository) GetSaleByID(ctx context.Context, tenantID, saleID u
 		defer paymentRows.Close()
 		for paymentRows.Next() {
 			var pm domain.Payment
-			if err := paymentRows.Scan(&pm.ID, &pm.TenantID, &pm.SaleID, &pm.PaymentMethod, &pm.Amount, &pm.Status, &pm.ExternalReference, &pm.CreatedAt); err != nil {
+			var amount int64
+			if err := paymentRows.Scan(&pm.ID, &pm.TenantID, &pm.SaleID, &pm.PaymentMethod, &amount, &pm.Status, &pm.ExternalReference, &pm.CreatedAt); err != nil {
 				return err
 			}
+			pm.Amount = money.Cents(amount)
 			s.Payments = append(s.Payments, pm)
 		}
 
@@ -297,7 +310,7 @@ func (r *PostgresRepository) CountSoldTicketsByShowtime(ctx context.Context, ten
 	return totalSold, halfSold, nil
 }
 
-func (r *PostgresRepository) LockShowtimeAndCountHalfTickets(ctx context.Context, tx pgx.Tx, tenantID, showtimeID uuid.UUID) (int, float64, int, error) {
+func (r *PostgresRepository) LockShowtimeAndCountHalfTickets(ctx context.Context, tx pgx.Tx, tenantID, showtimeID uuid.UUID) (int, money.Cents, int, error) {
 	// 1. Lock exclusivo FOR UPDATE na sessão para serializar compras concorrentes
 	queryLock := `
 		SELECT r.capacity, s.base_ticket_price
@@ -307,7 +320,7 @@ func (r *PostgresRepository) LockShowtimeAndCountHalfTickets(ctx context.Context
 		FOR UPDATE OF s
 	`
 	var capacity int
-	var baseTicketPrice float64
+	var baseTicketPrice int64
 	err := tx.QueryRow(ctx, queryLock, showtimeID).Scan(&capacity, &baseTicketPrice)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -329,7 +342,7 @@ func (r *PostgresRepository) LockShowtimeAndCountHalfTickets(ctx context.Context
 		return 0, 0, 0, fmt.Errorf("falha ao apurar meias vendidas na transacao: %w", err)
 	}
 
-	return capacity, baseTicketPrice, currentHalfSold, nil
+	return capacity, money.Cents(baseTicketPrice), currentHalfSold, nil
 }
 
 func (r *PostgresRepository) GetTicketByHash(ctx context.Context, tenantID uuid.UUID, qrCodeHash string) (*domain.Ticket, error) {
@@ -346,7 +359,12 @@ func (r *PostgresRepository) GetTicketByHash(ctx context.Context, tenantID uuid.
 		} else {
 			exec = r.pool.QueryRow(ctx, query, qrCodeHash)
 		}
-		return exec.Scan(&tk.ID, &tk.TenantID, &tk.SaleID, &tk.ShowtimeID, &tk.SeatID, &tk.TicketType, &tk.Price, &tk.DocumentNumber, &tk.QRCodeHash, &tk.Status, &tk.UsedAt, &tk.CreatedAt, &tk.UpdatedAt)
+		var price int64
+		if err := exec.Scan(&tk.ID, &tk.TenantID, &tk.SaleID, &tk.ShowtimeID, &tk.SeatID, &tk.TicketType, &price, &tk.DocumentNumber, &tk.QRCodeHash, &tk.Status, &tk.UsedAt, &tk.CreatedAt, &tk.UpdatedAt); err != nil {
+			return err
+		}
+		tk.Price = money.Cents(price)
+		return nil
 	})
 
 	if err != nil {

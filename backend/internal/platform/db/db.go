@@ -5,19 +5,19 @@ import (
 	"fmt"
 	"time"
 
+	"frame-24/internal/platform/auth"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"frame-24/internal/platform/auth"
 )
 
 // Config contém as opções de configuração do pool PostgreSQL
 type Config struct {
-	URL          string
-	MaxConns     int32
-	MinConns     int32
-	MaxConnIdle  time.Duration
-	MaxConnLife  time.Duration
+	URL         string
+	MaxConns    int32
+	MinConns    int32
+	MaxConnIdle time.Duration
+	MaxConnLife time.Duration
 }
 
 // DefaultConfig retorna uma configuração padrão balanceada

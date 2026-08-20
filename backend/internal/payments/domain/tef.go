@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 )
 
@@ -34,7 +35,7 @@ type TefTransaction struct {
 	CardBrand         string             `json:"cardBrand"` // Visa, Mastercard, Elo, etc.
 	TransactionType   TefTransactionType `json:"transactionType"`
 	Installments      int                `json:"installments"`
-	Amount            float64            `json:"amount"`
+	Amount            money.Cents        `json:"amount"`
 	Status            TefStatus          `json:"status"`
 	TerminalMAC       *string            `json:"terminalMac,omitempty"`
 	ReceiptMerchant   *string            `json:"receiptMerchant,omitempty"`
@@ -49,7 +50,7 @@ func NewTefTransaction(
 	posTerminalID, nsu, authCode, cardBrand string,
 	txType TefTransactionType,
 	installments int,
-	amount float64,
+	amount money.Cents,
 	receiptMerchant, receiptCustomer *string,
 ) (*TefTransaction, error) {
 	if amount <= 0 {

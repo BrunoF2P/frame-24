@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 )
 
@@ -56,14 +57,14 @@ func (r CreateUnitRequest) Validate() (*uuid.UUID, error) {
 }
 
 type CreateProductRequest struct {
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	Category    string  `json:"category,omitempty"` // popcorn | beverage | candy | combo | merch | service
-	BaseUnitID  string  `json:"baseUnitId"`
-	NCM         *string `json:"ncm,omitempty"`
-	CEST        *string `json:"cest,omitempty"`
-	CostPrice   float64 `json:"costPrice"`
-	SalePrice   float64 `json:"salePrice"`
+	Name        string        `json:"name"`
+	Description *string       `json:"description,omitempty"`
+	Category    string        `json:"category,omitempty"` // popcorn | beverage | candy | combo | merch | service
+	BaseUnitID  string        `json:"baseUnitId"`
+	NCM         *string       `json:"ncm,omitempty"`
+	CEST        *string       `json:"cest,omitempty"`
+	CostPrice   money.Subcent `json:"costPrice"`
+	SalePrice   money.Cents   `json:"salePrice"`
 }
 
 func (r CreateProductRequest) Validate() (uuid.UUID, error) {
@@ -102,7 +103,7 @@ func (r AddBarcodeRequest) Validate() (pID, uID uuid.UUID, err error) {
 type CreateComboRequest struct {
 	Name       string            `json:"name"`
 	BaseUnitID string            `json:"baseUnitId"`
-	ComboPrice float64           `json:"comboPrice"`
+	ComboPrice money.Cents       `json:"comboPrice"`
 	Items      []ComboItemDetail `json:"items"`
 }
 
@@ -121,9 +122,9 @@ func (r CreateComboRequest) Validate() (uuid.UUID, error) {
 }
 
 type ComboItemDetail struct {
-	GroupName       string  `json:"groupName"`
-	ProductID       string  `json:"productId"`
-	UnitID          string  `json:"unitId"`
-	Quantity        float64 `json:"quantity"`
-	AdditionalPrice float64 `json:"additionalPrice"`
+	GroupName       string      `json:"groupName"`
+	ProductID       string      `json:"productId"`
+	UnitID          string      `json:"unitId"`
+	Quantity        float64     `json:"quantity"`
+	AdditionalPrice money.Cents `json:"additionalPrice"`
 }

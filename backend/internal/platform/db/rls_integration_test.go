@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"frame-24/internal/platform/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,7 +18,6 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"frame-24/internal/platform/db"
 )
 
 // migrationsDir retorna o caminho absoluto da pasta migrations/

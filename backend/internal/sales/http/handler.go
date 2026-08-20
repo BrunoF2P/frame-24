@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"frame-24/internal/platform/auth"
 	"frame-24/internal/platform/httputil"
 	"frame-24/internal/sales/app"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 type Handler struct {

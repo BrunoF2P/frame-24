@@ -1,6 +1,9 @@
 package http
 
-import "github.com/google/uuid"
+import (
+	"frame-24/internal/platform/money"
+	"github.com/google/uuid"
+)
 
 type CreateAccountRequest struct {
 	Code        string `json:"code"`
@@ -9,9 +12,9 @@ type CreateAccountRequest struct {
 }
 
 type LedgerEntryDTO struct {
-	AccountCode string  `json:"accountCode"`
-	EntryType   string  `json:"entryType"` // debit | credit
-	Amount      float64 `json:"amount"`
+	AccountCode string      `json:"accountCode"`
+	EntryType   string      `json:"entryType"` // debit | credit
+	Amount      money.Cents `json:"amount"`
 }
 
 type PostTransactionRequest struct {
@@ -22,20 +25,20 @@ type PostTransactionRequest struct {
 }
 
 type OpenCashSessionRequest struct {
-	ComplexID     uuid.UUID `json:"complexId"`
-	POSTerminalID string    `json:"posTerminalId"`
-	OpeningFloat  float64   `json:"openingFloat"`
+	ComplexID     uuid.UUID   `json:"complexId"`
+	POSTerminalID string      `json:"posTerminalId"`
+	OpeningFloat  money.Cents `json:"openingFloat"`
 }
 
 type CashMovementRequest struct {
-	Amount         float64    `json:"amount"`
-	Reason         string     `json:"reason"`
-	AuthorizedByID *uuid.UUID `json:"authorizedById,omitempty"`
+	Amount         money.Cents `json:"amount"`
+	Reason         string      `json:"reason"`
+	AuthorizedByID *uuid.UUID  `json:"authorizedById,omitempty"`
 }
 
 type CloseBlindRequest struct {
-	CashCounted float64 `json:"cashCounted"`
-	CardCounted float64 `json:"cardCounted"`
-	PixCounted  float64 `json:"pixCounted"`
-	Notes       *string `json:"notes,omitempty"`
+	CashCounted money.Cents `json:"cashCounted"`
+	CardCounted money.Cents `json:"cardCounted"`
+	PixCounted  money.Cents `json:"pixCounted"`
+	Notes       *string     `json:"notes,omitempty"`
 }

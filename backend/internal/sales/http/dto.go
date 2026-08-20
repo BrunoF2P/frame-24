@@ -4,13 +4,14 @@ import (
 	"errors"
 	"strings"
 
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 )
 
 type LockSeatsRequest struct {
 	ShowtimeID string   `json:"showtimeId"`
 	SeatIDs    []string `json:"seatIds"`
-	SessionID  string   `json:"sessionId"` // Identificador da sessão do cliente no checkout
+	SessionID  string   `json:"sessionId"`  // Identificador da sessão do cliente no checkout
 	TTLSeconds int      `json:"ttlSeconds"` // Opcional (default 300)
 }
 
@@ -100,26 +101,26 @@ func (r ReleaseSeatsRequest) Validate() (uuid.UUID, []uuid.UUID, error) {
 }
 
 type TicketItemRequest struct {
-	ShowtimeID     string  `json:"showtimeId"`
-	SeatID         string  `json:"seatId"`
-	TicketType     string  `json:"ticketType"`
-	Price          float64 `json:"price"`
-	DocumentNumber *string `json:"documentNumber,omitempty"`
+	ShowtimeID     string      `json:"showtimeId"`
+	SeatID         string      `json:"seatId"`
+	TicketType     string      `json:"ticketType"`
+	Price          money.Cents `json:"price"`
+	DocumentNumber *string     `json:"documentNumber,omitempty"`
 }
 
 type ConcessionItemRequest struct {
-	ItemType  string  `json:"itemType"` // product | combo
-	ProductID *string `json:"productId,omitempty"`
-	ComboID   *string `json:"comboId,omitempty"`
-	UnitID    string  `json:"unitId"`
-	Quantity  float64 `json:"quantity"`
-	UnitPrice float64 `json:"unitPrice"`
+	ItemType  string      `json:"itemType"` // product | combo
+	ProductID *string     `json:"productId,omitempty"`
+	ComboID   *string     `json:"comboId,omitempty"`
+	UnitID    string      `json:"unitId"`
+	Quantity  float64     `json:"quantity"`
+	UnitPrice money.Cents `json:"unitPrice"`
 }
 
 type PaymentItemRequest struct {
-	PaymentMethod     string  `json:"paymentMethod"`
-	Amount            float64 `json:"amount"`
-	ExternalReference *string `json:"externalReference,omitempty"`
+	PaymentMethod     string      `json:"paymentMethod"`
+	Amount            money.Cents `json:"amount"`
+	ExternalReference *string     `json:"externalReference,omitempty"`
 }
 
 type CheckoutSaleRequest struct {
@@ -130,7 +131,7 @@ type CheckoutSaleRequest struct {
 	Tickets         []TicketItemRequest     `json:"tickets"`
 	ConcessionItems []ConcessionItemRequest `json:"concessionItems"`
 	Payments        []PaymentItemRequest    `json:"payments"`
-	DiscountAmount  float64                 `json:"discountAmount"`
+	DiscountAmount  money.Cents             `json:"discountAmount"`
 	Notes           *string                 `json:"notes,omitempty"`
 }
 

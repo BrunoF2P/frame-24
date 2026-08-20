@@ -5,27 +5,28 @@ import (
 	"strings"
 	"time"
 
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 )
 
 type Product struct {
-	ID          uuid.UUID `json:"id"`
-	TenantID    uuid.UUID `json:"tenantId"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description,omitempty"`
-	Category    string    `json:"category"` // popcorn | beverage | candy | combo | merch | service
-	BaseUnitID  uuid.UUID `json:"baseUnitId"`
-	NCM         *string   `json:"ncm,omitempty"`
-	CEST        *string   `json:"cest,omitempty"`
-	CostPrice   float64   `json:"costPrice"`
-	SalePrice   float64   `json:"salePrice"`
-	IsActive    bool      `json:"isActive"`
-	IsCombo     bool      `json:"isCombo"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID          uuid.UUID     `json:"id"`
+	TenantID    uuid.UUID     `json:"tenantId"`
+	Name        string        `json:"name"`
+	Description *string       `json:"description,omitempty"`
+	Category    string        `json:"category"` // popcorn | beverage | candy | combo | merch | service
+	BaseUnitID  uuid.UUID     `json:"baseUnitId"`
+	NCM         *string       `json:"ncm,omitempty"`
+	CEST        *string       `json:"cest,omitempty"`
+	CostPrice   money.Subcent `json:"costPrice"`
+	SalePrice   money.Cents   `json:"salePrice"`
+	IsActive    bool          `json:"isActive"`
+	IsCombo     bool          `json:"isCombo"`
+	CreatedAt   time.Time     `json:"createdAt"`
+	UpdatedAt   time.Time     `json:"updatedAt"`
 }
 
-func NewProduct(tenantID uuid.UUID, name, category string, baseUnitID uuid.UUID, ncm, cest *string, costPrice, salePrice float64) (*Product, error) {
+func NewProduct(tenantID uuid.UUID, name, category string, baseUnitID uuid.UUID, ncm, cest *string, costPrice money.Subcent, salePrice money.Cents) (*Product, error) {
 	cleanName := strings.TrimSpace(name)
 	if cleanName == "" {
 		return nil, fmt.Errorf("nome do produto obrigatorio")
@@ -49,19 +50,19 @@ func NewProduct(tenantID uuid.UUID, name, category string, baseUnitID uuid.UUID,
 
 	now := time.Now()
 	return &Product{
-		ID:          uuid.New(),
-		TenantID:    tenantID,
-		Name:        cleanName,
-		Category:    category,
-		BaseUnitID:  baseUnitID,
-		NCM:         ncm,
-		CEST:        cest,
-		CostPrice:   costPrice,
-		SalePrice:   salePrice,
-		IsActive:    true,
-		IsCombo:     false,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:         uuid.New(),
+		TenantID:   tenantID,
+		Name:       cleanName,
+		Category:   category,
+		BaseUnitID: baseUnitID,
+		NCM:        ncm,
+		CEST:       cest,
+		CostPrice:  costPrice,
+		SalePrice:  salePrice,
+		IsActive:   true,
+		IsCombo:    false,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}, nil
 }
 

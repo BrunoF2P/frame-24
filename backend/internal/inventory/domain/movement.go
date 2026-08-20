@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 )
 
@@ -74,26 +75,26 @@ type StockLevel struct {
 
 // Movement representa um lançamento físico imutável no livro de movimentações
 type Movement struct {
-	ID            uuid.UUID    `json:"id"`
-	TenantID      uuid.UUID    `json:"tenantId"`
-	WarehouseID   uuid.UUID    `json:"warehouseId"`
-	ProductID     uuid.UUID    `json:"productId"`
-	UnitID        uuid.UUID    `json:"unitId"`
-	MovementType  MovementType `json:"movementType"`
-	Quantity      float64      `json:"quantity"`
-	UnitCost      float64      `json:"unitCost"`
-	TotalCost     float64      `json:"totalCost"`
-	ReferenceType *string      `json:"referenceType,omitempty"`
-	ReferenceID   *uuid.UUID   `json:"referenceId,omitempty"`
-	OperatorID    *uuid.UUID   `json:"operatorId,omitempty"`
-	Notes         *string      `json:"notes,omitempty"`
-	CreatedAt     time.Time    `json:"createdAt"`
+	ID            uuid.UUID     `json:"id"`
+	TenantID      uuid.UUID     `json:"tenantId"`
+	WarehouseID   uuid.UUID     `json:"warehouseId"`
+	ProductID     uuid.UUID     `json:"productId"`
+	UnitID        uuid.UUID     `json:"unitId"`
+	MovementType  MovementType  `json:"movementType"`
+	Quantity      float64       `json:"quantity"`
+	UnitCost      money.Subcent `json:"unitCost"`
+	TotalCost     money.Cents   `json:"totalCost"`
+	ReferenceType *string       `json:"referenceType,omitempty"`
+	ReferenceID   *uuid.UUID    `json:"referenceId,omitempty"`
+	OperatorID    *uuid.UUID    `json:"operatorId,omitempty"`
+	Notes         *string       `json:"notes,omitempty"`
+	CreatedAt     time.Time     `json:"createdAt"`
 }
 
 func NewMovement(
 	tenantID, warehouseID, productID, unitID uuid.UUID,
 	mType string,
-	quantity, unitCost float64,
+	quantity float64, unitCost money.Subcent,
 	refType *string,
 	refID, operatorID *uuid.UUID,
 	notes *string,
@@ -112,7 +113,7 @@ func NewMovement(
 		}
 	}
 
-	totalCost := quantity * unitCost
+	totalCost := unitCost.MulQuantityToCents(quantity)
 	if totalCost < 0 {
 		totalCost = 0
 	}

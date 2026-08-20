@@ -8,18 +8,19 @@ import (
 	"strings"
 	"time"
 
+	"frame-24/internal/platform/money"
 	"github.com/google/uuid"
 )
 
 type TicketType string
 
 const (
-	TicketTypeInteira           TicketType = "inteira"
-	TicketTypeMeiaEstudante     TicketType = "meia_estudante"
-	TicketTypeMeiaIdoso         TicketType = "meia_idoso"
-	TicketTypeMeiaPCD           TicketType = "meia_pcd"
+	TicketTypeInteira             TicketType = "inteira"
+	TicketTypeMeiaEstudante       TicketType = "meia_estudante"
+	TicketTypeMeiaIdoso           TicketType = "meia_idoso"
+	TicketTypeMeiaPCD             TicketType = "meia_pcd"
 	TicketTypeMeiaJovemBaixaRenda TicketType = "meia_jovem_baixa_renda"
-	TicketTypeCortesia          TicketType = "cortesia"
+	TicketTypeCortesia            TicketType = "cortesia"
 )
 
 func IsValidTicketType(t string) bool {
@@ -50,22 +51,22 @@ func CalculateHalfPriceQuota(roomCapacity int) int {
 }
 
 type Ticket struct {
-	ID             uuid.UUID  `json:"id"`
-	TenantID       uuid.UUID  `json:"tenantId"`
-	SaleID         uuid.UUID  `json:"saleId"`
-	ShowtimeID     uuid.UUID  `json:"showtimeId"`
-	SeatID         uuid.UUID  `json:"seatId"`
-	TicketType     string     `json:"ticketType"`
-	Price          float64    `json:"price"`
-	DocumentNumber *string    `json:"documentNumber,omitempty"`
-	QRCodeHash     string     `json:"qrCodeHash"`
-	Status         string     `json:"status"` // active | used | canceled
-	UsedAt         *time.Time `json:"usedAt,omitempty"`
-	CreatedAt      time.Time  `json:"createdAt"`
-	UpdatedAt      time.Time  `json:"updatedAt"`
+	ID             uuid.UUID   `json:"id"`
+	TenantID       uuid.UUID   `json:"tenantId"`
+	SaleID         uuid.UUID   `json:"saleId"`
+	ShowtimeID     uuid.UUID   `json:"showtimeId"`
+	SeatID         uuid.UUID   `json:"seatId"`
+	TicketType     string      `json:"ticketType"`
+	Price          money.Cents `json:"price"`
+	DocumentNumber *string     `json:"documentNumber,omitempty"`
+	QRCodeHash     string      `json:"qrCodeHash"`
+	Status         string      `json:"status"` // active | used | canceled
+	UsedAt         *time.Time  `json:"usedAt,omitempty"`
+	CreatedAt      time.Time   `json:"createdAt"`
+	UpdatedAt      time.Time   `json:"updatedAt"`
 }
 
-func NewTicket(tenantID, saleID, showtimeID, seatID uuid.UUID, ticketType string, price float64, docNumber *string) (*Ticket, error) {
+func NewTicket(tenantID, saleID, showtimeID, seatID uuid.UUID, ticketType string, price money.Cents, docNumber *string) (*Ticket, error) {
 	cleanType := strings.ToLower(strings.TrimSpace(ticketType))
 	if !IsValidTicketType(cleanType) {
 		return nil, ErrInvalidTicketType
